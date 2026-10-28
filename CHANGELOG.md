@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- PLATOON mode: you and three wingmen in your colour against two other platoons of four. Pick
+  SOLO or PLATOON on the start screen (remembered). No friendly fire; wingmen hold a slot behind
+  you, cover you (they go for whoever hit you) and parachute in next to you; enemy platoons
+  follow their lead tank. HUD shows TEAM kills and the leading platoon; the result ranks the
+  platoons. Option `platoons: true`, drop-in `data-platoons="true"`.
+
 ## 0.2.0
 
 Blitz steps it up:

@@ -18,6 +18,13 @@ sprites. No runtime dependencies; everything first-party is snapshotted with pro
 
 ## The game
 
+**Two modes** (pick on the start screen; it remembers). **SOLO:** eight tanks, every tank for
+itself. **PLATOON:** you and three wingmen in your colour against two other platoons of four
+(three a side on a dropped-in page). No friendly fire. Your wingmen hold a slot behind you, go
+after whoever is shooting at you, and parachute back in next to you; the other platoons stick
+with their lead tank. The platoon with the most kills wins.
+
+
 **Two guns.** The cannon fires fast but overheats if you hold it (watch the ring on FIRE). The
 LONG gun locks on (laser sight), then a guided round crosses the whole field, punches through
 cover and wrecks in one hit. You start with 3 long shots; find and earn more.
@@ -58,6 +65,8 @@ The board follows the page's light or dark theme (`<html data-theme>`).
 <script src=".../blitz.js" defer></script>
 <!-- Hidden: Konami code on desktop, hold-then-tap a [data-blitz-trigger] element on phones -->
 <script src=".../blitz.js" data-easter-egg="true" defer></script>
+<!-- Platoon battle on your page -->
+<script src=".../blitz.js" data-platoons="true" defer></script>
 <!-- Your brand colours (hex only) -->
 <script src=".../blitz.js" data-palette='{"cmd":"#8573ee"}' defer></script>
 ```
@@ -70,7 +79,7 @@ Mark anything with `data-blitz-ignore` to keep it out of the arena.
 import { createBlitz, install } from "./blitz.mjs";
 const game = createBlitz(document.querySelector("#arena"), { mode: "board", seconds: 180 });
 game.start();             // intro → countdown → match
-// { demo: true } runs bots only with no HUD (a landing-page hero)
+// { platoons: true } starts in platoon mode; { demo: true } runs bots only with no HUD
 ```
 
 ## Develop

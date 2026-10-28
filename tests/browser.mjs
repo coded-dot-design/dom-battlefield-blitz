@@ -95,6 +95,28 @@ try {
   assert.ok(d.fighting >= 5, "bots fight on their own");
   await page.evaluate(() => demo.destroy());
 
+  where = "platoons";
+  await page.evaluate(async () => {
+    const { createBlitz } = await import("/blitz.mjs");
+    window.pl = createBlitz(document.getElementById("board"), { mode: "board", seconds: 6, platoons: true });
+  });
+  assert.deepEqual(await page.evaluate(() => [pl.platoons, pl.world.tanks.length, pl.world.tanks.map((t) => t.team).join("")]), [true, 12, "000011112222"]);
+  // The start screen switches modes (and back).
+  const pick = async (m) => { const [x, y] = await page.evaluate((m) => { const r = document.getElementById("board").shadowRoot.querySelector(`[data-mode=${m}]`).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, m); await page.mouse.click(x, y); };
+  await pick("solo");
+  assert.equal(await page.evaluate(() => pl.platoons), false);
+  await pick("platoon");
+  assert.equal(await page.evaluate(() => pl.world.tanks.length), 12);
+  await page.evaluate(() => pl.start());
+  await page.waitForFunction(() => pl.world.tanks.filter((t) => t.alive && t.drop >= 1).length >= 9, null, { timeout: 15000 });
+  // No friendly fire: a shell from a wingman passes through you.
+  const shot = await page.evaluate(() => { const [you, wing] = pl.world.tanks; const s = pl.world.shells.find((q) => !q.on); Object.assign(s, { on: true, rail: false, tgt: -1, owner: wing.i, x: you.x - 30, y: you.y, vx: 600, vy: 0, life: 1 }); return [pl.world.shells.indexOf(s), you.x]; });
+  await page.waitForTimeout(120);
+  assert.ok(await page.evaluate(([i, x]) => { const s = pl.world.shells[i]; return s.on && s.owner === 1 && s.x > x; }, shot), "a wingman's shell passes through you");
+  await page.waitForFunction(() => pl.state === "end", null, { timeout: 15000 });
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-over]").textContent), /PLATOON/);
+  await page.evaluate(() => (pl.destroy(), localStorage.removeItem("blitz:mode")));
+
   where = "drop-in";
   const snap = () => page.evaluate(() => [...document.body.querySelectorAll("*")].filter((n) => !n.closest("[data-fizlet-host],[data-blitz-ignore]")).map((n) => n.tagName + [...n.attributes].map((a) => a.name + "=" + a.value).sort().join("|") + "#" + [...n.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join("")).join("\n"));
   const before = await snap();
@@ -114,7 +136,7 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme → result), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme → result), platoons (picker, teams, result), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

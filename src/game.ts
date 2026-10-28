@@ -29,12 +29,19 @@ export interface BlitzOptions {
   bots?: number;
   /** Attract mode: every tank is a bot, no HUD or keys, endless (a landing-page hero). */
   demo?: boolean;
+  /** Platoons: you and 3 wingmen in your colour against two other platoons (default: solo, or
+   *  the last mode picked on the start screen). */
+  platoons?: boolean;
   /** Called when a board match ends. */
-  onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean }[]) => void;
+  onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
 
 const TAU = Math.PI * 2;
 const MAXHP = 5, RAIL_MAX = 9, STRIKE_MAX = 5, RAIL_START = 3;
+// Platoon mode: one colour per platoon; your wingmen have names, the others are numbered.
+const TEAM_COLORS = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"];
+const PLATOON = ["YOUR", "VIPER", "NOVA", "BRICK"];
+const WING = ["ACE", "BOLT", "DUKE"];
 const NAMES = ["YOU", "VIPER", "NOVA", "BRICK", "ZAP", "HEX", "RUMBLE", "MOTH", "SPUD", "JINX", "ORBIT"];
 const COLORS = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a", "#b48cff", "#ff8a1f", "#a8ff3e", "#f6f3ff", "#ff2e88", "#7cf0ff", "#e8b4ff"];
 // Power tiles: what a lit square settles into.
@@ -49,7 +56,7 @@ const FX_COLORS = ["#fff4ff", "#ffc21a", "#ff8a1f", "#ff2e88", "#19f0ff", "#39ff
 const REWARD = ["", "", "+1 LONG SHOT", "+1 AIRSTRIKE", "", "CARPET BOMB READY", "", "", "NUKE INCOMING"];
 
 interface Tank {
-  i: number; name: string; color: string; you: boolean;
+  i: number; team: number; slot: number; name: string; color: string; you: boolean;
   x: number; y: number; a: number; ta: number;
   hp: number; alive: boolean; dead: number; drop: number; shield: number; rapid: number; triple: number;
   strikes: number; carpet: number; rail: number; charge: number; chargeT: number; heat: number; hot: number;
@@ -135,6 +142,11 @@ button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 @keyframes pop{from{scale:.4;opacity:0}}@keyframes call{0%{opacity:.9;scale:1}100%{opacity:0;scale:1.45 1.6;translate:0 11px}}
 .burst{position:absolute;pointer-events:none;z-index:5}.burst .start{position:absolute;inset:0;width:100%;height:100%;animation:none;box-shadow:none;filter:invert(1) hue-rotate(180deg)}.burst .start::after{content:none}
 .burst i{position:absolute;border-radius:50%}.burst .bit{border-radius:0}
+.hud .tm{display:none}.platoon .hud .tm{display:block}.hud .tm b{color:#39ffb0}
+.modes{display:flex;gap:12px}.mode{display:grid;justify-items:center;gap:3px;min-width:132px;padding:10px 14px 9px;color:#f6f3ff;background:#110d22;border:2.5px solid #3b3170;border-radius:10px;box-shadow:0 5px 0 #3b3170;transition:transform .1s,box-shadow .1s}
+.mode b{font:900 14px/1 ui-monospace,monospace;letter-spacing:.12em}.mode small{font-size:9px;letter-spacing:.06em;color:#aea4d6}
+.mode[aria-checked=true]{color:#07060f;background:#39ffb0;border-color:#07060f;box-shadow:0 5px 0 #1d6a40}.mode[aria-checked=true] small{color:#07060f}.mode:active{transform:translateY(5px);box-shadow:0 0 0 #3b3170}
+.light .mode{color:#07060f;background:#f6f3ff;border-color:#07060f;box-shadow:0 5px 0 #07060f}.light .mode small{color:#3b3170}.light .mode[aria-checked=true]{background:#39ffb0}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
 @media (max-height:520px){.legend{display:none}}
 .light .over{background:#e4e6f7a6;backdrop-filter:grayscale(.4)}.light .over.intro{background:radial-gradient(closest-side,#e4e6f7cc,#e4e6f733 70%,transparent)}
@@ -162,7 +174,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const wrap = document.createElement("div");
   wrap.className = `bz ${mode}${demo ? " demo" : ""}`;
   wrap.innerHTML = `<canvas></canvas>
-<div class="hud"><div class="k"><small>KILLS</small><b data-k>0</b></div><div class="t"><small>${embed ? "RANK" : "TIME"}</small><b data-t>3:00</b></div><div class="hp"><small>ARMOR</small><i><u data-hp></u></i></div><div class="st"><small>STREAK</small><b data-st>0</b></div><div class="lead"><small>LEADER</small><b data-lead>—</b></div></div>
+<div class="hud"><div class="k"><small>KILLS</small><b data-k>0</b></div><div class="t"><small>${embed ? "RANK" : "TIME"}</small><b data-t>3:00</b></div><div class="hp"><small>ARMOR</small><i><u data-hp></u></i></div><div class="st"><small>STREAK</small><b data-st>0</b></div><div class="tm"><small>TEAM</small><b data-tm>0</b></div><div class="lead"><small>LEADER</small><b data-lead>—</b></div></div>
 <ol class="feed"><li></li><li></li><li></li><li></li></ol>
 <div class="banner" data-banner><b></b><span></span></div>
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
@@ -184,7 +196,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     auto: $<HTMLButtonElement>("[data-k=auto]"), lock: $<HTMLButtonElement>("[data-k=lock]"),
   };
   const hud = {
-    k: $<HTMLElement>("[data-k]"), t: $<HTMLElement>("[data-t]"), lead: $<HTMLElement>("[data-lead]"), st: $<HTMLElement>("[data-st]"), hp: $<HTMLElement>("[data-hp]"),
+    k: $<HTMLElement>("[data-k]"), tm: $<HTMLElement>("[data-tm]"), t: $<HTMLElement>("[data-t]"), lead: $<HTMLElement>("[data-lead]"), st: $<HTMLElement>("[data-st]"), hp: $<HTMLElement>("[data-hp]"),
     sn: $<HTMLElement>("[data-n=strike]"), ln: $<HTMLElement>("[data-n=long]"),
   };
   const feed = [...wrap.querySelectorAll<HTMLLIElement>(".feed li")];
@@ -207,15 +219,33 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // ---------- World ----------
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
   let clock = o.seconds ?? 180, state: "intro" | "count" | "play" | "end" | "paused" = embed || demo ? "play" : "intro", count = 0;
-  const N = 1 + (o.bots ?? (embed ? 5 : 7));
-  const tanks: Tank[] = Array.from({ length: N }, (_, i) => ({
-    i, name: demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!, color: COLORS[i % COLORS.length]!, you: i === 0,
-    x: 0, y: 0, a: 0, ta: 0, hp: MAXHP, alive: false, dead: 0.2 + i * 0.18, drop: 0, shield: 0, rapid: 0, triple: 0,
-    strikes: i === 0 ? 1 : 0, carpet: 0, rail: i === 0 ? RAIL_START : 1, charge: 0, chargeT: -1, heat: 0, hot: 0,
-    cool: 0, kills: 0, deaths: 0, recoil: 0, flash: 0, tread: 0, streak: 0, streakT: 0, run: 0, gx: 0, gy: 0, think: 0, target: -1, lastHit: -1,
-  }));
-  const you = tanks[0]!;
-  if (demo) you.you = false;
+  // Solo: every tank for itself. Platoons: teams of 4 (3 on a dropped-in page), three platoons.
+  let platoon = o.platoons ?? (() => {
+    try {
+      return localStorage.getItem("blitz:mode") === "platoon";
+    } catch {
+      return false;
+    }
+  })();
+  let N = 0, tanks: Tank[] = [], you: Tank = null!;
+  const per = embed ? 3 : 4;
+  function roster() {
+    N = platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : 7));
+    tanks = Array.from({ length: N }, (_, i) => {
+      const team = platoon ? (i / per) | 0 : i, slot = platoon ? i % per : 0;
+      return {
+        i, team, slot, you: i === 0 && !demo,
+        name: platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
+        color: platoon ? TEAM_COLORS[team]! : COLORS[i % COLORS.length]!,
+        x: 0, y: 0, a: 0, ta: 0, hp: MAXHP, alive: false, dead: platoon ? 0.2 + team * 0.45 + slot * 0.12 : 0.2 + i * 0.18, drop: 0, shield: 0, rapid: 0, triple: 0,
+        strikes: i === 0 ? 1 : 0, carpet: 0, rail: i === 0 ? RAIL_START : 1, charge: 0, chargeT: -1, heat: 0, hot: 0,
+        cool: 0, kills: 0, deaths: 0, recoil: 0, flash: 0, tread: 0, streak: 0, streakT: 0, run: 0, gx: 0, gy: 0, think: 0, target: -1, lastHit: -1,
+      };
+    });
+    you = tanks[0]!;
+    wrap.classList.toggle("platoon", platoon);
+  }
+  roster();
   const shells: Shell[] = Array.from({ length: 140 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, owner: 0, on: false, rail: false, tgt: -1 }));
   const tiles: Tile[] = Array.from({ length: 22 }, () => ({ c: 0, r: 0, type: 0, roll: 0, t: 0, on: false }));
   const marks: Mark[] = Array.from({ length: 8 }, () => ({ x: 0, y: 0, t: 0, max: 1, owner: 0, on: false }));
@@ -312,12 +342,23 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 
   // ---------- Spawning: everyone parachutes in ----------
   function spawn(t: Tank) {
-    let x = 0, y = 0;
+    let x = 0, y = 0, hx = 0, hy = 0;
+    if (platoon) {
+      // Platoons drop together: next to the platoon's lead tank, else at the platoon's corner.
+      let anchor: Tank | null = null;
+      for (const o2 of tanks) if (o2 !== t && o2.team === t.team && o2.alive && (!anchor || o2.slot < anchor.slot)) anchor = o2;
+      const a = Math.PI * 0.75 + (t.team * TAU) / 3;
+      hx = anchor ? anchor.x : W / 2 + Math.cos(a) * W * 0.32;
+      hy = anchor ? anchor.y : H / 2 + Math.sin(a) * H * 0.3;
+    }
     for (let k = 0; k < 24; k++) {
-      x = 40 + R() * (W - 80);
-      y = 70 + R() * (H - 130);
+      if (platoon) {
+        const a = R() * TAU, r = 55 + R() * 70;
+        x = Math.max(40, Math.min(W - 40, hx + Math.cos(a) * r));
+        y = Math.max(70, Math.min(H - 60, hy + Math.sin(a) * r));
+      } else (x = 40 + R() * (W - 80)), (y = 70 + R() * (H - 130));
       let ok = !blocked(x, y, 22 * scale);
-      for (const o2 of tanks) if (o2 !== t && o2.alive && Math.hypot(o2.x - x, o2.y - y) < 160) ok = false;
+      for (const o2 of tanks) if (o2 !== t && o2.alive && Math.hypot(o2.x - x, o2.y - y) < (o2.team === t.team ? 44 : 160)) ok = false;
       if (ok) break;
     }
     Object.assign(t, { x, y, a: R() * TAU, hp: MAXHP, alive: true, drop: 0, shield: 0, rapid: 0, triple: 0, cool: 0.6, recoil: 0, think: 0, target: -1, gx: x, gy: y, streak: 0, run: 0, heat: 0, hot: 0, charge: 0, chargeT: -1 });
@@ -395,7 +436,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     t.run = 0;
     t.charge = 0;
     if (t.you) targeting = false;
-    const k = by >= 0 && by !== t.i ? tanks[by]! : null;
+    const k = by >= 0 && tanks[by]!.team !== t.team ? tanks[by]! : null;
     if (k) {
       k.kills++;
       k.run++;
@@ -516,7 +557,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (b.main && R() < 0.6) fx.word(b.x, b.y - 30, W_STRIKE, 3, 22);
     const rad = (b.main ? 95 : 80) * (scale / 1.4);
     for (const t of tanks) {
-      if (t.i === b.owner) continue;
+      if (t.team === tanks[b.owner]!.team) continue;
       const d = Math.hypot(t.x - b.x, t.y - b.y);
       if (d < rad) damage(t, b.owner, d < rad * 0.6 ? MAXHP : 3, W_STRIKE);
     }
@@ -533,7 +574,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function nukeGoesOff() {
     whiteout = 1;
-    for (const t of tanks) if (t.i !== nukeBy && t.alive && t.drop >= 1) (t.shield = 0), kill(t, nukeBy, W_NUKE);
+    for (const t of tanks) if (t.team !== tanks[nukeBy]!.team && t.alive && t.drop >= 1) (t.shield = 0), kill(t, nukeBy, W_NUKE);
     for (const b of blocks) if (b.hp > 0) wreckBlock(b);
     for (let k = 0; k < 9; k++) later(40 + R() * (W - 80), 70 + R() * (H - 120), 2.4 + R() * 1.6, (k % 4) + 1, k * 0.08);
     knockAround(W / 2, H / 2, Math.max(W, H), 2.6);
@@ -619,17 +660,17 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const nearestEnemy = (t: Tank, range: number) => {
     let best = -1, bd = range;
     for (const o2 of tanks) {
-      if (o2 === t || !o2.alive || o2.drop < 1) continue;
+      if (o2.team === t.team || !o2.alive || o2.drop < 1) continue;
       const d = Math.hypot(o2.x - t.x, o2.y - t.y);
       if (d < bd) (bd = d), (best = o2.i);
     }
     return best;
   };
-  /** The enemy closest to a point (a tap, the mouse). */
-  const nearestTo = (x: number, y: number, range: number, skip: number) => {
+  /** The enemy (of `team`) closest to a point (a tap, the mouse, a tank to protect). */
+  const nearestTo = (x: number, y: number, range: number, team: number) => {
     let best = -1, bd = range;
     for (const o2 of tanks) {
-      if (o2.i === skip || !o2.alive || o2.drop < 1) continue;
+      if (o2.team === team || !o2.alive || o2.drop < 1) continue;
       const d = Math.hypot(o2.x - x, o2.y - y);
       if (d < bd) (bd = d), (best = o2.i);
     }
@@ -648,7 +689,45 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (!blocked(t.x, ny, rad)) t.y = ny;
     t.tread += sp * 0.15;
   }
+  /** A platoon's lead tank: you for yours, else its lowest-numbered tank on the ground. */
+  function leaderOf(t: Tank) {
+    let l: Tank | null = null;
+    for (const o2 of tanks) if (o2.team === t.team && o2.alive && o2.drop >= 1 && (!l || o2.slot < l.slot)) l = o2;
+    return l;
+  }
+  /** Wingmen: hold a slot behind the leader, cover them (shoot whoever hit them), keep up. */
+  function follow(t: Tank, lead: Tank, dt: number) {
+    t.think -= dt;
+    if (t.think <= 0) {
+      t.think = 0.35 + R() * 0.4;
+      const h = lead.lastHit;
+      t.target = live(h) && tanks[h]!.team !== t.team && Math.hypot(tanks[h]!.x - lead.x, tanks[h]!.y - lead.y) < 560 ? h : nearestTo(lead.x, lead.y, 420, t.team);
+      if (t.target < 0) t.target = nearestEnemy(t, 360);
+      if (t.target >= 0) {
+        const o2 = tanks[t.target]!, d = Math.hypot(o2.x - t.x, o2.y - t.y);
+        if (t.strikes > 0 && R() < 0.2) callStrike(t.i, o2.x, o2.y);
+        else if (t.rail > 0 && d > 380 && R() < 0.3) charge(t, o2.i);
+      }
+    }
+    // The slot: fanned out behind the leader.
+    const back = lead.a + Math.PI, off = t.slot === 1 ? 0.85 : t.slot === 2 ? -0.85 : 0, r = (t.slot === 3 ? 78 : 58) * scale;
+    let gx = lead.x + Math.cos(back + off) * r, gy = lead.y + Math.sin(back + off) * r;
+    const o2 = t.target >= 0 ? tanks[t.target]! : null;
+    if (o2 && Math.hypot(o2.x - lead.x, o2.y - lead.y) < 300) (gx += (o2.x - gx) * 0.25), (gy += (o2.y - gy) * 0.25); // step up between the leader and the threat
+    if (t.hp <= 2)
+      for (const s of tiles)
+        if (s.on && s.roll <= 0 && s.type === HEAL && Math.hypot((s.c + 0.5) * T - t.x, (s.r + 0.5) * T - t.y) < 220) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
+    gx = Math.max(30, Math.min(W - 30, gx));
+    gy = Math.max(60, Math.min(H - 30, gy));
+    const dx = gx - t.x, dy = gy - t.y, d = Math.hypot(dx, dy);
+    if (d > 14) drive(t, dx / d, dy / d, dt * (d > 140 ? 1.05 : 0.8));
+    gun(t, dt);
+  }
   function bot(t: Tank, dt: number) {
+    if (platoon) {
+      const lead = leaderOf(t);
+      if (lead && lead !== t) return follow(t, lead, dt);
+    }
     t.think -= dt;
     if (t.think <= 0) {
       t.think = 0.7 + R() * 0.9;
@@ -680,6 +759,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       drive(t, dx / d, dy / d, dt * 0.85);
       if (Math.abs(t.x + t.y - before) < 0.01) t.think = Math.min(t.think, 0.05); // stuck: rethink
     }
+    gun(t, dt);
+  }
+  /** Bots' turret: track the target, fire when lined up and in range. */
+  function gun(t: Tank, dt: number) {
     const o2 = t.target >= 0 ? tanks[t.target]! : null;
     if (o2 && o2.alive && o2.drop >= 1) {
       const aim = Math.atan2(o2.y - t.y, o2.x - t.x);
@@ -850,7 +933,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         s.life -= dt;
         let done = s.life <= 0 || nx < -20 || ny < -20 || nx > W + 20 || ny > H + 20;
         for (const t of tanks) {
-          if (done || t.i === s.owner || !t.alive || t.drop < 1) continue;
+          if (done || t.team === tanks[s.owner]!.team || !t.alive || t.drop < 1) continue; // no friendly fire
           if (segCircle(s.x, s.y, nx, ny, t.x, t.y, 15 * scale) >= 0) {
             done = true;
             fx.blast(t.x, t.y, s.rail ? 1.8 : 1, s.rail ? 1 : 4);
@@ -965,9 +1048,21 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     wrap.classList.add("pre");
     over.hidden = false;
     over.classList.add("intro");
-    over.innerHTML = `<div class="sticker">${BADGE}<span>BATTLEFIELD · FREE FOR ALL</span><b>BLITZ<em>!</em></b></div>
+    over.innerHTML = `<div class="sticker">${BADGE}<span data-kick>BATTLEFIELD · ${platoon ? "PLATOONS" : "FREE FOR ALL"}</span><b>BLITZ<em>!</em></b></div>
+<div class="modes" role="radiogroup" aria-label="Mode"><button class="mode" type="button" role="radio" data-mode="solo" aria-checked="${!platoon}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" role="radio" data-mode="platoon" aria-checked="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button></div>
 <div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
 <button class="start" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
+    for (const b of over.querySelectorAll<HTMLButtonElement>("[data-mode]"))
+      b.addEventListener("click", () => {
+        platoon = b.dataset.mode === "platoon";
+        try {
+          localStorage.setItem("blitz:mode", platoon ? "platoon" : "solo");
+        } catch {}
+        roster();
+        for (const m of over.querySelectorAll("[data-mode]")) m.setAttribute("aria-checked", String(m === b));
+        over.querySelector("[data-kick]")!.textContent = `BATTLEFIELD · ${platoon ? "PLATOONS" : "FREE FOR ALL"}`;
+        e.events.emit("lock", 0);
+      }, { signal: e.signal });
     const go = over.querySelector<HTMLButtonElement>("[data-go]")!;
     go.addEventListener("click", () => (burst(go), countdown()), { signal: e.signal });
   }
@@ -986,23 +1081,31 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     over.innerHTML = "";
   }
   function standings() {
-    return tanks.map((t) => ({ name: t.name, kills: t.kills, deaths: t.deaths, you: t.you })).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    return tanks.map((t) => ({ name: t.name, kills: t.kills, deaths: t.deaths, you: t.you, team: t.team })).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   }
   function end() {
     state = "end";
     targeting = false;
-    const st = standings(), won = st[0]!.you;
+    const st = standings();
+    // Platoons: the platoon with the most kills wins; the table is the platoons, then you.
+    const teams = [0, 1, 2].map((team) => ({ team, kills: 0, deaths: 0 }));
+    if (platoon) for (const t of tanks) (teams[t.team]!.kills += t.kills), (teams[t.team]!.deaths += t.deaths);
+    teams.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    const won = platoon ? teams[0]!.team === 0 : st[0]!.you;
     e.events.emit(won ? "win" : "end", 0);
     over.hidden = false;
-    over.innerHTML = `<div class="sticker plain"><span>MATCH OVER</span><b>${won ? "YOU WIN" : `${st[0]!.name} WINS`}</b></div>
-<div class="table">${st.slice(0, 5).map((s, i) => `<div class="${s.you ? "you" : ""}"><span>${i + 1}. ${s.name}</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("")}</div>
+    const rows = platoon
+      ? teams.map((s, i) => `<div class="${s.team === 0 ? "you" : ""}"><span>${i + 1}. ${PLATOON[s.team]} PLATOON</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("") + `<div class="you"><span>YOU</span><span>${you.kills} K · ${you.deaths} D</span></div>`
+      : st.slice(0, 5).map((s, i) => `<div class="${s.you ? "you" : ""}"><span>${i + 1}. ${s.name}</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("");
+    over.innerHTML = `<div class="sticker plain"><span>MATCH OVER</span><b>${won ? (platoon ? "PLATOON WINS" : "YOU WIN") : `${platoon ? PLATOON[teams[0]!.team] : st[0]!.name} WINS`}</b></div>
+<div class="table">${rows}</div>
 <div class="row"><button class="key go" type="button" data-again>REMATCH</button></div>`;
     over.querySelector("[data-again]")!.addEventListener("click", rematch, { signal: e.signal });
     o.onEnd?.(st);
   }
   function rematch() {
     clock = o.seconds ?? 180;
-    for (const t of tanks) Object.assign(t, { kills: 0, deaths: 0, alive: false, dead: 0.2 + t.i * 0.15, strikes: t.you ? 1 : 0, carpet: 0, rail: t.you ? RAIL_START : 1, run: 0 });
+    for (const t of tanks) Object.assign(t, { kills: 0, deaths: 0, alive: false, dead: platoon ? 0.2 + t.team * 0.45 + t.slot * 0.12 : 0.2 + t.i * 0.15, strikes: t.you ? 1 : 0, carpet: 0, rail: t.you ? RAIL_START : 1, run: 0 });
     for (const pool of [shells, tiles, marks, planes, bombs, booms, crates] as { on: boolean }[][]) for (const s of pool) s.on = false;
     nukeT = whiteout = 0;
     crateIn = 12;
@@ -1021,15 +1124,22 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
 
   // ---------- HUD (change-only writes, render phase) ----------
-  const last = { k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
+  const teamKills = new Int32Array(4);
+  const last = { tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
   function hudFrame() {
     const k = String(you.kills);
     let lead = tanks[0]!;
     for (const t of tanks) if (t.kills > lead.kills) lead = t;
     let rank = 1;
     for (const t of tanks) if (t.kills > you.kills) rank++;
+    teamKills.fill(0);
+    for (const t of tanks) if (t.team < 4) teamKills[t.team]! += t.kills;
     const tt = embed ? `#${rank}` : `${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, "0")}`;
-    const ld = lead.kills ? `${lead.name} ${lead.kills}` : "—";
+    let top = 0;
+    for (let k2 = 1; k2 < 3; k2++) if (teamKills[k2]! > teamKills[top]!) top = k2;
+    const ld = platoon ? (teamKills[top] ? `${PLATOON[top]} ${teamKills[top]}` : "—") : lead.kills ? `${lead.name} ${lead.kills}` : "—";
+    const tm = String(teamKills[0]);
+    if (tm !== last.tm) hud.tm.textContent = last.tm = tm;
     if (k !== last.k) hud.k.textContent = last.k = k;
     if (tt !== last.t) hud.t.textContent = last.t = tt;
     if (ld !== last.lead) hud.lead.textContent = last.lead = ld;
@@ -1373,6 +1483,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           ctx.stroke();
           ctx.setLineDash([]);
         }
+        if (platoon && !t.you && t.team === you.team && !demo) {
+          // Your wingmen: a thin ring in your colour.
+          ctx.globalAlpha = 0.55;
+          ctx.strokeStyle = t.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, 23 * scale, 0, TAU);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
         if (t.shield > 0 && (t.shield > 1.5 || ((now * 10) | 0) % 2)) {
           ctx.strokeStyle = "#f6f3ff";
           ctx.globalAlpha = 0.7;
@@ -1408,9 +1528,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       ctx.font = `800 ${t.you ? 12 : 10}px ui-monospace,monospace`;
       ctx.lineWidth = 3;
       ctx.strokeStyle = lightTheme ? "#f6f3ff" : "#07060f";
-      ctx.strokeText(t.you ? "▼ YOU" : t.name, t.x, ty);
+      const tag = t.you ? "▼ YOU" : platoon && t.team === you.team && !demo ? `▲ ${t.name}` : t.name;
+      ctx.strokeText(tag, t.x, ty);
       ctx.fillStyle = t.color;
-      ctx.fillText(t.you ? "▼ YOU" : t.name, t.x, ty);
+      ctx.fillText(tag, t.x, ty);
       if (t.drop >= 1)
         for (let k = 0; k < MAXHP; k++) {
           ctx.fillStyle = k < t.hp ? (t.hp <= 2 ? "#ff2b4e" : t.color) : "rgba(174,164,214,.3)";
@@ -1582,7 +1703,15 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     },
     start: () => (state === "intro" ? countdown() : undefined),
     /** Debug / tests: the live world. */
-    world: { tanks, tiles, shells, blocks, planes, bombs, crates, marks },
+    world: {
+      get tanks() {
+        return tanks;
+      },
+      tiles, shells, blocks, planes, bombs, crates, marks,
+    },
+    get platoons() {
+      return platoon;
+    },
     /** Debug / tests: your controls. */
     controls: {
       get auto() {

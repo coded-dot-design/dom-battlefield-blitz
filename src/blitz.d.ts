@@ -8,9 +8,13 @@ export interface BlitzOptions {
   bots?: number;
   /** Attract mode: every tank is a bot, no HUD or keys, endless. */
   demo?: boolean;
-  onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean }[]) => void;
+  /** Platoons: you + 3 wingmen in your colour against two other platoons. */
+  platoons?: boolean;
+  onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
 export interface Blitz {
+  /** Platoon mode on? */
+  readonly platoons: boolean;
   readonly state: "intro" | "count" | "play" | "end" | "paused";
   /** Leave the intro screen and start the countdown. */
   start(): void;
@@ -29,4 +33,4 @@ export interface BlitzInstall {
   readonly opened: boolean;
 }
 /** The drop-in: a PLAY BLITZ key (or a hidden easter egg) that turns the page into the arena. */
-export function install(config?: { easterEgg?: boolean | object; palette?: Record<string, string>; label?: string }): BlitzInstall;
+export function install(config?: { easterEgg?: boolean | object; palette?: Record<string, string>; label?: string; platoons?: boolean }): BlitzInstall;

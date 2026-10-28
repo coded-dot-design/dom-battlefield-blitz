@@ -5,14 +5,15 @@
  *   data-easter-egg="true"   stay hidden until the Konami code (desktop) or a hold-then-tap on any
  *                            [data-blitz-trigger] element (phones). Default: a PLAY BLITZ key.
  *   data-palette='{"cmd":"#8573ee"}'   Board UI colours (hex only)
+ *   data-platoons="true"     platoon battle: you + 2 wingmen against two other platoons
  *   data-blitz-manual        don't auto-install; call window.BattlefieldBlitz.install({...})
  * Escape (or the toggle key) closes it, and the page is exactly as it was.
  */
 import { embed, type EmbedConfig } from "../vendor/fizlet/embed";
 import { createBlitz } from "./game";
 
-export function install(config: Partial<EmbedConfig> = {}) {
-  return embed(() => (host) => createBlitz(host, { mode: "embed" }), {
+export function install(config: Partial<EmbedConfig> & { platoons?: boolean } = {}) {
+  return embed(() => (host) => createBlitz(host, { mode: "embed", platoons: config.platoons ?? false }), {
     name: "blitz",
     label: "Play Blitz",
     open: false,
@@ -27,7 +28,7 @@ if (tag && tag.dataset.blitzManual === undefined) {
   try {
     palette = tag.dataset.palette ? JSON.parse(tag.dataset.palette) : undefined;
   } catch {}
-  const ready = () => install({ palette, easterEgg: tag.dataset.easterEgg === "true" });
+  const ready = () => install({ palette, easterEgg: tag.dataset.easterEgg === "true", platoons: tag.dataset.platoons === "true" });
   if (document.body) ready();
   else addEventListener("DOMContentLoaded", ready, { once: true });
 }
