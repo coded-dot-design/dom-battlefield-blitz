@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- The SURRENDER key's white flag shows its grid lines, frame and flag outline again (Fizlet 0.2.3 kit).
+
 ## 0.6.0
 
 - Pause is the surrender question, exactly as in DOM Battlefield (Board UI kit overlay): the white

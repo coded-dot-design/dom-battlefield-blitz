@@ -435,8 +435,14 @@
   color: var(--rim);
   background: var(--k-flag);
 }
-/* The surrender icon: your team's colour in any theme, the flag always white. */
+/* The surrender icon: your team's colour in any theme, the flag always white. The key's icon rule
+   (fill only, no stroke) would wipe the grid lines, frame and flag outline, so they are set here:
+   <g class="bui-cells">16 rects</g><path class="bui-grid"/><rect class="bui-frame"/>
+   <path class="bui-pole"/><path class="bui-cloth"/> (64 × 64). */
 .bui .bui-surrender .bui-cells rect { fill: var(--team); }
+.bui .bui-surrender svg .bui-grid { fill: none; stroke: #07060f; stroke-opacity: 0.3; stroke-width: 1; }
+.bui .bui-surrender svg .bui-frame { fill: none; stroke: #f6f3ff; stroke-width: 2; }
+.bui .bui-surrender svg :is(.bui-pole, .bui-cloth) { fill: #f6f3ff; stroke: #07060f; stroke-width: 2; stroke-linejoin: round; shape-rendering: geometricPrecision; }
 .bui .bui-surrender.go .bui-cells rect { animation: bui-whiteout 160ms calc(var(--i) * 18ms) steps(2) forwards; }
 .bui .bui-surrender.go .bui-cloth { animation: bui-wave 120ms ease-in-out 4 alternate; }
 .bui .bui-cloth { transform-box: fill-box; transform-origin: 0 50%; }

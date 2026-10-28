@@ -1,8 +1,8 @@
 {
   "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/fizlet",
-  "version": "0.2.1",
-  "commit": "eb633b7bcb6f8e979116dc9cb51ea649cd6cc0a3",
+  "version": "0.2.3",
+  "commit": "5dc41e549506de96b91600c44de576ec2034327d",
   "files": [
     {
       "path": "collide.ts",
@@ -58,7 +58,7 @@
     },
     {
       "path": "ui/board-ui.css",
-      "sha256": "840d16c665d0529d15f0be607a8a24551348facd0c6fa5c90227d2e0e50a7a31"
+      "sha256": "ba6b3f4ab68c535cbccc4c564bb72dce0298153322668e611b3835795f2d7b5c"
     },
     {
       "path": "ui/board-ui.ts",
