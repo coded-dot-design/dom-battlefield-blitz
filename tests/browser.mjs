@@ -26,7 +26,7 @@ try {
   where = "board";
   await page.evaluate(async () => {
     const { createBlitz } = await import("/blitz.mjs");
-    window.game = createBlitz(document.getElementById("board"), { mode: "board", seconds: 5 });
+    window.game = createBlitz(document.getElementById("board"), { mode: "board", seconds: 16 });
   });
   assert.equal(await page.evaluate(() => game.state), "intro");
   await page.evaluate(() => game.start());
@@ -38,7 +38,42 @@ try {
   const dbg = await page.evaluate(() => { const b = document.getElementById("board").getBoundingClientRect(); const t = game.world.tanks[0]; return { b: [b.top, b.bottom], you: [t.alive, t.drop, t.cool, Math.round(t.x), Math.round(t.y)], run: game.engine.running, paused: game.engine.paused, shells: game.world.shells.filter((s) => s.on).length }; });
   assert.ok(dbg.shells > 0, "shots fly " + JSON.stringify(dbg));
   await page.mouse.up();
-  await page.waitForFunction(() => game.state === "end", null, { timeout: 12000 });
+
+  where = "board: pad";
+  await page.evaluate(() => document.getElementById("board").scrollIntoView({ block: "end" }));
+  const sr = (sel) => page.evaluate((sel) => { const r = document.getElementById("board").shadowRoot.querySelector(sel).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, sel);
+  const ready = () => page.waitForFunction(() => game.world.tanks[0].alive && game.world.tanks[0].drop >= 1 && game.world.tanks.filter((t) => t.alive && t.drop >= 1).length >= 4, null, { timeout: 8000 });
+  // AUTO and LOCK toggle (keys and round buttons).
+  let [x, y] = await sr("[data-k=auto]");
+  const auto0 = await page.evaluate(() => game.controls.auto);
+  await page.mouse.click(x, y);
+  await page.waitForFunction((a) => game.controls.auto !== a, auto0);
+  await page.keyboard.press("KeyT");
+  await page.waitForFunction(() => game.controls.lock && game.controls.lockTarget >= 0);
+  assert.equal(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-k=lock]").getAttribute("aria-pressed")), "true");
+  // LONG: locks on, fires, spends one round.
+  await ready();
+  [x, y] = await sr("[data-k=long]");
+  await page.mouse.click(x, y);
+  await page.waitForFunction(() => game.world.tanks[0].rail === 2, null, { timeout: 3000 });
+  // STRIKE: target mode, click the field, a bomber flies over and the bombs land.
+  await ready();
+  await page.evaluate(() => (game.world.tanks[0].strikes = 1));
+  [x, y] = await sr("[data-k=strike]");
+  await page.mouse.click(x, y);
+  await page.waitForFunction(() => game.controls.targeting);
+  const fieldAt = await page.evaluate(() => { const r = document.getElementById("board").getBoundingClientRect(); return [r.x + 400, r.y + 260]; });
+  await page.mouse.click(fieldAt[0], fieldAt[1]);
+  await page.waitForFunction(() => game.world.planes.some((p) => p.on) && game.world.bombs.some((b) => b.on), null, { timeout: 2000 });
+  await page.waitForFunction(() => !game.world.bombs.some((b) => b.on), null, { timeout: 4000 });
+  assert.equal(await page.evaluate(() => game.controls.targeting), false);
+  // Supply crate drops, and the board follows the page theme.
+  await page.evaluate(() => game.controls.crate());
+  assert.ok(await page.evaluate(() => game.world.crates.some((c) => c.on)), "a supply crate drops");
+  await page.evaluate(() => (document.documentElement.dataset.theme = "light"));
+  await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector(".bz").classList.contains("light"));
+  await page.evaluate(() => delete document.documentElement.dataset.theme);
+  await page.waitForFunction(() => game.state === "end", null, { timeout: 20000 });
   const over = await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-over]").textContent);
   assert.match(over, /MATCH OVER/);
   await page.evaluate(() => game.destroy());
@@ -79,7 +114,7 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → result), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme → result), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

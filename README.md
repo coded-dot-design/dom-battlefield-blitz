@@ -18,21 +18,38 @@ sprites. No runtime dependencies; everything first-party is snapshotted with pro
 
 ## The game
 
+**Two guns.** The cannon fires fast but overheats if you hold it (watch the ring on FIRE). The
+LONG gun locks on (laser sight), then a guided round crosses the whole field, punches through
+cover and wrecks in one hit. You start with 3 long shots; find and earn more.
+
+**Airstrikes.** Press STRIKE, then tap (or click) where the bombs go: a bomber flies in over your
+shoulder, the bombs fall and go off with the Battlefield hero's triple blasts and black scorch.
+
+**Aim help.** AUTO swings the turret onto the nearest tank. LOCK sticks to one target (tap a tank
+to switch). Your tank wears a marching dashed ring so you always find yourself.
+
 | Tile | What it does |
 |---|---|
-| `»` Rapid | rapid fire for 8 seconds |
+| `»` Rapid | rapid fire for 8 seconds, no overheating |
 | `≡` Triple | triple shot for 8 seconds |
-| `✚` Airstrike | one airstrike charge (max 3) |
+| ✈ Airstrike | one airstrike (max 5) |
 | `◆` Shield | shield for 6 seconds |
+| ✚ Health | +2 armour |
+| ◎ Long | +1 long shot |
 | `!` Mine | blows up whoever drives onto it (and goes off by itself if left alone) |
 
-Lit squares roll through colours like a slot machine for a second before they settle, so you can
-read what's coming. Everyone respawns by parachute (invulnerable while dropping). Double kills and
-rampages pop on screen.
+Lit squares roll through colours like a slot machine before they settle. **Supply crates**
+parachute in every 20 seconds or so (medkit, long ammo, an airstrike, or the jackpot). Every kill
+patches 1 armour.
 
-**Controls.** Desktop: WASD / arrows drive, the mouse aims, click or Space fires, Q (or right-click)
-calls an airstrike on the pointer, Esc pauses (board) or closes (drop-in). Phones: drag on the left
-half to drive; the turret aims at the nearest enemy and fires by itself; the ✚ key calls a strike.
+**Kill streaks** (kills in one life): 2 → +1 long shot, 3 → +1 airstrike, 5 → carpet bomb (your
+next strike drops seven bombs), 8 → NUKE (siren, then every other tank on the field is wrecked).
+
+**Controls.** Desktop: WASD / arrows drive, the mouse aims, click or Space fires, E (or
+right-click) long shot, F airstrike then click the spot, Q auto-aim, T aim lock, Esc pauses
+(board) or closes (drop-in). Phones: drag on the left half to drive, tap the field to shoot there,
+and the round arcade keys bottom right (FIRE, LONG, STRIKE, AUTO, LOCK); auto-aim starts on.
+The board follows the page's light or dark theme (`<html data-theme>`).
 
 ## Drop-in options
 
@@ -61,8 +78,8 @@ game.start();             // intro → countdown → match
 ```sh
 npm ci
 npm run check          # typecheck + build dist/ (committed)
-npm run size           # budget: 32 KB gzip (today ~17 KB, engine and art included)
-npm run test:browser   # board match, demo, drop-in (Chromium)
+npm run size           # budget: 32 KB gzip (today ~26 KB, engine and art included)
+npm run test:browser   # board match + every key, demo, drop-in (Chromium)
 node scripts/sync.mjs  # refresh vendor/fizlet and shared/ from sibling checkouts
 ```
 

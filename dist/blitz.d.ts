@@ -17,7 +17,9 @@ export interface Blitz {
   sound: boolean;
   destroy(): void;
   readonly engine: { stats(): unknown; stop(): void; start(): void; readonly running: boolean };
-  readonly world: { tanks: unknown[]; tiles: unknown[]; shells: unknown[]; blocks: unknown[] };
+  readonly world: { tanks: unknown[]; tiles: unknown[]; shells: unknown[]; blocks: unknown[]; planes: unknown[]; bombs: unknown[]; crates: unknown[]; marks: unknown[] };
+  /** Your controls (debug / tests). */
+  readonly controls: { readonly auto: boolean; readonly lock: boolean; readonly lockTarget: number; readonly targeting: boolean; crate(): void };
 }
 export function createBlitz(host: HTMLElement, options?: BlitzOptions): Blitz;
 export interface BlitzInstall {
