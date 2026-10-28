@@ -962,8 +962,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           if (!p.alive || !q.alive || p.drop < 1 || q.drop < 1) continue;
           const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), min = 26 * scale;
           if (d > 0 && d < min) {
-            const k = (min - d) / 2 / d;
-            (p.x -= dx * k), (p.y -= dy * k), (q.x += dx * k), (q.y += dy * k);
+            // Practice TARGETs are immovable: whoever bumps them gets the whole push.
+            const pf = practice && p.i >= 1 && p.i <= 3 ? 0 : 1, qf = practice && q.i >= 1 && q.i <= 3 ? 0 : 1, k = (min - d) / (pf + qf || 1) / d;
+            (p.x -= dx * k * pf), (p.y -= dy * k * pf), (q.x += dx * k * qf), (q.y += dy * k * qf);
           }
         }
       // Shells: swept hits so fast shots never pass through. Long shots home in and punch through cover.

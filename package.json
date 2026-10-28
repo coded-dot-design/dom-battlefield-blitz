@@ -1,6 +1,6 @@
 {
   "name": "@coded-design/dom-battlefield-blitz",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "description": "Battlefield Blitz: free-for-all tank chaos on any web page. The arcade version of DOM Battlefield, built on the Fizlet engine.",

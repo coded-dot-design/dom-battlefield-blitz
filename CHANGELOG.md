@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Practice TARGETs can't be shoved around (bumping one pushes only you).
+
 ## 0.4.0
 
 - PRACTICE mode: no clock, TARGET tanks that stand still and MOVERs that drive about (none shoot),
