@@ -18,7 +18,10 @@ sprites. No runtime dependencies; everything first-party is snapshotted with pro
 
 ## The game
 
-**Two modes** (pick on the start screen; it remembers). **SOLO:** eight tanks, every tank for
+**Three modes** (pick on the start screen; it remembers). **PRACTICE:** no clock, three TARGET
+tanks that stand still and three MOVERs that drive about, none of them shoot back; a coach walks you
+through every control (drive, fire, auto, lock, long shot, airstrike, tiles, kill streaks, a supply
+crate, moving the keys), then shares tricks. Ammo and strikes never run out. **SOLO:** eight tanks, every tank for
 itself. **PLATOON:** you and three wingmen in your colour against two other platoons of four
 (three a side on a dropped-in page). No friendly fire. Your wingmen hold a slot behind you, go
 after whoever is shooting at you, and parachute back in next to you; the other platoons stick
@@ -55,7 +58,10 @@ next strike drops seven bombs), 8 → NUKE (siren, then every other tank on the 
 **Controls.** Desktop: WASD / arrows drive, the mouse aims, click or Space fires, E (or
 right-click) long shot, F airstrike then click the spot, Q auto-aim, T aim lock, Esc pauses
 (board) or closes (drop-in). Phones: drag on the left half to drive, tap the field to shoot there,
-and the round arcade keys bottom right (FIRE, LONG, STRIKE, AUTO, LOCK); auto-aim starts on.
+and the round arcade keys bottom right: AUTO and LOCK ride on FIRE (like the Battlefield cockpit),
+LONG and STRIKE sit in a row above, and the grab bar on top moves the whole pad (remembered;
+double-click puts it back). Auto-aim starts on. The screen shakes only for blasts near your tank
+and hits you take (harder the bigger the hit), and phones buzz when you're hit.
 The board follows the page's light or dark theme (`<html data-theme>`).
 
 ## Drop-in options

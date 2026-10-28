@@ -117,6 +117,35 @@ try {
   assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-over]").textContent), /PLATOON/);
   await page.evaluate(() => (pl.destroy(), localStorage.removeItem("blitz:mode")));
 
+  where = "practice";
+  await page.evaluate(async () => {
+    const { createBlitz } = await import("/blitz.mjs");
+    window.pr = createBlitz(document.getElementById("board"), { mode: "board" });
+  });
+  await pick("practice");
+  assert.deepEqual(await page.evaluate(() => [pr.practice, pr.world.tanks.map((t) => t.name).join(",")]), [true, "YOU,TARGET1,TARGET2,TARGET3,MOVER1,MOVER2,MOVER3"]);
+  await page.evaluate(() => pr.start());
+  await page.waitForFunction(() => pr.state === "play" && pr.world.tanks.every((t) => t.alive && t.drop >= 1), null, { timeout: 15000 });
+  const still = await page.evaluate(() => pr.world.tanks.slice(1, 4).map((t) => [t.x, t.y]));
+  assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("board").shadowRoot.querySelector("[data-coach]")).display), "grid", "the coach shows");
+  await page.keyboard.down("KeyD");
+  await page.waitForTimeout(2200);
+  await page.keyboard.up("KeyD");
+  await page.waitForFunction(() => pr.coach >= 1, null, { timeout: 3000 });
+  assert.deepEqual(await page.evaluate(() => pr.world.tanks.slice(1, 4).map((t) => [t.x, t.y])), still, "TARGETs stand still");
+  assert.equal(await page.evaluate(() => pr.world.shells.filter((s) => s.on && s.owner !== 0).length), 0, "dummies never shoot");
+  // The grab bar moves the keys, and it's remembered.
+  const [gx, gy] = await page.evaluate(() => { const r = document.getElementById("board").shadowRoot.querySelector("[data-grab]").getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  await page.mouse.move(gx - 200, gy - 80, { steps: 5 });
+  await page.mouse.up();
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-pad]").style.translate), /-200px -80px/);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("blitz:pad"))), [-200, -80]);
+  await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-cx]").click());
+  assert.equal(await page.evaluate(() => pr.state), "intro", "END PRACTICE goes back to the start");
+  await page.evaluate(() => (pr.destroy(), localStorage.clear()));
+
   where = "drop-in";
   const snap = () => page.evaluate(() => [...document.body.querySelectorAll("*")].filter((n) => !n.closest("[data-fizlet-host],[data-blitz-ignore]")).map((n) => n.tagName + [...n.attributes].map((a) => a.name + "=" + a.value).sort().join("|") + "#" + [...n.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join("")).join("\n"));
   const before = await snap();
@@ -136,7 +165,7 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme → result), platoons (picker, teams, result), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme → result), platoons (picker, teams, result), practice (coach, still targets, harmless dummies, grab bar), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

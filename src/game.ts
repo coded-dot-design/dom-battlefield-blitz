@@ -106,7 +106,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .tip{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));translate:-50% 0;padding:8px 14px;font-size:11px;letter-spacing:.12em;color:#07060f;background:#ff2e88;border:2px solid #07060f;border-radius:8px;box-shadow:0 4px 0 #8f1950;pointer-events:none;white-space:nowrap;animation:blink 1s steps(2) infinite}
 .tip[hidden]{display:none}@keyframes blink{50%{opacity:.6}}
 button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.pad{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));width:186px;height:218px;pointer-events:none;transform-origin:100% 100%}
+.pad{position:absolute;right:max(10px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:200px;height:256px;pointer-events:none;transform-origin:100% 100%}
+.grab{position:absolute;right:42px;bottom:226px;display:flex;align-items:center;justify-content:center;gap:4px;width:72px;height:22px;padding:0;background:#110d22e6;border:2px solid #3b3170;border-radius:11px;pointer-events:auto;touch-action:none;cursor:grab}
+.grab i{width:4px;height:4px;background:#aea4d6;border-radius:50%}.grab:active,.grab.on{cursor:grabbing;border-color:#19f0ff}.grab:active i,.grab.on i{background:#19f0ff}
+.light .grab{background:#f6f3ff;border-color:#07060f}.light .grab i{background:#3b3170}
 .embed .pad{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px))}
 .rk{--c:#19f0ff;--e:color-mix(in srgb,var(--c) 45%,#07060f);position:absolute;display:grid;place-content:center;justify-items:center;gap:2px;width:62px;height:62px;padding:0;color:#07060f;background:var(--c);border:2.5px solid #07060f;border-radius:50%;box-shadow:0 5px 0 var(--e),0 0 14px color-mix(in srgb,var(--c) 40%,transparent);pointer-events:auto;touch-action:none;transition:transform .1s,box-shadow .1s,opacity .2s}
 .rk svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
@@ -118,17 +121,19 @@ button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .rk[disabled]{opacity:.38;cursor:default;animation:none}
 .rk .n{position:absolute;top:-7px;right:-7px;min-width:24px;height:24px;padding:0 6px;font:900 12px/20px ui-monospace,monospace;color:#f6f3ff;background:#07060f;border:2px solid var(--c);border-radius:12px}
 .rk kbd{position:absolute;left:-6px;top:-6px;padding:1px 4px;font:800 8px/1.3 ui-monospace,monospace;color:#aea4d6;background:#110d22;border:1px solid #3b3170;border-radius:4px}
-.fire{--c:#ff2b4e;width:96px;height:96px;right:0;bottom:6px}.fire svg{width:40px;height:40px}
+.fire{--c:#ff2b4e;width:96px;height:96px;right:30px;bottom:0}.fire kbd{left:50%;top:auto;bottom:-8px;translate:-50% 0}.fire svg{width:40px;height:40px}
 .fire::after{content:"";position:absolute;inset:-9px;border-radius:50%;background:conic-gradient(#ffc21a calc(var(--h,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));pointer-events:none}
 .fire.hot::after{background:#ff2b4e;animation:blink .25s steps(2) infinite}
-.long{--c:#ffc21a;right:117px;bottom:23px}.strike{--c:#ff2e88;right:88px;bottom:94px}
-.lock,.auto{width:52px;height:52px}.lock{right:22px;bottom:128px}.auto{right:86px;bottom:164px}
+/* AUTO and LOCK ride on FIRE's shoulders (the Battlefield cockpit); the two specials sit in a row above. */
+.long{--c:#ffc21a;right:85px;bottom:150px}.strike{--c:#ff2e88;right:9px;bottom:150px}
+.lock,.auto{width:52px;height:52px}.auto{right:92px;bottom:84px}.lock{right:12px;bottom:84px}
+.coach-on{outline:3px dashed #f6f3ff;outline-offset:6px;animation:coach 1s ease-in-out infinite}@keyframes coach{50%{outline-offset:10px}}
 .lock svg,.auto svg{width:20px;height:20px}
 .demo .hud,.demo .pad,.demo .help,.demo .feed,.demo .banner,.demo .tip{display:none}.demo canvas{cursor:default}
 .help{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100% - 240px);padding:6px 10px;font-size:10px;letter-spacing:.08em;color:#aea4d6;background:#110d22cc;border-radius:8px;pointer-events:none}
 .over{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:22px;background:#07060fb8;backdrop-filter:grayscale(.6)}
 .over[hidden]{display:none}
-.sticker{display:grid;grid-template-columns:auto auto;grid-template-areas:"icon kicker" "icon name";column-gap:14px;align-items:center;justify-items:start;padding:10px 24px 12px 14px;color:#07060f;background:#f6f3ff;border:3px solid #07060f;border-radius:12px;box-shadow:0 6px 0 #07060f;rotate:-4deg;animation:slam 1.1s linear both}
+.sticker{display:grid;grid-template-columns:auto auto;grid-template-areas:"icon kicker" "icon name";column-gap:14px;align-items:center;justify-items:start;padding:10px 24px 12px 14px;color:#07060f;background:#f6f3ff;border:3px solid #07060f;border-radius:12px;box-shadow:0 6px 0 #07060f;rotate:-4deg;animation:slam 1.1s linear both;pointer-events:none}
 .sticker.plain{grid-template-columns:auto;grid-template-areas:"kicker" "name";justify-items:center;padding:10px 24px 12px}
 .sticker .ic{grid-area:icon;display:block;width:62px;height:62px;padding:3px;color:#19f0ff;background:#10233f;border-radius:7px}
 .sticker span{grid-area:kicker;align-self:end;font:800 9px/1 ui-monospace,monospace;letter-spacing:4px;animation:blink 1s steps(2) infinite}
@@ -143,12 +148,17 @@ button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .burst{position:absolute;pointer-events:none;z-index:5}.burst .start{position:absolute;inset:0;width:100%;height:100%;animation:none;box-shadow:none;filter:invert(1) hue-rotate(180deg)}.burst .start::after{content:none}
 .burst i{position:absolute;border-radius:50%}.burst .bit{border-radius:0}
 .hud .tm{display:none}.platoon .hud .tm{display:block}.hud .tm b{color:#39ffb0}
-.modes{display:flex;gap:12px}.mode{display:grid;justify-items:center;gap:3px;min-width:132px;padding:10px 14px 9px;color:#f6f3ff;background:#110d22;border:2.5px solid #3b3170;border-radius:10px;box-shadow:0 5px 0 #3b3170;transition:transform .1s,box-shadow .1s}
+.over.intro{padding-top:64px}
+.modes{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:calc(100vw - 24px)}.mode{flex:1 1 112px;display:grid;justify-items:center;gap:3px;min-width:0;padding:10px 14px 9px;color:#f6f3ff;background:#110d22;border:2.5px solid #3b3170;border-radius:10px;box-shadow:0 5px 0 #3b3170;transition:transform .1s,box-shadow .1s}
 .mode b{font:900 14px/1 ui-monospace,monospace;letter-spacing:.12em}.mode small{font-size:9px;letter-spacing:.06em;color:#aea4d6}
 .mode[aria-checked=true]{color:#07060f;background:#39ffb0;border-color:#07060f;box-shadow:0 5px 0 #1d6a40}.mode[aria-checked=true] small{color:#07060f}.mode:active{transform:translateY(5px);box-shadow:0 0 0 #3b3170}
 .light .mode{color:#07060f;background:#f6f3ff;border-color:#07060f;box-shadow:0 5px 0 #07060f}.light .mode small{color:#3b3170}.light .mode[aria-checked=true]{background:#39ffb0}
+.coach{position:absolute;left:50%;top:max(76px,calc(env(safe-area-inset-top) + 66px));translate:-50% 0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:2px 12px;width:min(520px,calc(100% - 24px));padding:10px 12px 10px 14px;color:#f6f3ff;background:#10233f;border:2.5px solid #f6f3ff;border-radius:12px;box-shadow:0 5px 0 #f6f3ff}
+.coach[hidden]{display:none}.coach span{grid-row:span 2;font:900 11px/1 ui-monospace,monospace;color:#19f0ff}.coach b{font:900 14px/1.1 ui-monospace,monospace;letter-spacing:.08em;color:#ffc21a}.coach small{grid-column:2;font-size:11px;line-height:1.35;color:#d9d3f5}
+.coach button{grid-row:1/span 2;grid-column:3;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em;color:#07060f;background:#ff2e88;border:2px solid #07060f;border-radius:8px;box-shadow:0 3px 0 #8f1950}.coach button:active{transform:translateY(3px);box-shadow:none}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
-@media (max-height:520px){.legend{display:none}}
+@media (max-height:380px){.legend{display:none}.over.intro{padding-top:0}}
+@media (max-height:460px){.over{gap:12px}.sticker b{font-size:36px}.sticker .ic{width:46px;height:46px}.start{height:76px}}
 .light .over{background:#e4e6f7a6;backdrop-filter:grayscale(.4)}.light .over.intro{background:radial-gradient(closest-side,#e4e6f7cc,#e4e6f733 70%,transparent)}
 .light .table,.light .legend{color:#3b3170;background:#f6f3ffee;border-color:#07060f}.light .legend b{color:#07060f}.light .table .you{color:#0a8a55}
 .light .count{color:#07060f;text-shadow:0 0 24px #19f0ff}
@@ -160,7 +170,7 @@ button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .key:active{transform:translateY(5px);box-shadow:0 0 0 #8f1950}
 .go{background:#39ffb0;box-shadow:0 5px 0 #1d6a40}.go:active{box-shadow:0 0 0 #1d6a40}
 .count{font:900 96px/1 ui-monospace,monospace;color:#f6f3ff;text-shadow:0 0 30px #19f0ff;animation:slam .5s both}
-.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;max-width:min(460px,calc(100vw - 32px));padding:12px 16px;font-size:11px;color:#aea4d6;background:#110d22ee;border:2px solid #3b3170;border-radius:12px}
+.legend{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;translate:-50% 0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;width:max-content;max-width:calc(100% - 24px);padding:8px 16px;font-size:11px;color:#aea4d6;background:#110d22ee;border:2px solid #3b3170;border-radius:10px}
 .legend b{color:#f6f3ff}
 @media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.rk kbd{display:none}}
@@ -178,7 +188,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <ol class="feed"><li></li><li></li><li></li><li></li></ol>
 <div class="banner" data-banner><b></b><span></span></div>
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
-<div class="pad">
+<div class="pad" data-pad>
+<button class="grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"><i></i><i></i><i></i></button>
 <button class="rk auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
 <button class="rk lock" type="button" data-k="lock" aria-pressed="false" aria-label="Aim lock: stick to one target, tap a tank to switch (T)" title="T · Aim lock">${svg("lock")}<small>LOCK</small><kbd>T</kbd></button>
 <button class="rk strike" type="button" data-k="strike" aria-pressed="false" aria-label="Airstrike: then tap where the bombs go (F)" title="F · Airstrike">${svg("strike")}<small>STRIKE</small><span class="n" data-n="strike">1</span><kbd>F</kbd></button>
@@ -186,6 +197,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <button class="rk fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC PAUSE"}</div>
+<div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button type="button" data-cx>END PRACTICE</button></div>
 <div class="over" data-over hidden></div>`;
   root.append(style, wrap);
   const $ = <T extends Element>(s: string) => wrap.querySelector<T>(s)!;
@@ -220,22 +232,25 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
   let clock = o.seconds ?? 180, state: "intro" | "count" | "play" | "end" | "paused" = embed || demo ? "play" : "intro", count = 0;
   // Solo: every tank for itself. Platoons: teams of 4 (3 on a dropped-in page), three platoons.
-  let platoon = o.platoons ?? (() => {
+  const saved = (() => {
     try {
-      return localStorage.getItem("blitz:mode") === "platoon";
+      return localStorage.getItem("blitz:mode") ?? "";
     } catch {
-      return false;
+      return "";
     }
   })();
+  // Practice: no clock, a coach with tips, and dummies that never shoot back: three stand still
+  // (TARGET), three drive about (MOVER). Rewards and streaks work as in a match.
+  let platoon = o.platoons ?? saved === "platoon", practice = !embed && !demo && o.platoons === undefined && saved === "practice";
   let N = 0, tanks: Tank[] = [], you: Tank = null!;
   const per = embed ? 3 : 4;
   function roster() {
-    N = platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : 7));
+    N = practice ? 7 : platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : 7));
     tanks = Array.from({ length: N }, (_, i) => {
       const team = platoon ? (i / per) | 0 : i, slot = platoon ? i % per : 0;
       return {
         i, team, slot, you: i === 0 && !demo,
-        name: platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
+        name: practice ? (i === 0 ? "YOU" : i <= 3 ? `TARGET${i}` : `MOVER${i - 3}`) : platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
         color: platoon ? TEAM_COLORS[team]! : COLORS[i % COLORS.length]!,
         x: 0, y: 0, a: 0, ta: 0, hp: MAXHP, alive: false, dead: platoon ? 0.2 + team * 0.45 + slot * 0.12 : 0.2 + i * 0.18, drop: 0, shield: 0, rapid: 0, triple: 0,
         strikes: i === 0 ? 1 : 0, carpet: 0, rail: i === 0 ? RAIL_START : 1, charge: 0, chargeT: -1, heat: 0, hot: 0,
@@ -244,6 +259,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     });
     you = tanks[0]!;
     wrap.classList.toggle("platoon", platoon);
+    wrap.classList.toggle("practice", practice);
   }
   roster();
   const shells: Shell[] = Array.from({ length: 140 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, owner: 0, on: false, rail: false, tgt: -1 }));
@@ -260,7 +276,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // Your controls: auto-aim (on by default on phones), aim lock and the airstrike target mode.
   let autoOn = coarse.matches, lockOn = false, lockT = -1, targeting = false;
   // Taps the step picks up: an airstrike spot, a lock target, a long shot.
-  let strikeQ = false, strikeX = 0, strikeY = 0, longQ = false, strikeT = false;
+  let strikeQ = false, strikeX = 0, strikeY = 0, longQ = false, strikeT = false, fireQ = false;
   // The nuke: countdown, then the flash.
   let nukeT = 0, nukeBy = -1, whiteout = 0;
   // Messages for the DOM, written in render: the kill feed ring and the streak banner.
@@ -365,6 +381,18 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     t.ta = t.a;
   }
 
+  // ---------- Shake: only what lands near you (or hits you) moves the screen ----------
+  let quakeAmt = 0, buzz = 0;
+  function quake(x: number, y: number, power: number) {
+    if (demo || !you.alive || state !== "play") return;
+    const reach = 250 * (scale / 1.4), d = Math.hypot(x - you.x, y - you.y);
+    if (d < reach) quakeAmt = Math.min(18, quakeAmt + power * 3.5 * (1 - d / reach) ** 1.5);
+  }
+  function boom(x: number, y: number, power: number, tint: number) {
+    fx.blast(x, y, power, tint);
+    quake(x, y, power);
+  }
+
   // ---------- Combat ----------
   function freeShell() {
     for (const s of shells) if (!s.on) return s;
@@ -388,6 +416,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     t.recoil = 6;
     t.flash = 0.08;
+    if (t.you) cShots++;
     // The cannon is quick; hold it down too long and it overheats (rapid fire never does).
     t.cool = t.you ? (t.rapid > 0 ? 0.1 : 0.19) : t.rapid > 0 ? 0.22 : 0.5 + R() * 0.35;
     if (t.you && t.rapid <= 0 && (t.heat += 0.16) >= 1) {
@@ -410,6 +439,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     t.charge = 0;
     if (!s || !o2.alive) return;
     t.rail--;
+    if (t.you) cRail++;
     const a = Math.atan2(o2.y - t.y, o2.x - t.x), len = 26 * scale;
     t.ta = a;
     s.on = true;
@@ -425,7 +455,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     t.flash = 0.14;
     fx.spawn(1, s.x, s.y, 0, 0, 16, 0.16, 1);
     fx.spawn(2, s.x, s.y, 0, 0, 8, 0.3, 1);
-    fx.kick(4);
+    if (t.you) quakeAmt = Math.min(18, quakeAmt + 3);
     e.events.emit("shot", t.i, 0, 0, 0, 1.5);
   }
   function kill(t: Tank, by: number, word = W_BOOM) {
@@ -448,14 +478,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (k.you) fx.word(k.x, k.y - 26, W_PLUS, 5, 18);
       reward(k);
     }
-    fx.blast(t.x, t.y, 2.2, 3);
-    fx.blast(t.x + (R() - 0.5) * 30, t.y + (R() - 0.5) * 30, 1.2, 1);
+    boom(t.x, t.y, 2.2, 3);
+    boom(t.x + (R() - 0.5) * 30, t.y + (R() - 0.5) * 30, 1.2, 1);
     for (let n = 0; n < 9; n++) {
       const a = R() * TAU, sp = 90 + R() * 140;
       fx.spawn(0, t.x, t.y, Math.cos(a) * sp, Math.sin(a) * sp, (7 + R() * 7) * (scale / 1.4), 1.1, n % 3 ? 5 : 7, R() * TAU, (R() - 0.5) * 24);
     }
     fx.word(t.x, t.y - 18, word === W_BOOM ? (R() * 5) | 0 : word, 3, word === W_NUKE ? 24 : 18);
-    if (t.you) fx.kick(10);
+    if (t.you) (quakeAmt = 16), (buzz += 220);
     e.events.emit("boom", t.i, by);
     feedK[feedN % 8] = k ? k.i : -1;
     feedV[feedN % 8] = t.i;
@@ -484,6 +514,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     t.hp -= amount;
     t.lastHit = by;
+    if (t.you) (quakeAmt = Math.min(18, quakeAmt + amount * 2.5)), (buzz += 35 * amount); // worse the harder you're hit
     e.events.emit("hit", t.i);
     if (t.hp <= 0) kill(t, by, word);
     return true;
@@ -498,6 +529,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const q of planes) if (!q.on) (p = q);
     if (!m || !p) return false;
     t.strikes--;
+    if (owner === 0) cStrike++;
     const carpet = t.carpet > 0;
     if (carpet) t.carpet--;
     // The bomber comes in over the caller's shoulder.
@@ -551,7 +583,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function detonate(b: Bomb) {
     // The Battlefield hero's airstrike: one big blast, two more a beat later, black scorch.
     const p = b.main ? 3.2 : 2.4;
-    fx.blast(b.x, b.y, p, 3);
+    boom(b.x, b.y, p, 3);
     later(b.x + (R() - 0.5) * 60, b.y + (R() - 0.5) * 48, 1.6, 1, 0.09);
     later(b.x + (R() - 0.5) * 60, b.y + (R() - 0.5) * 48, 1.3, 4, 0.19);
     if (b.main && R() < 0.6) fx.word(b.x, b.y - 30, W_STRIKE, 3, 22);
@@ -563,7 +595,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     for (const k of blocks) if (k.hp > 0 && Math.hypot(k.x + k.w / 2 - b.x, k.y + k.h / 2 - b.y) < rad + 20) wreckBlock(k);
     knockAround(b.x, b.y, rad * 2, 2.4);
-    fx.kick(7);
     e.events.emit("boom", -1, 0, 0, 0, 1.4);
   }
   function nuke(owner: number) {
@@ -578,7 +609,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const b of blocks) if (b.hp > 0) wreckBlock(b);
     for (let k = 0; k < 9; k++) later(40 + R() * (W - 80), 70 + R() * (H - 120), 2.4 + R() * 1.6, (k % 4) + 1, k * 0.08);
     knockAround(W / 2, H / 2, Math.max(W, H), 2.6);
-    fx.kick(18);
+    if (!demo) quakeAmt = 18;
   }
   function wreckBlock(b: Block) {
     b.hp = 0;
@@ -604,9 +635,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function takeTile(s: Tile, t: Tank) {
     s.on = false;
+    if (t.you) cTile++;
     const cx = (s.c + 0.5) * T, cy = (s.r + 0.5) * T;
     if (s.type === MINE) {
-      fx.blast(cx, cy, 2.6, 3);
+      boom(cx, cy, 2.6, 3);
       fx.word(cx, cy - 26, W_MINE, 3, 20);
       for (const o2 of tanks) if (Math.hypot(o2.x - cx, o2.y - cy) < 80 * (scale / 1.4)) damage(o2, -1, 3);
       e.events.emit("boom", -1);
@@ -642,6 +674,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function takeCrate(c: Crate, t: Tank) {
     c.on = false;
+    if (t.you) cCrate++;
     if (c.kind === 0 || c.kind === 3) (t.hp = MAXHP), (t.shield = Math.max(t.shield, 2));
     if (c.kind === 1) t.rail = Math.min(RAIL_MAX, t.rail + 2);
     if (c.kind === 2 || c.kind === 3) t.strikes = Math.min(STRIKE_MAX, t.strikes + 1);
@@ -688,6 +721,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (!blocked(nx, t.y, rad)) t.x = nx;
     if (!blocked(t.x, ny, rad)) t.y = ny;
     t.tread += sp * 0.15;
+    if (t.you) cMoved += sp;
   }
   /** A platoon's lead tank: you for yours, else its lowest-numbered tank on the ground. */
   function leaderOf(t: Tank) {
@@ -724,6 +758,15 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     gun(t, dt);
   }
   function bot(t: Tank, dt: number) {
+    if (practice) {
+      // Practice dummies: TARGETs stand still, MOVERs roll about. Nobody shoots.
+      if (t.i <= 3) return void (t.ta = turn(t.ta, t.a + Math.sin(performance.now() / 900 + t.i), 1.5 * dt));
+      if ((t.think -= dt) <= 0) (t.think = 2 + R() * 2), (t.gx = 60 + R() * (W - 120)), (t.gy = 90 + R() * (H - 160));
+      const dx = t.gx - t.x, dy = t.gy - t.y, d = Math.hypot(dx, dy);
+      if (d > 16) drive(t, dx / d, dy / d, dt * 0.55);
+      t.ta = turn(t.ta, t.a, 3 * dt);
+      return;
+    }
     if (platoon) {
       const lead = leaderOf(t);
       if (lead && lead !== t) return follow(t, lead, dt);
@@ -788,7 +831,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       t.ta = turn(t.ta, Math.atan2(o2.y - t.y, o2.x - t.x), 8 * dt);
     } else if (!touch || input.pointer.down) t.ta = turn(t.ta, Math.atan2(input.pointer.y - t.y, input.pointer.x - t.x), 10 * dt);
     else t.ta = turn(t.ta, t.a, 4 * dt);
-    if ((input.down("fire") || input.pointer.down) && !targeting && t.cool <= 0 && t.hot <= 0 && t.charge <= 0) fire(t);
+    if ((input.down("fire") || input.pointer.down || fireQ) && !targeting && t.cool <= 0 && t.hot <= 0 && t.charge <= 0) fire(t);
+    if (t.cool <= 0) fireQ = false; // a quick tap on FIRE always gets its shot
     if (longQ) {
       longQ = false;
       const k = aim >= 0 ? aim : touch ? nearestEnemy(t, 9999) : nearestTo(input.pointer.x, input.pointer.y, 9999, 0);
@@ -821,6 +865,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     },
     step(_, dt) {
       fx.step(dt);
+      quakeAmt = Math.max(0, quakeAmt - dt * 40);
       whiteout = Math.max(0, whiteout - dt * 0.9);
       if (state === "intro" || state === "count") {
         // The start screen: the grid lights up with everything that can land on it.
@@ -838,7 +883,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         return;
       }
       if (state !== "play") return;
-      if (!embed && !demo) {
+      if (!embed && !demo && !practice) {
         clock -= dt;
         if (clock <= 0) return void end();
       }
@@ -889,7 +934,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         t.flash = Math.max(0, t.flash - dt);
         t.hot = Math.max(0, t.hot - dt);
         t.heat = Math.max(0, t.heat - dt * (t.hot > 0 ? 0.7 : 0.45));
-        if (t.you) player(dt);
+        if (t.you) player(dt), practice && coachStep(dt);
         else bot(t, dt);
         // Long shot charging: the turret holds the target, then it fires.
         if (t.charge > 0) {
@@ -936,16 +981,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           if (done || t.team === tanks[s.owner]!.team || !t.alive || t.drop < 1) continue; // no friendly fire
           if (segCircle(s.x, s.y, nx, ny, t.x, t.y, 15 * scale) >= 0) {
             done = true;
-            fx.blast(t.x, t.y, s.rail ? 1.8 : 1, s.rail ? 1 : 4);
+            boom(t.x, t.y, s.rail ? 1.8 : 1, s.rail ? 1 : 4);
             damage(t, s.owner, s.rail ? MAXHP : 1, s.rail ? W_SNIPED : W_BOOM);
           }
         }
         const b = done ? null : blocked(nx, ny, 2);
         if (b) {
-          if (s.rail) wreckBlock(b), fx.blast(nx, ny, 1, 1);
+          if (s.rail) wreckBlock(b), boom(nx, ny, 1, 1);
           else {
             done = true;
-            fx.blast(nx, ny, 0.8, 2);
+            boom(nx, ny, 0.8, 2);
             if (--b.hp <= 0) wreckBlock(b);
           }
         }
@@ -956,7 +1001,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
               knock(c, s.vx / d, s.vy / d, s.rail ? 2 : 1.2, false);
               if (!s.rail) {
                 done = true;
-                fx.blast(nx, ny, 0.9, 4);
+                boom(nx, ny, 0.9, 4);
                 break;
               }
             }
@@ -974,12 +1019,18 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         else if ((b.fall -= dt) <= 0) (b.on = false), detonate(b);
       }
       for (const m of marks) if (m.on && (m.t -= dt) <= 0) m.on = false;
-      for (const b of booms) if (b.on && (b.t -= dt) <= 0) (b.on = false), fx.blast(b.x, b.y, b.p, b.c);
+      for (const b of booms) if (b.on && (b.t -= dt) <= 0) (b.on = false), boom(b.x, b.y, b.p, b.c);
       if (nukeT > 0 && (nukeT -= dt) <= 0) nukeGoesOff();
     },
     render() {
       hudFrame();
       draw();
+      if (buzz > 0) {
+        try {
+          navigator.vibrate?.(Math.min(400, buzz));
+        } catch {}
+        buzz = 0;
+      }
     },
   });
 
@@ -1008,6 +1059,66 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     },
     { capture: true, signal: e.signal },
   );
+
+  // ---------- Practice: the coach walks you through every control, then shares tricks ----------
+  const COACH: [string, string, string][] = [
+    ["DRIVE", "WASD or the arrow keys. On a phone, drag on the left half of the screen.", ""],
+    ["FIRE", "Click, Space, or hold FIRE. Keep holding and the ring fills: the cannon overheats.", "fire"],
+    ["AUTO AIM", "Tap AUTO (Q). The turret swings onto the nearest tank by itself.", "auto"],
+    ["AIM LOCK", "Tap LOCK (T). The turret sticks to one tank; tap another tank to switch.", "lock"],
+    ["LONG SHOT", "Tap LONG (E). It locks on, then wrecks a tank from across the field.", "long"],
+    ["AIRSTRIKE", "Tap STRIKE (F), then tap where the bombs go. They never hurt you.", "strike"],
+    ["POWER TILES", "Drive over a lit square: health, ammo, rapid fire, shields. Not the blinking red one.", ""],
+    ["KILL STREAK", "Wreck 3 tanks without being wrecked. 2 in a row earns a long shot, 3 an airstrike (5: carpet bomb, 8: nuke).", ""],
+    ["SUPPLY CRATE", "A crate is parachuting in. Drive over it: a medkit, long ammo, an airstrike or the jackpot.", ""],
+    ["YOUR KEYS", "Drag the grab bar above the keys to put them under your thumb.", "grab"],
+  ];
+  const TRICKS = [
+    "Right-click (desktop) fires a long shot at the tank nearest the mouse.",
+    "Rapid fire tiles cool the cannon: no overheating for 8 seconds.",
+    "Every kill patches 1 armour. Kill streaks: 2 long shot, 3 airstrike, 5 carpet bomb, 8 nuke.",
+    "Supply crates parachute in every 20 seconds or so. Race for them.",
+    "Mines blink fast and red. Drive around them, or lure someone over one.",
+    "In PLATOON, your three wingmen follow you and go after whoever shoots you.",
+    "Esc cancels an airstrike. Double-click the grab bar to put the keys back.",
+  ];
+  let cCrate = 0, cStep = 0, cShots = 0, cMoved = 0, cRail = 0, cStrike = 0, cTile = 0, cDrag = 0, cT = 0, coachShown = -1;
+  function coachStep(dt: number) {
+    // Never run dry while practising.
+    if (you.rail < 1) you.rail = 3;
+    if (you.strikes < 1 && !targeting) you.strikes = 2;
+    cT += dt;
+    const done = [cMoved > 220, cShots >= 6, autoOn, lockOn, cRail > 0, cStrike > 0, cTile > 0, you.run >= 3, cCrate > 0, cDrag > 0 || cT > 9][cStep];
+    if (cStep < COACH.length && done) {
+      cStep++;
+      cT = 0;
+      e.events.emit("power", 0);
+      if (COACH[cStep]?.[0] === "SUPPLY CRATE") dropCrate();
+    }
+    // The crate step: if the crate timed out (or someone else took it), drop another.
+    if (COACH[cStep]?.[0] === "SUPPLY CRATE" && !crates.some((c) => c.on)) dropCrate();
+  }
+  function coachFrame() {
+    const key = cStep < COACH.length ? cStep : COACH.length + (((cT / 6) | 0) % TRICKS.length);
+    if (key === coachShown) return;
+    coachShown = key;
+    for (const el of wrap.querySelectorAll(".coach-on")) el.classList.remove("coach-on");
+    const [title, text, k] = cStep < COACH.length ? COACH[cStep]! : ["TRICK", TRICKS[key - COACH.length]!, ""];
+    $<HTMLElement>("[data-cs]").textContent = cStep < COACH.length ? `${cStep + 1}/${COACH.length}` : "✓";
+    $<HTMLElement>("[data-ct]").textContent = cStep < COACH.length ? title : `FREE PLAY · ${title}`;
+    $<HTMLElement>("[data-cm]").textContent = text;
+    if (k) wrap.querySelector(k === "grab" ? "[data-grab]" : `[data-k=${k}]`)?.classList.add("coach-on");
+  }
+  $<HTMLButtonElement>("[data-cx]").addEventListener("click", () => toIntro(), { signal: e.signal });
+  /** Back to the start screen (End practice). */
+  function toIntro() {
+    for (const pool of [shells, tiles, marks, planes, bombs, booms, crates] as { on: boolean }[][]) for (const s of pool) s.on = false;
+    targeting = false;
+    nukeT = whiteout = quakeAmt = 0;
+    fx.clear();
+    roster();
+    intro();
+  }
 
   // ---------- Match flow ----------
   /** PRESS START blows up like the Battlefield launch keys: it presses in, inverts, and shatters. */
@@ -1042,25 +1153,27 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     setTimeout(() => layer.remove(), 800);
   }
+  const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
   function intro() {
     state = "intro";
     tileIn = 0;
     wrap.classList.add("pre");
     over.hidden = false;
     over.classList.add("intro");
-    over.innerHTML = `<div class="sticker">${BADGE}<span data-kick>BATTLEFIELD · ${platoon ? "PLATOONS" : "FREE FOR ALL"}</span><b>BLITZ<em>!</em></b></div>
-<div class="modes" role="radiogroup" aria-label="Mode"><button class="mode" type="button" role="radio" data-mode="solo" aria-checked="${!platoon}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" role="radio" data-mode="platoon" aria-checked="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button></div>
+    over.innerHTML = `<div class="sticker">${BADGE}<span data-kick>${kicker()}</span><b>BLITZ<em>!</em></b></div>
+<div class="modes" role="radiogroup" aria-label="Mode"><button class="mode" type="button" role="radio" data-mode="solo" aria-checked="${!platoon && !practice}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" role="radio" data-mode="platoon" aria-checked="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button><button class="mode" type="button" role="radio" data-mode="practice" aria-checked="${practice}"><b>PRACTICE</b><small>learn the keys, with tips</small></button></div>
 <div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
 <button class="start" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
     for (const b of over.querySelectorAll<HTMLButtonElement>("[data-mode]"))
       b.addEventListener("click", () => {
         platoon = b.dataset.mode === "platoon";
+        practice = b.dataset.mode === "practice";
         try {
-          localStorage.setItem("blitz:mode", platoon ? "platoon" : "solo");
+          localStorage.setItem("blitz:mode", b.dataset.mode!);
         } catch {}
         roster();
         for (const m of over.querySelectorAll("[data-mode]")) m.setAttribute("aria-checked", String(m === b));
-        over.querySelector("[data-kick]")!.textContent = `BATTLEFIELD · ${platoon ? "PLATOONS" : "FREE FOR ALL"}`;
+        over.querySelector("[data-kick]")!.textContent = kicker();
         e.events.emit("lock", 0);
       }, { signal: e.signal });
     const go = over.querySelector<HTMLButtonElement>("[data-go]")!;
@@ -1076,6 +1189,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function begin() {
     state = "play";
+    if (practice) (cStep = cCrate = cShots = cMoved = cRail = cStrike = cTile = cDrag = cT = 0), (coachShown = -1);
     wrap.classList.remove("pre");
     over.hidden = true;
     over.innerHTML = "";
@@ -1127,6 +1241,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const teamKills = new Int32Array(4);
   const last = { tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
   function hudFrame() {
+    const coaching = practice && state === "play";
+    if (coaching) coachFrame();
+    if ($<HTMLElement>("[data-coach]").hidden === coaching) {
+      $<HTMLElement>("[data-coach]").hidden = !coaching;
+      if (!coaching) for (const el of wrap.querySelectorAll(".coach-on")) el.classList.remove("coach-on");
+    }
     const k = String(you.kills);
     let lead = tanks[0]!;
     for (const t of tanks) if (t.kills > lead.kills) lead = t;
@@ -1134,7 +1254,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const t of tanks) if (t.kills > you.kills) rank++;
     teamKills.fill(0);
     for (const t of tanks) if (t.team < 4) teamKills[t.team]! += t.kills;
-    const tt = embed ? `#${rank}` : `${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, "0")}`;
+    const tt = practice ? "∞" : embed ? `#${rank}` : `${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, "0")}`;
     let top = 0;
     for (let k2 = 1; k2 < 3; k2++) if (teamKills[k2]! > teamKills[top]!) top = k2;
     const ld = platoon ? (teamKills[top] ? `${PLATOON[top]} ${teamKills[top]}` : "—") : lead.kills ? `${lead.name} ${lead.kills}` : "—";
@@ -1342,7 +1462,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function draw() {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    const sh = fx.shake, sx = sh ? (R() - 0.5) * sh : 0, sy = sh ? (R() - 0.5) * sh : 0;
+    const sh = quakeAmt, sx = sh ? (R() - 0.5) * sh : 0, sy = sh ? (R() - 0.5) * sh : 0;
     ctx.translate(sx, sy);
     if (!embed) {
       // The arena: a dark grid like the game's map.
@@ -1675,8 +1795,42 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     keys.fire.setPointerCapture?.(ev.pointerId);
     keys.fire.classList.add("down");
     input.press("fire");
+    fireQ = true;
   }, { signal: e.signal });
   for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) keys.fire.addEventListener(t, fireUp, { signal: e.signal });
+  // The grab bar moves the keys; where you put them is remembered. Double-click puts them back.
+  const pad = $<HTMLElement>("[data-pad]"), grab = $<HTMLButtonElement>("[data-grab]"), padAt = new Float64Array(4);
+  const placePad = () => {
+    const r = wrap.getBoundingClientRect(), pw = pad.offsetWidth * 0.9, ph = pad.offsetHeight * 0.9;
+    padAt[0] = Math.max(-(r.width - pw - 8), Math.min(8, padAt[0]!));
+    padAt[1] = Math.max(-(r.height - ph - 8), Math.min(8, padAt[1]!));
+    pad.style.translate = padAt[0] || padAt[1] ? `${padAt[0]}px ${padAt[1]}px` : "";
+  };
+  try {
+    const v = JSON.parse(localStorage.getItem("blitz:pad") ?? "null");
+    if (Array.isArray(v)) (padAt[0] = +v[0] || 0), (padAt[1] = +v[1] || 0), requestAnimationFrame(placePad);
+  } catch {}
+  const savePad = () => {
+    try {
+      localStorage.setItem("blitz:pad", JSON.stringify([padAt[0], padAt[1]]));
+    } catch {}
+  };
+  grab.addEventListener("pointerdown", (ev) => {
+    ev.stopPropagation();
+    grab.setPointerCapture?.(ev.pointerId);
+    grab.classList.add("on");
+    padAt[2] = ev.clientX - padAt[0]!;
+    padAt[3] = ev.clientY - padAt[1]!;
+  }, { signal: e.signal });
+  grab.addEventListener("pointermove", (ev) => {
+    if (!grab.classList.contains("on")) return;
+    padAt[0] = ev.clientX - padAt[2]!;
+    padAt[1] = ev.clientY - padAt[3]!;
+    placePad();
+    cDrag++;
+  }, { signal: e.signal });
+  for (const t of ["pointerup", "pointercancel"]) grab.addEventListener(t, () => grab.classList.contains("on") && (grab.classList.remove("on"), savePad()), { signal: e.signal });
+  grab.addEventListener("dblclick", () => ((padAt[0] = padAt[1] = 0), placePad(), savePad()), { signal: e.signal });
   // Right-click: long shot at the tank nearest the mouse (or cancel the airstrike).
   canvas.addEventListener("contextmenu", (ev) => (ev.preventDefault(), targeting ? (targeting = false) : (longQ = true)), { signal: e.signal });
   // Light or dark: follows the page's Board UI theme (<html data-theme>), like the Battlefield game.
@@ -1711,6 +1865,13 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     },
     get platoons() {
       return platoon;
+    },
+    get practice() {
+      return practice;
+    },
+    /** Practice coach: the step you're on (0-based; 8 = done). */
+    get coach() {
+      return cStep;
     },
     /** Debug / tests: your controls. */
     controls: {

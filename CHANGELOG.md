@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+- PRACTICE mode: no clock, TARGET tanks that stand still and MOVERs that drive about (none shoot),
+  a 10-step coach for every control and reward (with the right key pulsing), then tricks.
+  Endless long shots and strikes. END PRACTICE returns to the start screen.
+- The pad, like the Battlefield cockpit: AUTO and LOCK ride on FIRE, LONG and STRIKE sit in a row
+  above, and a grab bar moves the whole pad (remembered; double-click resets).
+- Shake is about you now: only blasts near your tank move the screen (closer = harder), hits
+  you take shake it by how hard they were, and phones vibrate when you're hit.
+- Start screen: the controls note runs across the top; the sticker no longer blocks the mode
+  keys while it slams in.
+- Fix: a very quick tap on FIRE always fires.
+
 ## 0.3.0
 
 - PLATOON mode: you and three wingmen in your colour against two other platoons of four. Pick
