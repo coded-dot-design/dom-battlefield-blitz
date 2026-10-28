@@ -67,6 +67,17 @@ try {
   await page.waitForFunction(() => game.world.planes.some((p) => p.on) && game.world.bombs.some((b) => b.on), null, { timeout: 2000 });
   await page.waitForFunction(() => !game.world.bombs.some((b) => b.on), null, { timeout: 4000 });
   assert.equal(await page.evaluate(() => game.controls.targeting), false);
+  // Pause = the surrender question (the Battlefield overlay): KEEP FIGHTING resumes.
+  [x, y] = await sr("[data-pause]");
+  await page.mouse.click(x, y);
+  await page.waitForFunction(() => game.state === "paused");
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-ov]").textContent), /BATTLE PAUSED.*GIVE UP\?.*KEEP FIGHTING.*SURRENDER/s);
+  await page.mouse.click(...(await sr("[data-resume]")));
+  await page.waitForFunction(() => game.state === "play");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => game.state === "paused");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => game.state === "play");
   // Full screen key (board).
   [x, y] = await sr("[data-fs]");
   await page.mouse.click(x, y);
@@ -81,8 +92,8 @@ try {
   await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector(".bz").classList.contains("light"));
   await page.evaluate(() => delete document.documentElement.dataset.theme);
   await page.waitForFunction(() => game.state === "end", null, { timeout: 20000 });
-  const over = await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-over]").textContent);
-  assert.match(over, /MATCH OVER/);
+  const over = await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-ov]").textContent);
+  assert.match(over, /(STAGE CLEAR|INSERT COIN).*REMATCH.*NEW GAME/s);
   await page.evaluate(() => game.destroy());
   assert.equal(await page.evaluate(() => document.getElementById("board").shadowRoot.childElementCount), 0, "destroy removes the game");
 
@@ -120,8 +131,13 @@ try {
   const shot = await page.evaluate(() => { const [you, wing] = pl.world.tanks; const s = pl.world.shells.find((q) => !q.on); Object.assign(s, { on: true, rail: false, tgt: -1, owner: wing.i, x: you.x - 30, y: you.y, vx: 600, vy: 0, life: 1 }); return [pl.world.shells.indexOf(s), you.x]; });
   await page.waitForTimeout(120);
   assert.ok(await page.evaluate(([i, x]) => { const s = pl.world.shells[i]; return s.on && s.owner === 1 && s.x > x; }, shot), "a wingman's shell passes through you");
-  await page.waitForFunction(() => pl.state === "end", null, { timeout: 15000 });
-  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-over]").textContent), /PLATOON/);
+  // SURRENDER: the white flag whites out, waves, bursts, and the match ends as GAME OVER.
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => pl.state === "paused");
+  await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-surrender]").click());
+  await page.waitForFunction(() => pl.state === "end", null, { timeout: 5000 });
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-ov]").textContent), /WHITE FLAG.*GAME OVER/s);
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-ov]").textContent), /PLATOON/);
   await page.evaluate(() => (pl.destroy(), localStorage.removeItem("blitz:mode")));
 
   where = "practice";
@@ -173,7 +189,7 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, full screen → result), platoons (picker, teams, result), practice (coach, still targets, harmless dummies, grab bar), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

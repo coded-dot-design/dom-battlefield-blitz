@@ -63,7 +63,8 @@ LONG and STRIKE sit in a row above, and the grab bar on top moves the whole pad 
 double-click puts it back). Auto-aim starts on. The screen shakes only for blasts near your tank
 and hits you take (harder the bigger the hit), and phones buzz when you're hit.
 The board follows the page's light or dark theme (`<html data-theme>`) and has a full screen key
-(top left). Every key is a Board UI kit key (Fizlet's `ui` brick), the same as DOM Battlefield's.
+(top left) next to the white flag: pause asks BATTLE PAUSED / GIVE UP? with KEEP FIGHTING or
+SURRENDER, the same overlay as DOM Battlefield. Every key is a Board UI kit key (Fizlet's `ui` brick), the same as DOM Battlefield's.
 
 ## Drop-in options
 

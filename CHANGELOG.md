@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0
+
+- Pause is the surrender question, exactly as in DOM Battlefield (Board UI kit overlay): the white
+  flag key (top left, Esc / P) dims the board and slams BATTLE PAUSED / GIVE UP? with KEEP FIGHTING
+  and SURRENDER. Surrender whites out your team grid, waves the flag, bursts and ends the match
+  (in practice it goes back to the start screen).
+- Results use the kit overlay too: STAGE CLEAR (you win), INSERT COIN (someone else wins) or WHITE
+  FLAG / GAME OVER (you gave up), the standings, then REMATCH and NEW GAME (back to the mode picker).
+
 ## 0.5.0
 
 - Blitz now wears the Board UI kit (Fizlet's ui brick), the same CSS as DOM Battlefield, so keys

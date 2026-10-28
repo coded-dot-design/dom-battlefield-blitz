@@ -20,7 +20,7 @@ import { effects } from "../vendor/fizlet/fx";
 import { sound } from "../vendor/fizlet/sound";
 import { segCircle, inRect, circleRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
-import { launch } from "../vendor/fizlet/ui/board-ui";
+import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 
 /** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
 declare const __KIT_CSS__: string;
@@ -85,12 +85,17 @@ const ICON = {
   strike: '<path d="M10 1.5l1.6 5.2 6.4 3.6v1.6l-6.3-1.4-.7 4.3 2.3 1.9v1.3l-3.3-.9-3.3.9v-1.3l2.3-1.9-.7-4.3L2 11.9v-1.6l6.4-3.6z"/>',
   auto: '<path d="M10 1v4M10 15v4M1 10h4M15 10h4M5.5 5.5l2 2M14.5 5.5l-2 2M5.5 14.5l2-2M14.5 14.5l-2-2"/>',
   lock: '<path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M10 8v4M8 10h4"/>',
+  flag: '<path d="M5 18V3M5 4h10l-3 3.5 3 3.5H5"/>',
   full: '<path d="M2 7V2h5M18 7V2h-5M2 13v5h5M18 13v5h-5"/>',
   exit: '<path d="M7 2v5H2M13 2v5h5M7 18v-5H2M13 18v-5h5"/>',
 };
 // The Battlefield cartridge skull on its grid tile, with a pink Blitz bolt.
 const GRID = '<path d="M0 16h64M0 32h64M0 48h64M16 0v64M32 0v64M48 0v64" stroke="#19f0ff" stroke-opacity=".35"/><rect x="1" y="1" width="62" height="62" fill="none" stroke="#19f0ff" stroke-width="2"/>';
 const BADGE = `<svg class="ic" viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<g transform="translate(10 9) scale(.69)" fill="currentColor"><path fill-rule="evenodd" d="M19 6h26v6h7v6h6v6h5v22h-5v6h-8v12h-9v-8h-6v8h-8v-8h-6v8h-8V52H5v-6H0V24h5v-6h6v-6h8ZM11 29v14h15V29Zm26 0v14h15V29Z"/></g><path d="M50 3h9l-4 7h5l-10 12 3-9h-5z" fill="#ff2e88"/></svg>`;
+// The white flag (kit section 9.3): a 4 × 4 grid in your team colour that whites out, and a flag that waves.
+const CELLS = [0, 1, 4, 2, 5, 8, 3, 6, 9, 12, 7, 10, 13, 11, 14, 15].map((i, k) => `<rect x="${(i % 4) * 16}" y="${((i / 4) | 0) * 16}" width="16" height="16" style="--i:${k}"/>`).join("");
+const FLAG = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges"><g class="bui-cells">${CELLS}</g><path d="M0 16h64M0 32h64M0 48h64M16 0v64M32 0v64M48 0v64" fill="none" stroke="#07060f" stroke-opacity=".3"/><path d="M17 9h4v46h-4Z" fill="#f6f3ff" stroke="#07060f" stroke-width="2"/><path class="bui-cloth" d="M21 12h24l-6 9 6 9H21Z" fill="#f6f3ff" stroke="#07060f" stroke-width="2"/></svg>`;
+const SKULL = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges"><g transform="translate(10 9) scale(.69)"><path fill-rule="evenodd" d="M19 6h26v6h7v6h6v6h5v22h-5v6h-8v12h-9v-8h-6v8h-8v-8h-6v8h-8V52H5v-6H0V24h5v-6h6v-6h8ZM11 29v14h15V29Zm26 0v14h15V29Z"/></g></svg>`;
 const PLAY = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<path d="M22 16v32l26-16Z" fill="currentColor"/></svg>`;
 const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="true">${ICON[k]}</svg>`;
 
@@ -151,6 +156,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .bui .coach button{grid-row:1/span 2;grid-column:3;min-height:0;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em}
 .bui .fs{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
+.bui .pz{position:absolute;z-index:3;left:max(60px,calc(env(safe-area-inset-left) + 48px));top:max(10px,env(safe-area-inset-top));height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
+.ov .table{position:absolute;left:50%;top:56%;translate:-50% -50%}.ov.result .bui-sticker{top:26%}
+@media (pointer:coarse){.pz span{display:none}}
+@media (max-height:460px){.ov .table{top:57%;gap:2px;padding:6px 12px;font-size:10px}.ov .table div:nth-child(n+4):not(.you){display:none}.ov.result .bui-sticker{top:22%}}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
 @media (max-height:380px){.legend{display:none}.over.intro{padding-top:0}}
 @media (max-height:460px){.over{gap:14px}.sticker b{font-size:36px}.sticker .ic{width:46px;height:46px}}
@@ -178,6 +187,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <div class="banner" data-banner><b></b><span></span></div>
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
+<button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause or surrender (Esc)" title="Esc · Pause">${svg("flag")}<span>Surrender</span></button>
 <div class="pad" data-pad>
 <button class="grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"><i></i><i></i><i></i></button>
 <button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
@@ -188,7 +198,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC PAUSE"}</div>
 <div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div>
-<div class="over" data-over hidden></div>`;
+<div class="over" data-over hidden></div>
+<div class="bui-overlay ov" data-ov hidden role="dialog"></div>`;
   root.append(style, wrap);
   const $ = <T extends Element>(s: string) => wrap.querySelector<T>(s)!;
   const canvas = $<HTMLCanvasElement>("canvas"), ctx = canvas.getContext("2d")!;
@@ -1103,6 +1114,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   $<HTMLButtonElement>("[data-cx]").addEventListener("click", () => toIntro(), { signal: e.signal });
   /** Back to the start screen (End practice). */
   function toIntro() {
+    closeOverlay();
+    for (const t of tanks) t.alive = false;
     for (const pool of [shells, tiles, marks, planes, bombs, booms, crates] as { on: boolean }[][]) for (const s of pool) s.on = false;
     targeting = false;
     nukeT = whiteout = quakeAmt = 0;
@@ -1156,7 +1169,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function standings() {
     return tanks.map((t) => ({ name: t.name, kills: t.kills, deaths: t.deaths, you: t.you, team: t.team })).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
   }
-  function end() {
+  function end(surrendered = false) {
     state = "end";
     targeting = false;
     const st = standings();
@@ -1164,16 +1177,20 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const teams = [0, 1, 2].map((team) => ({ team, kills: 0, deaths: 0 }));
     if (platoon) for (const t of tanks) (teams[t.team]!.kills += t.kills), (teams[t.team]!.deaths += t.deaths);
     teams.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-    const won = platoon ? teams[0]!.team === 0 : st[0]!.you;
+    const won = !surrendered && (platoon ? teams[0]!.team === 0 : st[0]!.you);
     e.events.emit(won ? "win" : "end", 0);
-    over.hidden = false;
     const rows = platoon
       ? teams.map((s, i) => `<div class="${s.team === 0 ? "you" : ""}"><span>${i + 1}. ${PLATOON[s.team]} PLATOON</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("") + `<div class="you"><span>YOU</span><span>${you.kills} K · ${you.deaths} D</span></div>`
       : st.slice(0, 5).map((s, i) => `<div class="${s.you ? "you" : ""}"><span>${i + 1}. ${s.name}</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("");
-    over.innerHTML = `<div class="sticker plain"><span>MATCH OVER</span><b>${won ? (platoon ? "PLATOON WINS" : "YOU WIN") : `${platoon ? PLATOON[teams[0]!.team] : st[0]!.name} WINS`}</b></div>
-<div class="table">${rows}</div>
-<div class="row"><button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button></div>`;
-    over.querySelector("[data-again]")!.addEventListener("click", rematch, { signal: e.signal });
+    // Kit result overlays: STAGE CLEAR when you win, INSERT COIN when you don't, WHITE FLAG when you gave up.
+    overlay(
+      won ? "STAGE CLEAR" : surrendered ? "WHITE FLAG" : "INSERT COIN",
+      won ? (platoon ? "PLATOON WINS" : "YOU WIN") : surrendered ? "GAME OVER" : `${platoon ? PLATOON[teams[0]!.team] : st[0]!.name} WINS`,
+      `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button><button class="bui-sticker-key bui-second" type="button" data-new>${PLAY}<b>NEW GAME</b></button>`,
+      `<div class="table">${rows}</div>`,
+    );
+    ov.querySelector("[data-again]")!.addEventListener("click", () => (closeOverlay(), rematch()), { signal: e.signal });
+    ov.querySelector("[data-new]")!.addEventListener("click", () => (closeOverlay(), toIntro()), { signal: e.signal });
     o.onEnd?.(st);
   }
   function rematch() {
@@ -1187,13 +1204,35 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (!embed) layBlocks();
     countdown();
   }
+  /** The kit overlay (Board UI section 9): grey dim, a sticker that slams and presses in, two keys. */
+  const ov = $<HTMLElement>("[data-ov]");
+  function overlay(kick: string, word: string, keys: string, table = "") {
+    ov.hidden = false;
+    ov.classList.toggle("result", !!table);
+    ov.setAttribute("aria-label", `${kick} ${word}`);
+    ov.innerHTML = `<div class="bui-sticker"><span>${kick}</span><b>${word}</b></div>${table}<div class="bui-overlay-keys">${keys}</div>`;
+    slam(ov.querySelector(".bui-sticker"));
+    requestAnimationFrame(() => ov.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true }));
+  }
+  const closeOverlay = () => ((ov.hidden = true), (ov.innerHTML = ""));
+  /** Pause = the surrender question, exactly like DOM Battlefield: KEEP FIGHTING or SURRENDER. */
   function togglePause() {
     if (state === "play") {
       state = "paused";
-      over.hidden = false;
-      over.innerHTML = `<div class="sticker plain"><span>BLITZ PAUSED</span><b>HOLD FIRE</b></div><div class="row"><button class="bui-sticker-key" type="button" data-resume>${PLAY}<b>KEEP FIGHTING</b></button></div>`;
-      over.querySelector("[data-resume]")!.addEventListener("click", togglePause, { signal: e.signal });
-    } else if (state === "paused") begin();
+      targeting = false;
+      input.press("fire", false);
+      overlay("BATTLE PAUSED", "GIVE UP?", `<button class="bui-sticker-key" type="button" data-resume>${SKULL}<b>KEEP FIGHTING</b></button><button class="bui-sticker-key bui-second bui-surrender" type="button" data-surrender>${FLAG}<b>SURRENDER</b></button>`);
+      ov.querySelector("[data-resume]")!.addEventListener("click", togglePause, { signal: e.signal });
+      const flag = ov.querySelector<HTMLButtonElement>("[data-surrender]")!;
+      flag.addEventListener("click", () => {
+        if (flag.classList.contains("go")) return;
+        // The white flag: cells white out, the flag waves, then it blows up and the match ends.
+        flag.classList.add("go");
+        e.events.emit("strike", 0);
+        const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        setTimeout(() => launch(flag, () => (practice ? (closeOverlay(), toIntro()) : end(true)), { reduced }), reduced ? 0 : 480);
+      }, { signal: e.signal });
+    } else if (state === "paused") (closeOverlay(), (state = "play"));
   }
 
   // ---------- HUD (change-only writes, render phase) ----------
@@ -1790,6 +1829,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }, { signal: e.signal });
   for (const t of ["pointerup", "pointercancel"]) grab.addEventListener(t, () => grab.classList.contains("on") && (grab.classList.remove("on"), savePad()), { signal: e.signal });
   grab.addEventListener("dblclick", () => ((padAt[0] = padAt[1] = 0), placePad(), savePad()), { signal: e.signal });
+  $<HTMLButtonElement>("[data-pause]").addEventListener("click", () => state === "play" && togglePause(), { signal: e.signal });
   // Full screen: the real thing where the browser allows it, else the board fills the window.
   const fsKey = $<HTMLButtonElement>("[data-fs]");
   const fsOn = () => document.fullscreenElement === host || wrap.classList.contains("full");
