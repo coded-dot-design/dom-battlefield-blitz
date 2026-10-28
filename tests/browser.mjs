@@ -67,6 +67,13 @@ try {
   await page.waitForFunction(() => game.world.planes.some((p) => p.on) && game.world.bombs.some((b) => b.on), null, { timeout: 2000 });
   await page.waitForFunction(() => !game.world.bombs.some((b) => b.on), null, { timeout: 4000 });
   assert.equal(await page.evaluate(() => game.controls.targeting), false);
+  // Full screen key (board).
+  [x, y] = await sr("[data-fs]");
+  await page.mouse.click(x, y);
+  await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector("[data-fs]").getAttribute("aria-pressed") === "true");
+  await page.mouse.click(...(await sr("[data-fs]")));
+  await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector("[data-fs]").getAttribute("aria-pressed") === "false");
+  await page.evaluate(() => document.getElementById("board").scrollIntoView({ block: "end" }));
   // Supply crate drops, and the board follows the page theme.
   await page.evaluate(() => game.controls.crate());
   assert.ok(await page.evaluate(() => game.world.crates.some((c) => c.on)), "a supply crate drops");
@@ -166,7 +173,7 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme → result), platoons (picker, teams, result), practice (coach, still targets, harmless dummies, grab bar), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, full screen → result), platoons (picker, teams, result), practice (coach, still targets, harmless dummies, grab bar), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

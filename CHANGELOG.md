@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0
+
+- Blitz now wears the Board UI kit (Fizlet's ui brick), the same CSS as DOM Battlefield, so keys
+  look and behave the same on both boards in dark and light: the round keys are kit arcade keys
+  (FIRE in the fire colour, AUTO and LOCK in the aim colour, dim off and lit and breathing when
+  locked, STRIKE in attack pink), the mode picker is the kit's segmented choice (the picked mode
+  stays pressed in), PRESS START / REMATCH / KEEP FIGHTING are kit sticker keys (white face and
+  ink rim in light), and PRESS START bursts with the kit's launch(). HUD, feed, table and notes
+  use the kit tokens, so they flip with the theme too.
+- Full screen key (top left, board): real full screen where allowed (landscape on phones), else
+  the board fills the window.
+- More room on the start screen between the sticker, the modes and PRESS START.
+- Size budget 40 KB gzip (the kit CSS is ~3 KB of it).
+
 ## 0.4.1
 
 - Practice TARGETs can't be shoved around (bumping one pushes only you).

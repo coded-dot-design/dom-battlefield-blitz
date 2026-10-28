@@ -62,7 +62,8 @@ and the round arcade keys bottom right: AUTO and LOCK ride on FIRE (like the Bat
 LONG and STRIKE sit in a row above, and the grab bar on top moves the whole pad (remembered;
 double-click puts it back). Auto-aim starts on. The screen shakes only for blasts near your tank
 and hits you take (harder the bigger the hit), and phones buzz when you're hit.
-The board follows the page's light or dark theme (`<html data-theme>`).
+The board follows the page's light or dark theme (`<html data-theme>`) and has a full screen key
+(top left). Every key is a Board UI kit key (Fizlet's `ui` brick), the same as DOM Battlefield's.
 
 ## Drop-in options
 
@@ -93,7 +94,7 @@ game.start();             // intro → countdown → match
 ```sh
 npm ci
 npm run check          # typecheck + build dist/ (committed)
-npm run size           # budget: 32 KB gzip (today ~26 KB, engine and art included)
+npm run size           # budget: 40 KB gzip (today ~34 KB, engine, art and the Board UI kit included)
 npm run test:browser   # board match + every key, demo, drop-in (Chromium)
 node scripts/sync.mjs  # refresh vendor/fizlet and shared/ from sibling checkouts
 ```

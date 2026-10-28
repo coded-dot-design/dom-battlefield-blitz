@@ -3,14 +3,17 @@
 //   dist/blitz.mjs  - the module: createBlitz + install, for the Battlefield site's Blitz pages
 //   dist/blitz.d.ts - its types
 //   dist/build.json - version and SHA-256 per file (provenance for the sync into dom-battlefield)
-import { build } from "esbuild";
+import { build, transform } from "esbuild";
 import { createHash } from "node:crypto";
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 rmSync("dist", { recursive: true, force: true });
 mkdirSync("dist");
-const common = { bundle: true, minify: true, target: "es2022", legalComments: "none", logLevel: "warning", banner: { js: `/* Battlefield Blitz ${version} · MIT © Chris Cooley · built on Fizlet */` } };
+// The Board UI kit (Fizlet's ui brick): the same keys, states and stickers as DOM Battlefield,
+// minified and baked in as a string for the game's shadow root.
+const kit = (await transform(readFileSync("vendor/fizlet/ui/board-ui.css", "utf8"), { loader: "css", minify: true })).code;
+const common = { define: { __KIT_CSS__: JSON.stringify(kit) }, bundle: true, minify: true, target: "es2022", legalComments: "none", logLevel: "warning", banner: { js: `/* Battlefield Blitz ${version} · MIT © Chris Cooley · built on Fizlet */` } };
 await build({ ...common, entryPoints: ["src/embed.ts"], format: "iife", outfile: "dist/blitz.js" });
 await build({ ...common, entryPoints: ["src/index.ts"], format: "esm", outfile: "dist/blitz.mjs" });
 copyFileSync("src/blitz.d.ts", "dist/blitz.d.ts");

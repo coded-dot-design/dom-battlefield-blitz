@@ -20,6 +20,10 @@ import { effects } from "../vendor/fizlet/fx";
 import { sound } from "../vendor/fizlet/sound";
 import { segCircle, inRect, circleRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
+import { launch } from "../vendor/fizlet/ui/board-ui";
+
+/** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
+declare const __KIT_CSS__: string;
 
 export interface BlitzOptions {
   mode?: "board" | "embed";
@@ -81,6 +85,8 @@ const ICON = {
   strike: '<path d="M10 1.5l1.6 5.2 6.4 3.6v1.6l-6.3-1.4-.7 4.3 2.3 1.9v1.3l-3.3-.9-3.3.9v-1.3l2.3-1.9-.7-4.3L2 11.9v-1.6l6.4-3.6z"/>',
   auto: '<path d="M10 1v4M10 15v4M1 10h4M15 10h4M5.5 5.5l2 2M14.5 5.5l-2 2M5.5 14.5l2-2M14.5 14.5l-2-2"/>',
   lock: '<path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M10 8v4M8 10h4"/>',
+  full: '<path d="M2 7V2h5M18 7V2h-5M2 13v5h5M18 13v5h-5"/>',
+  exit: '<path d="M7 2v5H2M13 2v5h5M7 18v-5H2M13 18v-5h5"/>',
 };
 // The Battlefield cartridge skull on its grid tile, with a pink Blitz bolt.
 const GRID = '<path d="M0 16h64M0 32h64M0 48h64M16 0v64M32 0v64M48 0v64" stroke="#19f0ff" stroke-opacity=".35"/><rect x="1" y="1" width="62" height="62" fill="none" stroke="#19f0ff" stroke-width="2"/>';
@@ -89,115 +95,99 @@ const PLAY = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crisp
 const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="true">${ICON[k]}</svg>`;
 
 const CSS = `:host{all:initial;display:block}*{box-sizing:border-box}
-.bz{position:absolute;inset:0;overflow:hidden;font:600 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;color:#f6f3ff;touch-action:none;user-select:none;-webkit-user-select:none}
+.bz{position:absolute;inset:0;overflow:hidden;font:600 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
 .bz.embed{position:fixed;z-index:2147483000}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
 .aiming canvas{cursor:none}
-.hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:#110d22ee;border:2px solid #3b3170;border-radius:12px;box-shadow:0 5px 0 #2a2150;pointer-events:none;white-space:nowrap}
-.hud b{font-size:17px;font-weight:900}.hud small{display:block;font-size:8px;letter-spacing:.16em;color:#aea4d6}
-.hud .k b{color:#39ffb0}.hud .t b{color:#19f0ff}.hud .lead b{color:#ffc21a;font-size:13px}.hud .st b{color:#ff2e88}
-.hud i{display:block;width:64px;height:10px;margin-top:4px;background:#2a2150;border:1.5px solid #07060f;border-radius:3px;overflow:hidden}
-.hud u{display:block;height:100%;background:#39ffb0;transition:width .2s}.hud .low u{background:#ff2b4e}
+.hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim);pointer-events:none;white-space:nowrap}
+.hud b{font-size:17px;font-weight:900}.hud small{display:block;font-size:8px;letter-spacing:.16em;color:var(--muted)}
+.hud :is(.k,.tm) b{color:var(--team)}.hud .t b{color:var(--k-sys-ink)}.hud .lead b{color:var(--k-cmd-ink);font-size:13px}.hud .st b{color:var(--k-fire-ink)}
+.bui[data-theme=light] .hud :is(.k,.tm) b{color:#0a8a55}
+.hud i{display:block;width:64px;height:10px;margin-top:4px;background:var(--raised);border:1.5px solid var(--rim);border-radius:3px;overflow:hidden}
+.hud u{display:block;height:100%;background:var(--team);transition:width .2s}.hud .low u{background:var(--k-fire)}
+.hud .tm{display:none}.platoon .hud .tm{display:block}
 .feed{position:absolute;right:max(12px,env(safe-area-inset-right));top:max(70px,calc(env(safe-area-inset-top) + 60px));margin:0;padding:0;list-style:none;display:grid;gap:4px;justify-items:end;pointer-events:none}
-.feed li{padding:4px 8px;background:#110d22dd;border:1px solid #3b3170;border-radius:6px;font-size:11px}.feed li:empty{display:none}
-.feed i{font-style:normal;font-weight:900}
+.feed li{padding:4px 8px;color:var(--ink);background:color-mix(in srgb,var(--surface) 90%,transparent);border:1px solid var(--line);border-radius:6px;font-size:11px}.feed li:empty{display:none}
+.feed i{font-style:normal;font-weight:900;text-shadow:0 0 1px var(--rim)}
 .banner{position:absolute;left:50%;top:max(80px,calc(env(safe-area-inset-top) + 70px));translate:-50% 0;display:grid;justify-items:center;gap:4px;padding:10px 22px 12px;background:#10233f;border:3px solid #f6f3ff;border-radius:14px;box-shadow:0 6px 0 #f6f3ff;rotate:-2deg;pointer-events:none;opacity:0;white-space:nowrap}
 .banner b{font:900 clamp(20px,4vw,34px)/1 ui-monospace,monospace;letter-spacing:.05em;color:#ffc21a}.banner span{font-size:11px;letter-spacing:.18em;color:#19f0ff}
-.tip{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));translate:-50% 0;padding:8px 14px;font-size:11px;letter-spacing:.12em;color:#07060f;background:#ff2e88;border:2px solid #07060f;border-radius:8px;box-shadow:0 4px 0 #8f1950;pointer-events:none;white-space:nowrap;animation:blink 1s steps(2) infinite}
+.tip{position:absolute;left:50%;bottom:max(18px,env(safe-area-inset-bottom));translate:-50% 0;padding:8px 14px;font-size:11px;letter-spacing:.12em;color:var(--rim);background:var(--k-attack);border:2px solid var(--rim);border-radius:8px;box-shadow:0 4px 0 var(--rim);pointer-events:none;white-space:nowrap;animation:blink 1s steps(2) infinite}
 .tip[hidden]{display:none}@keyframes blink{50%{opacity:.6}}
-button{font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pad{position:absolute;right:max(10px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:200px;height:256px;pointer-events:none;transform-origin:100% 100%}
-.grab{position:absolute;right:42px;bottom:226px;display:flex;align-items:center;justify-content:center;gap:4px;width:72px;height:22px;padding:0;background:#110d22e6;border:2px solid #3b3170;border-radius:11px;pointer-events:auto;touch-action:none;cursor:grab}
-.grab i{width:4px;height:4px;background:#aea4d6;border-radius:50%}.grab:active,.grab.on{cursor:grabbing;border-color:#19f0ff}.grab:active i,.grab.on i{background:#19f0ff}
-.light .grab{background:#f6f3ff;border-color:#07060f}.light .grab i{background:#3b3170}
 .embed .pad{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px))}
-.rk{--c:#19f0ff;--e:color-mix(in srgb,var(--c) 45%,#07060f);position:absolute;display:grid;place-content:center;justify-items:center;gap:2px;width:62px;height:62px;padding:0;color:#07060f;background:var(--c);border:2.5px solid #07060f;border-radius:50%;box-shadow:0 5px 0 var(--e),0 0 14px color-mix(in srgb,var(--c) 40%,transparent);pointer-events:auto;touch-action:none;transition:transform .1s,box-shadow .1s,opacity .2s}
-.rk svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+.bui .grab{--py:3px;position:absolute;right:52px;bottom:226px;width:56px;height:18px;min-height:0;padding:0;background:var(--k-cmd) radial-gradient(circle,#f6f3ff 1px,transparent 1.5px) center/6px 6px;border:2px solid var(--rim);border-radius:6px;--edge:var(--k-cmd-base);pointer-events:auto;touch-action:none;cursor:grab}
+.bui .grab.on{cursor:grabbing}
+.bui .rk{--py:5px;position:absolute;display:grid;place-content:center;justify-items:center;gap:2px;width:62px;height:62px;min-height:0;padding:0;border-width:2.5px;border-radius:50%;pointer-events:auto;touch-action:none}
+.bui .rk svg{width:24px;height:24px;stroke-width:2.3}
 .rk small{font:900 8px/1 ui-monospace,monospace;letter-spacing:.12em}
-.rk:active,.rk.down,.rk[aria-pressed=true]{transform:translateY(5px);box-shadow:0 0 0 var(--e),0 0 22px color-mix(in srgb,var(--c) 70%,transparent)}
-.rk[aria-pressed=true]{animation:locked 1.8s ease-in-out infinite}
-.rk[aria-pressed=false]{--e:#07060f;color:var(--c);background:#1d1738}
-@keyframes locked{50%{box-shadow:0 0 0 var(--e),0 0 0 5px color-mix(in srgb,var(--c) 35%,transparent),0 0 26px color-mix(in srgb,var(--c) 80%,transparent)}}
-.rk[disabled]{opacity:.38;cursor:default;animation:none}
-.rk .n{position:absolute;top:-7px;right:-7px;min-width:24px;height:24px;padding:0 6px;font:900 12px/20px ui-monospace,monospace;color:#f6f3ff;background:#07060f;border:2px solid var(--c);border-radius:12px}
-.rk kbd{position:absolute;left:-6px;top:-6px;padding:1px 4px;font:800 8px/1.3 ui-monospace,monospace;color:#aea4d6;background:#110d22;border:1px solid #3b3170;border-radius:4px}
-.fire{--c:#ff2b4e;width:96px;height:96px;right:30px;bottom:0}.fire kbd{left:50%;top:auto;bottom:-8px;translate:-50% 0}.fire svg{width:40px;height:40px}
-.fire::after{content:"";position:absolute;inset:-9px;border-radius:50%;background:conic-gradient(#ffc21a calc(var(--h,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));pointer-events:none}
-.fire.hot::after{background:#ff2b4e;animation:blink .25s steps(2) infinite}
+.rk .n{position:absolute;top:-7px;right:-7px;min-width:24px;height:24px;padding:0 6px;font:900 12px/20px ui-monospace,monospace;color:var(--ink);background:var(--surface);border:2px solid var(--c);border-radius:12px}
+.bui .rk kbd{position:absolute;left:-6px;top:-6px;margin:0;padding:1px 4px;font:800 8px/1.3 ui-monospace,monospace;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:4px;opacity:1}
+.bui .fire{width:96px;height:96px;right:30px;bottom:0}.bui .fire kbd{left:50%;top:auto;bottom:-8px;translate:-50% 0}.bui .fire svg{width:40px;height:40px}
+.fire::after{content:"";position:absolute;inset:-9px;border-radius:50%;background:conic-gradient(var(--hurt) calc(var(--h,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));pointer-events:none}
+.fire.hot::after{background:var(--k-fire);animation:blink .25s steps(2) infinite}
 /* AUTO and LOCK ride on FIRE's shoulders (the Battlefield cockpit); the two specials sit in a row above. */
-.long{--c:#ffc21a;right:85px;bottom:150px}.strike{--c:#ff2e88;right:9px;bottom:150px}
-.lock,.auto{width:52px;height:52px}.auto{right:92px;bottom:84px}.lock{right:12px;bottom:84px}
-.coach-on{outline:3px dashed #f6f3ff;outline-offset:6px;animation:coach 1s ease-in-out infinite}@keyframes coach{50%{outline-offset:10px}}
-.lock svg,.auto svg{width:20px;height:20px}
+.bui .long{--c:var(--hurt);right:85px;bottom:150px}.bui .strike{--lock:var(--k-attack);right:9px;bottom:150px}
+.bui :is(.lock,.auto){width:52px;height:52px}.bui .auto{right:92px;bottom:84px}.bui .lock{right:12px;bottom:84px}.bui :is(.lock,.auto) svg{width:20px;height:20px}
+.coach-on{outline:3px dashed var(--ink);outline-offset:6px;animation:coach 1s ease-in-out infinite}@keyframes coach{50%{outline-offset:10px}}
 .demo .hud,.demo .pad,.demo .help,.demo .feed,.demo .banner,.demo .tip{display:none}.demo canvas{cursor:default}
-.help{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100% - 240px);padding:6px 10px;font-size:10px;letter-spacing:.08em;color:#aea4d6;background:#110d22cc;border-radius:8px;pointer-events:none}
-.over{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:22px;background:#07060fb8;backdrop-filter:grayscale(.6)}
+.help{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100% - 240px);padding:6px 10px;font-size:10px;letter-spacing:.08em;color:var(--muted);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:8px;pointer-events:none}
+.over{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:30px;background:color-mix(in srgb,#2a2d38 72%,transparent)}
 .over[hidden]{display:none}
-.sticker{display:grid;grid-template-columns:auto auto;grid-template-areas:"icon kicker" "icon name";column-gap:14px;align-items:center;justify-items:start;padding:10px 24px 12px 14px;color:#07060f;background:#f6f3ff;border:3px solid #07060f;border-radius:12px;box-shadow:0 6px 0 #07060f;rotate:-4deg;animation:slam 1.1s linear both;pointer-events:none}
+.over.intro{padding-top:64px;background:radial-gradient(closest-side,color-mix(in srgb,var(--bg) 60%,transparent),transparent)}
+.sticker{display:grid;grid-template-columns:auto auto;grid-template-areas:"icon kicker" "icon name";column-gap:14px;align-items:center;justify-items:start;padding:10px 24px 12px 14px;color:var(--rim);background:var(--k-flag);border:3px solid var(--rim);border-radius:12px;box-shadow:0 6px 0 var(--rim);rotate:-4deg;animation:bui-slam 1.1s linear both;pointer-events:none}
 .sticker.plain{grid-template-columns:auto;grid-template-areas:"kicker" "name";justify-items:center;padding:10px 24px 12px}
 .sticker .ic{grid-area:icon;display:block;width:62px;height:62px;padding:3px;color:#19f0ff;background:#10233f;border-radius:7px}
 .sticker span{grid-area:kicker;align-self:end;font:800 9px/1 ui-monospace,monospace;letter-spacing:4px;animation:blink 1s steps(2) infinite}
 .sticker b{grid-area:name;font:900 clamp(34px,7vw,58px)/1 ui-monospace,monospace;letter-spacing:3px;white-space:nowrap;text-shadow:0 4px 0 #07060f59}
 .sticker b em{font-style:normal;color:#ff2e88;text-shadow:0 4px 0 #8f195066}
-@keyframes slam{0%{opacity:0;scale:1.9;rotate:10deg;translate:0 -24px;box-shadow:0 46px 34px #07060f8c;animation-timing-function:cubic-bezier(.55,0,1,.45)}36%{opacity:1;scale:1;rotate:-4deg;translate:0 0;box-shadow:0 6px 0 #07060f;animation-timing-function:ease-out}46%{scale:1.04}58%,72%{scale:1;translate:0 0;box-shadow:0 6px 0 #07060f;animation-timing-function:cubic-bezier(.5,0,.75,0)}100%{opacity:1;scale:1;rotate:-4deg;translate:0 6px;box-shadow:0 0 0 #07060f}}
-.start{position:relative;display:grid;justify-items:center;align-content:center;gap:6px;width:156px;height:92px;padding:0;color:#19f0ff;background:#10233f;border:3px solid #f6f3ff;border-radius:14px;box-shadow:0 5px 0 #f6f3ff;transition:transform .1s,box-shadow .1s;animation:pop .38s 1s cubic-bezier(.34,1.7,.5,1) both}
-.start svg{display:block;width:42px;height:42px}.start b{font:900 11px/1 ui-monospace,monospace;letter-spacing:2px;color:#f6f3ff;animation:blink 1s steps(2) infinite}
-.start::after{content:"";position:absolute;inset:-3px;z-index:-1;border-radius:inherit;translate:0 5px;border:2px solid #19f0ff;pointer-events:none;animation:call 1.4s ease-out infinite}
-.start:hover{transform:translateY(-2px);box-shadow:0 7px 0 #f6f3ff}.start:active{transform:translateY(5px);box-shadow:0 0 0 #f6f3ff}
-@keyframes pop{from{scale:.4;opacity:0}}@keyframes call{0%{opacity:.9;scale:1}100%{opacity:0;scale:1.45 1.6;translate:0 11px}}
-.burst{position:absolute;pointer-events:none;z-index:5}.burst .start{position:absolute;inset:0;width:100%;height:100%;animation:none;box-shadow:none;filter:invert(1) hue-rotate(180deg)}.burst .start::after{content:none}
-.burst i{position:absolute;border-radius:50%}.burst .bit{border-radius:0}
-.hud .tm{display:none}.platoon .hud .tm{display:block}.hud .tm b{color:#39ffb0}
-.over.intro{padding-top:64px}
-.modes{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:calc(100vw - 24px)}.mode{flex:1 1 112px;display:grid;justify-items:center;gap:3px;min-width:0;padding:10px 14px 9px;color:#f6f3ff;background:#110d22;border:2.5px solid #3b3170;border-radius:10px;box-shadow:0 5px 0 #3b3170;transition:transform .1s,box-shadow .1s}
-.mode b{font:900 14px/1 ui-monospace,monospace;letter-spacing:.12em}.mode small{font-size:9px;letter-spacing:.06em;color:#aea4d6}
-.mode[aria-checked=true]{color:#07060f;background:#39ffb0;border-color:#07060f;box-shadow:0 5px 0 #1d6a40}.mode[aria-checked=true] small{color:#07060f}.mode:active{transform:translateY(5px);box-shadow:0 0 0 #3b3170}
-.light .mode{color:#07060f;background:#f6f3ff;border-color:#07060f;box-shadow:0 5px 0 #07060f}.light .mode small{color:#3b3170}.light .mode[aria-checked=true]{background:#39ffb0}
+.bui .bui-sticker-key{animation:pop .38s .9s var(--bui-spring) both}.bui .bui-sticker-key svg [stroke]{stroke:currentColor}.bui .bui-sticker-key b{animation:blink 1s steps(2) infinite}
+@keyframes pop{from{scale:.4;opacity:0}}
+.modes{margin-top:-6px;flex-wrap:wrap;justify-content:center;gap:12px;max-width:calc(100vw - 24px)}
+.bui .mode{flex:1 1 120px;display:grid;justify-items:center;align-content:center;gap:4px;min-width:0;padding:10px 14px 9px;--py:5px}
+.mode b{font:900 14px/1 ui-monospace,monospace;letter-spacing:.12em}.mode small{font-size:9px;letter-spacing:.06em;color:var(--muted)}.mode[aria-pressed=true] small{color:inherit;opacity:.8}
 .coach{position:absolute;left:50%;top:max(76px,calc(env(safe-area-inset-top) + 66px));translate:-50% 0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:2px 12px;width:min(520px,calc(100% - 24px));padding:10px 12px 10px 14px;color:#f6f3ff;background:#10233f;border:2.5px solid #f6f3ff;border-radius:12px;box-shadow:0 5px 0 #f6f3ff}
-.coach[hidden]{display:none}.coach span{grid-row:span 2;font:900 11px/1 ui-monospace,monospace;color:#19f0ff}.coach b{font:900 14px/1.1 ui-monospace,monospace;letter-spacing:.08em;color:#ffc21a}.coach small{grid-column:2;font-size:11px;line-height:1.35;color:#d9d3f5}
-.coach button{grid-row:1/span 2;grid-column:3;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em;color:#07060f;background:#ff2e88;border:2px solid #07060f;border-radius:8px;box-shadow:0 3px 0 #8f1950}.coach button:active{transform:translateY(3px);box-shadow:none}
+.bui[data-theme=light] .coach{color:var(--rim);background:#f6f3ff;border-color:var(--rim);box-shadow:0 5px 0 var(--rim)}
+.coach[hidden]{display:none}.coach span{grid-row:span 2;font:900 11px/1 ui-monospace,monospace;color:var(--k-sys-ink)}.coach b{font:900 14px/1.1 ui-monospace,monospace;letter-spacing:.08em;color:var(--hurt)}.bui[data-theme=light] .coach b{color:#b07400}.coach small{grid-column:2;font-size:11px;line-height:1.35;opacity:.85}
+.bui .coach button{grid-row:1/span 2;grid-column:3;min-height:0;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em}
+.bui .fs{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
+.bz.full{position:fixed;z-index:2147483000}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
 @media (max-height:380px){.legend{display:none}.over.intro{padding-top:0}}
-@media (max-height:460px){.over{gap:12px}.sticker b{font-size:36px}.sticker .ic{width:46px;height:46px}.start{height:76px}}
-.light .over{background:#e4e6f7a6;backdrop-filter:grayscale(.4)}.light .over.intro{background:radial-gradient(closest-side,#e4e6f7cc,#e4e6f733 70%,transparent)}
-.light .table,.light .legend{color:#3b3170;background:#f6f3ffee;border-color:#07060f}.light .legend b{color:#07060f}.light .table .you{color:#0a8a55}
-.light .count{color:#07060f;text-shadow:0 0 24px #19f0ff}
-.over.intro{background:radial-gradient(closest-side,#07060f99,#07060f33 70%,transparent);backdrop-filter:none}
-.table{display:grid;gap:4px;min-width:240px;padding:12px 16px;background:#110d22;border:2px solid #3b3170;border-radius:12px}
-.table div{display:flex;justify-content:space-between;gap:20px}.table .you{color:#39ffb0}
-.row{display:flex;gap:14px}
-.key{display:grid;place-items:center;min-width:64px;height:58px;padding:0 18px;font:900 12px/1.1 ui-monospace,monospace;letter-spacing:.1em;color:#07060f;background:#ff2e88;border:2.5px solid #07060f;border-radius:12px;box-shadow:0 5px 0 #8f1950;transition:transform .1s,box-shadow .1s}
-.key:active{transform:translateY(5px);box-shadow:0 0 0 #8f1950}
-.go{background:#39ffb0;box-shadow:0 5px 0 #1d6a40}.go:active{box-shadow:0 0 0 #1d6a40}
-.count{font:900 96px/1 ui-monospace,monospace;color:#f6f3ff;text-shadow:0 0 30px #19f0ff;animation:slam .5s both}
-.legend{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;translate:-50% 0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;width:max-content;max-width:calc(100% - 24px);padding:8px 16px;font-size:11px;color:#aea4d6;background:#110d22ee;border:2px solid #3b3170;border-radius:10px}
-.legend b{color:#f6f3ff}
+@media (max-height:460px){.over{gap:14px}.sticker b{font-size:36px}.sticker .ic{width:46px;height:46px}}
+.table{display:grid;gap:4px;min-width:240px;padding:12px 16px;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim)}
+.table div{display:flex;justify-content:space-between;gap:20px}.table .you{color:var(--team)}.bui[data-theme=light] .table .you{color:#0a8a55}
+.row{display:flex;gap:16px}
+.count{font:900 96px/1 ui-monospace,monospace;color:var(--ink);text-shadow:0 0 30px var(--k-sys);animation:bui-slam .5s both}
+.legend{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;translate:-50% 0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;width:max-content;max-width:calc(100% - 128px);padding:8px 16px;font-size:11px;color:var(--muted);background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:10px;box-shadow:0 4px 0 var(--rim)}
+.legend b{color:var(--ink)}
 @media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}}
-@media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.rk kbd{display:none}}
-@media (prefers-reduced-motion:reduce){.sticker,.start,.start::after,.count,.rk[aria-pressed=true],.tip{animation:none}}`;
+@media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
+@media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}`;
 
 export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const mode = o.mode ?? "board", embed = mode === "embed", demo = !!o.demo;
   const root = host.shadowRoot ?? host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
-  style.textContent = CSS;
+  style.textContent = __KIT_CSS__ + CSS;
   const wrap = document.createElement("div");
-  wrap.className = `bz ${mode}${demo ? " demo" : ""}`;
+  wrap.className = `bui bz ${mode}${demo ? " demo" : ""}`;
+  wrap.dataset.theme = "dark";
   wrap.innerHTML = `<canvas></canvas>
 <div class="hud"><div class="k"><small>KILLS</small><b data-k>0</b></div><div class="t"><small>${embed ? "RANK" : "TIME"}</small><b data-t>3:00</b></div><div class="hp"><small>ARMOR</small><i><u data-hp></u></i></div><div class="st"><small>STREAK</small><b data-st>0</b></div><div class="tm"><small>TEAM</small><b data-tm>0</b></div><div class="lead"><small>LEADER</small><b data-lead>—</b></div></div>
 <ol class="feed"><li></li><li></li><li></li><li></li></ol>
 <div class="banner" data-banner><b></b><span></span></div>
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
+<button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
 <div class="pad" data-pad>
 <button class="grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"><i></i><i></i><i></i></button>
-<button class="rk auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
-<button class="rk lock" type="button" data-k="lock" aria-pressed="false" aria-label="Aim lock: stick to one target, tap a tank to switch (T)" title="T · Aim lock">${svg("lock")}<small>LOCK</small><kbd>T</kbd></button>
-<button class="rk strike" type="button" data-k="strike" aria-pressed="false" aria-label="Airstrike: then tap where the bombs go (F)" title="F · Airstrike">${svg("strike")}<small>STRIKE</small><span class="n" data-n="strike">1</span><kbd>F</kbd></button>
-<button class="rk long" type="button" data-k="long" aria-label="Long shot: locks on and hits from across the field (E)" title="E · Long shot">${svg("long")}<small>LONG</small><span class="n" data-n="long">3</span><kbd>E</kbd></button>
-<button class="rk fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
+<button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
+<button class="rk bui-arcade bui-aim lock" type="button" data-k="lock" aria-pressed="false" aria-label="Aim lock: stick to one target, tap a tank to switch (T)" title="T · Aim lock">${svg("lock")}<small>LOCK</small><kbd>T</kbd></button>
+<button class="rk bui-arcade bui-attack strike" type="button" data-k="strike" aria-pressed="false" aria-label="Airstrike: then tap where the bombs go (F)" title="F · Airstrike">${svg("strike")}<small>STRIKE</small><span class="n" data-n="strike">1</span><kbd>F</kbd></button>
+<button class="rk bui-arcade long" type="button" data-k="long" aria-label="Long shot: locks on and hits from across the field (E)" title="E · Long shot">${svg("long")}<small>LONG</small><span class="n" data-n="long">3</span><kbd>E</kbd></button>
+<button class="rk bui-arcade bui-fire fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC PAUSE"}</div>
-<div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button type="button" data-cx>END PRACTICE</button></div>
+<div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div>
 <div class="over" data-over hidden></div>`;
   root.append(style, wrap);
   const $ = <T extends Element>(s: string) => wrap.querySelector<T>(s)!;
@@ -1122,38 +1112,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
 
   // ---------- Match flow ----------
-  /** PRESS START blows up like the Battlefield launch keys: it presses in, inverts, and shatters. */
-  function burst(b: HTMLElement) {
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const r = b.getBoundingClientRect(), wr = wrap.getBoundingClientRect(), w = r.width, h = r.height, layer = document.createElement("div");
-    layer.className = "burst";
-    Object.assign(layer.style, { left: `${r.left - wr.left}px`, top: `${r.top - wr.top}px`, width: `${w}px`, height: `${h}px` });
-    wrap.append(layer);
-    const fly = (el: HTMLElement, frames: Keyframe[], ms: number) => (layer.append(el), el.animate(frames, { duration: ms, delay: 90, easing: "cubic-bezier(.15,.8,.3,1)", fill: "both" }));
-    for (let i = 0; i < 6; i++) {
-      const col = i % 3, row = (i / 3) | 0, chunk = b.cloneNode(true) as HTMLElement, cx = (col + 0.5) / 3 - 0.5, cy = (row + 0.5) / 2 - 0.5;
-      chunk.removeAttribute("data-go");
-      chunk.style.clipPath = `inset(${row * 50}% ${100 - (col + 1) * 33.34}% ${100 - (row + 1) * 50}% ${col * 33.33}%)`;
-      chunk.style.transformOrigin = `${(col + 0.5) * 33.3}% ${(row + 0.5) * 50}%`;
-      const dx = cx * w * 1.1 + (i % 2 ? 8 : -8), dy = cy * h * 1.4 - 18, spin = (cx || 0.3) * (col === 1 ? 60 : 120);
-      fly(chunk, [{ transform: "translate(0,5px)", opacity: 1 }, { transform: `translate(${dx}px,${dy}px) rotate(${spin}deg) scale(.82)`, offset: 0.55 }, { transform: `translate(${dx * 1.15}px,${dy + 46}px) rotate(${spin * 1.4}deg) scale(.6)`, opacity: 0 }], 610);
-    }
-    const dot = (size: number, color: string, ring = false, bit = false) => {
-      const el = document.createElement("i");
-      if (bit) el.className = "bit";
-      Object.assign(el.style, { width: `${size}px`, height: `${size}px`, left: `${w / 2 - size / 2}px`, top: `${h / 2 - size / 2 + 5}px`, [ring ? "border" : "background"]: ring ? `3px solid ${color}` : color });
-      return el;
-    };
-    const m = Math.min(w, h);
-    fly(dot(m * 0.6, "#fff4ff"), [{ transform: "scale(.3)", opacity: 1 }, { transform: "scale(2.6)", opacity: 0.9, offset: 0.35 }, { transform: "scale(3.2)", opacity: 0 }], 320);
-    fly(dot(m * 0.45, "#19f0ff"), [{ transform: "scale(.4)", opacity: 1 }, { transform: "scale(2.2)", offset: 0.4 }, { transform: "scale(.2)", opacity: 0 }], 460);
-    fly(dot(m * 0.5, "#19f0ff", true), [{ transform: "scale(.5)", opacity: 1 }, { transform: "scale(5)", opacity: 0 }], 480);
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * TAU + (i % 2) * 0.3, d = m * 0.9 + (i % 3) * 18, dx = Math.cos(a) * d * 1.5, dy = Math.sin(a) * d;
-      fly(dot(5 + (i % 3) * 2, ["#19f0ff", "#ff2e88", "#ffc21a", "#39ffb0"][i % 4]!, false, true), [{ transform: "none", opacity: 1 }, { transform: `translate(${dx}px,${dy}px) rotate(${(i % 2 ? 1 : -1) * (90 + i * 25)}deg)`, offset: 0.78 }, { transform: `translate(${dx}px,${dy + 16}px)`, opacity: 0 }], 640);
-    }
-    setTimeout(() => layer.remove(), 800);
-  }
   const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
   function intro() {
     state = "intro";
@@ -1162,9 +1120,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     over.hidden = false;
     over.classList.add("intro");
     over.innerHTML = `<div class="sticker">${BADGE}<span data-kick>${kicker()}</span><b>BLITZ<em>!</em></b></div>
-<div class="modes" role="radiogroup" aria-label="Mode"><button class="mode" type="button" role="radio" data-mode="solo" aria-checked="${!platoon && !practice}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" role="radio" data-mode="platoon" aria-checked="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button><button class="mode" type="button" role="radio" data-mode="practice" aria-checked="${practice}"><b>PRACTICE</b><small>learn the keys, with tips</small></button></div>
+<div class="modes bui-seg" role="group" aria-label="Mode"><button class="mode" type="button" data-mode="solo" aria-pressed="${!platoon && !practice}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" data-mode="platoon" aria-pressed="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button><button class="mode" type="button" data-mode="practice" aria-pressed="${practice}"><b>PRACTICE</b><small>learn the keys, with tips</small></button></div>
 <div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
-<button class="start" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
+<button class="bui-sticker-key bui-call" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
     for (const b of over.querySelectorAll<HTMLButtonElement>("[data-mode]"))
       b.addEventListener("click", () => {
         platoon = b.dataset.mode === "platoon";
@@ -1173,12 +1131,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           localStorage.setItem("blitz:mode", b.dataset.mode!);
         } catch {}
         roster();
-        for (const m of over.querySelectorAll("[data-mode]")) m.setAttribute("aria-checked", String(m === b));
+        for (const m of over.querySelectorAll("[data-mode]")) m.setAttribute("aria-pressed", String(m === b));
         over.querySelector("[data-kick]")!.textContent = kicker();
         e.events.emit("lock", 0);
       }, { signal: e.signal });
     const go = over.querySelector<HTMLButtonElement>("[data-go]")!;
-    go.addEventListener("click", () => (burst(go), countdown()), { signal: e.signal });
+    go.addEventListener("click", () => launch(go, countdown, { reduced: matchMedia("(prefers-reduced-motion: reduce)").matches }), { signal: e.signal });
   }
   function countdown() {
     state = "count";
@@ -1214,7 +1172,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       : st.slice(0, 5).map((s, i) => `<div class="${s.you ? "you" : ""}"><span>${i + 1}. ${s.name}</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("");
     over.innerHTML = `<div class="sticker plain"><span>MATCH OVER</span><b>${won ? (platoon ? "PLATOON WINS" : "YOU WIN") : `${platoon ? PLATOON[teams[0]!.team] : st[0]!.name} WINS`}</b></div>
 <div class="table">${rows}</div>
-<div class="row"><button class="key go" type="button" data-again>REMATCH</button></div>`;
+<div class="row"><button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button></div>`;
     over.querySelector("[data-again]")!.addEventListener("click", rematch, { signal: e.signal });
     o.onEnd?.(st);
   }
@@ -1233,7 +1191,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (state === "play") {
       state = "paused";
       over.hidden = false;
-      over.innerHTML = `<div class="sticker plain"><span>BLITZ PAUSED</span><b>HOLD FIRE</b></div><div class="row"><button class="key go" type="button" data-resume>KEEP FIGHTING</button></div>`;
+      over.innerHTML = `<div class="sticker plain"><span>BLITZ PAUSED</span><b>HOLD FIRE</b></div><div class="row"><button class="bui-sticker-key" type="button" data-resume>${PLAY}<b>KEEP FIGHTING</b></button></div>`;
       over.querySelector("[data-resume]")!.addEventListener("click", togglePause, { signal: e.signal });
     } else if (state === "paused") begin();
   }
@@ -1832,12 +1790,33 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }, { signal: e.signal });
   for (const t of ["pointerup", "pointercancel"]) grab.addEventListener(t, () => grab.classList.contains("on") && (grab.classList.remove("on"), savePad()), { signal: e.signal });
   grab.addEventListener("dblclick", () => ((padAt[0] = padAt[1] = 0), placePad(), savePad()), { signal: e.signal });
+  // Full screen: the real thing where the browser allows it, else the board fills the window.
+  const fsKey = $<HTMLButtonElement>("[data-fs]");
+  const fsOn = () => document.fullscreenElement === host || wrap.classList.contains("full");
+  const fsPaint = () => {
+    const on = fsOn();
+    fsKey.innerHTML = svg(on ? "exit" : "full");
+    fsKey.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
+    fsKey.setAttribute("aria-pressed", String(on));
+  };
+  fsKey.addEventListener("click", async () => {
+    if (fsOn()) {
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      wrap.classList.remove("full");
+    } else if (host.requestFullscreen) {
+      await host.requestFullscreen({ navigationUI: "hide" }).catch(() => wrap.classList.add("full"));
+      (screen.orientation as unknown as { lock?: (o: string) => Promise<void> })?.lock?.("landscape").catch(() => {});
+    } else wrap.classList.add("full");
+    fsPaint();
+  }, { signal: e.signal });
+  document.addEventListener("fullscreenchange", fsPaint, { signal: e.signal });
   // Right-click: long shot at the tank nearest the mouse (or cancel the airstrike).
   canvas.addEventListener("contextmenu", (ev) => (ev.preventDefault(), targeting ? (targeting = false) : (longQ = true)), { signal: e.signal });
   // Light or dark: follows the page's Board UI theme (<html data-theme>), like the Battlefield game.
   const theme = () => {
     lightTheme = document.documentElement.dataset.theme === "light";
     wrap.classList.toggle("light", lightTheme);
+    wrap.dataset.theme = lightTheme ? "light" : "dark";
   };
   const mo = new MutationObserver(theme);
   mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
