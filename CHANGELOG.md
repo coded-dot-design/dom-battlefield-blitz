@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.4
+
+- Fix: the short-screen rule for the controls strip now actually applies.
+
 ## 0.6.3
 
 - Short screens (landscape phones): the controls strip steps aside so the start sticker and keys fit
