@@ -1,0 +1,700 @@
+/* Board UI kit: the game board controls of DOM Battlefield, made portable.
+   Spec: board-ui/BOARD-UI.md. Live guide: /board-ui/ on the hub.
+
+   Everything lives under one root class (.bui), so it is embed-safe: no global selectors, no
+   resets outside the root. A game changes its look by passing a palette (CSS variables or
+   applyPalette() in board-ui.ts); every other rule stays identical from board to board.
+
+   Units: one scale variable, --u (1px on desktop; phones clamp it to the viewport), so a board
+   scales as one piece. Every length below is calc(N * var(--u)). */
+
+/* ---------- 1. Tokens ---------- */
+.bui {
+  --u: 1px;
+  /* Surfaces and ink. */
+  --bg: #07060f;
+  --surface: #110d22;
+  --raised: #1d1738;
+  --card: #120f26;
+  --ink: #f6f3ff;
+  --muted: #aea4d6;
+  --line: #3b3170;
+  /* The rim: the ink outline and hard base under every key, sticker and card (both themes). */
+  --rim: #07060f;
+  /* Control palette: one colour per job. Faces read on dark and light alike; -ink twins are for
+     text and thin lines (deeper on light). These are the only colours a game passes in. */
+  --k-sys: #19f0ff;     /* navigation: menu, camera, pager, pickers, tips, focus */
+  --k-cmd: #9a63ff;     /* command and planning; every LOCKED order */
+  --k-fire: #ff2b4e;    /* the gun */
+  --k-aim: #ff7389;     /* aim modes (Auto, Lock): fire's lighter twin */
+  --k-attack: #ff2e88;  /* offensive order */
+  --k-advance: #ff8a1f; /* push to objective */
+  --k-fallin: #a8ff3e;  /* form up on you */
+  --k-flag: #f6f3ff;    /* white flag: pause / surrender */
+  --k-go: #39ffb0;      /* start and confirm */
+  --team-a: #39ffb0;
+  --team-b: #ff5c8f;
+  --team: var(--team-a);
+  --hurt: #ffc21a;
+  --critical: #f0506e;
+  --k-sys-ink: var(--k-sys);
+  --k-cmd-ink: #b48cff;
+  --k-fire-ink: var(--k-fire);
+  --team-ink: var(--team);
+  /* Derived (never passed in): a control's hard base is its own colour, deep. */
+  --k-cmd-base: color-mix(in srgb, var(--k-cmd) 50%, var(--rim));
+  /* Motion. */
+  --bui-spring: cubic-bezier(0.34, 1.7, 0.5, 1);
+  --bui-out: cubic-bezier(0.15, 0.8, 0.3, 1);
+  color: var(--ink);
+  font: calc(12 * var(--u)) / 1.3 ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+.bui[data-theme="light"] {
+  --bg: #eef0fb;
+  --surface: #ffffff;
+  --raised: #e6e4f8;
+  --card: #ffffff;
+  --ink: #1b1636;
+  --muted: #5d5684;
+  --line: #b9b2e3;
+  --k-sys-ink: #0088b3;
+  --k-cmd-ink: #6a3ae6;
+  --k-fire-ink: #d4143a;
+  color-scheme: light;
+}
+.bui[data-side="1"] {
+  --team: var(--team-b);
+}
+
+/* ---------- 2. The 3D key: one family, five states ----------
+   A key is a face over a hard base STRAIGHT BELOW it (never to the side). Families only set the
+   variables; the state rules below do all the motion, on one curve, so the face and its base
+   always travel together (they never snap separately).
+     rest    face up, base --py tall
+     hover   (fine pointers) face lifts --hy, base grows by the same
+     press   (:active, .down) face drops onto the base
+     locked  (aria-pressed / aria-expanded = true, .active) rests dropped, takes --lock, breathes
+     call    (.bui-call) face stays up, a ring leaves the bottom of the base: "press me"        */
+.bui button,
+.bui .bui-key {
+  --py: calc(3 * var(--u));
+  --hy: calc(1 * var(--u));
+  --edge: var(--line);
+  --edge-hover: var(--k-sys);
+  --border-hover: var(--k-sys);
+  --glow: 0 0 0 transparent;
+  --glow-hover: var(--glow);
+  --glow-press: var(--glow);
+  font: inherit;
+  text-decoration: none; /* link keys (<a class="bui-key">) */
+  color: var(--ink);
+  background: var(--surface);
+  border: calc(2 * var(--u)) solid var(--line);
+  border-radius: calc(6 * var(--u));
+  min-height: calc(40 * var(--u));
+  padding: calc(8 * var(--u)) calc(13 * var(--u));
+  cursor: pointer;
+  transform: none;
+  box-shadow: 0 var(--py) 0 var(--edge), var(--glow);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out, background-color 140ms, border-color 140ms;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bui button svg,
+.bui .bui-key svg {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) and (pointer: fine) {
+  .bui button:not(:disabled, [aria-pressed="true"], [aria-expanded="true"], .active):hover,
+  .bui .bui-key:not([aria-pressed="true"], .active):hover {
+    border-color: var(--border-hover);
+    transform: translateY(calc(-1 * var(--hy)));
+    box-shadow: 0 calc(var(--py) + var(--hy)) 0 var(--edge-hover), var(--glow-hover);
+  }
+}
+.bui button:not(:disabled):active,
+.bui button.down,
+.bui button:is([aria-pressed="true"], [aria-expanded="true"], .active),
+.bui .bui-key:is(:active, .down, [aria-pressed="true"], .active) {
+  transform: translateY(var(--py));
+  box-shadow: 0 0 0 var(--edge), var(--glow-press);
+}
+.bui button:not(:disabled):active,
+.bui button.down,
+.bui .bui-key:active {
+  transition-duration: 50ms;
+}
+.bui button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* Keyboard focus wraps the face AND its base (an outline stops short of the base). */
+.bui button:focus-visible,
+.bui .bui-key:focus-visible {
+  outline: none;
+  box-shadow:
+    0 var(--py) 0 var(--edge),
+    0 0 0 calc(3 * var(--u)) var(--bg),
+    0 var(--py) 0 calc(3 * var(--u)) var(--bg),
+    0 0 0 calc(6 * var(--u)) var(--k-sys-ink),
+    0 var(--py) 0 calc(6 * var(--u)) var(--k-sys-ink);
+}
+.bui button:focus-visible:is(:active, .down, .active, [aria-pressed="true"], [aria-expanded="true"]),
+.bui .bui-key:focus-visible:is(:active, .down, .active, [aria-pressed="true"]) {
+  box-shadow: 0 0 0 calc(3 * var(--u)) var(--bg), 0 0 0 calc(6 * var(--u)) var(--k-sys-ink);
+}
+
+/* Arcade key: a solid neon cap (--c) on the ink rim, over its own colour, deep. */
+.bui .bui-arcade {
+  --c: var(--k-sys);
+  --py: calc(4 * var(--u));
+  --hy: calc(2 * var(--u));
+  --edge: color-mix(in srgb, var(--c) 45%, var(--rim));
+  --edge-hover: var(--edge);
+  --border-hover: var(--rim);
+  --glow: 0 0 calc(14 * var(--u)) color-mix(in srgb, var(--c) 40%, transparent);
+  --glow-hover: 0 0 calc(18 * var(--u)) color-mix(in srgb, var(--c) 55%, transparent);
+  --glow-press: 0 0 calc(22 * var(--u)) color-mix(in srgb, var(--c) 70%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  min-height: calc(44 * var(--u));
+  font-size: calc(12 * var(--u));
+  font-weight: 700;
+  color: var(--rim);
+  background: var(--c);
+  border-color: var(--rim);
+  border-radius: calc(10 * var(--u));
+}
+.bui[data-theme="light"] .bui-arcade {
+  --glow: 0 0 0 transparent;
+  --glow-hover: 0 0 0 transparent;
+}
+/* Locked: the lock colour and a slow breath of glow ("this is on, tap to release"). */
+.bui .bui-arcade:is([aria-pressed="true"], .active) {
+  --glow-press: 0 0 calc(18 * var(--u)) color-mix(in srgb, var(--lock, var(--c)) 60%, transparent);
+  background: var(--lock, var(--c));
+  animation: bui-locked 1.8s ease-in-out infinite;
+}
+@keyframes bui-locked {
+  50% {
+    box-shadow: 0 0 0 transparent, 0 0 0 calc(3 * var(--u) + 0.15em) color-mix(in srgb, var(--lock, var(--c)) 35%, transparent),
+      0 0 calc(26 * var(--u)) color-mix(in srgb, var(--lock, var(--c)) 80%, transparent);
+  }
+}
+/* Call: a ring leaves the bottom of the base; the key stays up. A locked key never calls. */
+.bui .bui-call {
+  position: relative;
+  isolation: isolate;
+}
+.bui .bui-call::after {
+  content: "";
+  position: absolute;
+  inset: calc(-2 * var(--u));
+  z-index: -1;
+  border-radius: inherit;
+  translate: 0 var(--py);
+  border: calc(2 * var(--u)) solid var(--c, var(--k-sys));
+  pointer-events: none;
+  animation: bui-call 1.4s ease-out infinite;
+}
+.bui .bui-call:is([aria-pressed="true"], .active)::after {
+  content: none;
+}
+@keyframes bui-call {
+  0% { opacity: 0.9; scale: 1; }
+  100% { opacity: 0; scale: 1.45 1.6; translate: 0 calc(var(--py) + 6 * var(--u)); }
+}
+/* Roles: one colour per job. Orders and Command lock in the command colour. */
+.bui .bui-sys { --c: var(--k-sys); }
+.bui .bui-cmd { --c: var(--k-cmd); --lock: var(--k-cmd); }
+.bui .bui-fire { --c: var(--k-fire); }
+.bui .bui-aim { --c: var(--k-aim); }
+.bui .bui-attack { --c: var(--k-attack); --lock: var(--k-cmd); }
+.bui .bui-advance { --c: var(--k-advance); --lock: var(--k-cmd); }
+.bui .bui-fallin { --c: var(--k-fallin); --lock: var(--k-cmd); }
+.bui .bui-retreat { --c: var(--team); --lock: var(--k-cmd); }
+.bui .bui-flag { --c: var(--k-flag); }
+.bui .bui-go { --c: var(--k-go); }
+/* Aim keys at rest are dim (on when pressed): a tinted face, aim-coloured ink. */
+.bui .bui-aim:not([aria-pressed="true"]) {
+  --c: color-mix(in srgb, var(--k-aim) 28%, var(--surface));
+  color: var(--k-aim);
+}
+.bui[data-theme="light"] .bui-aim:not([aria-pressed="true"]) {
+  --c: color-mix(in srgb, var(--k-aim) 16%, #ffffff);
+  color: var(--k-fire-ink);
+}
+/* Shortcut chip: always on the key's right edge. */
+.bui kbd {
+  margin-left: auto;
+  font: calc(9 * var(--u)) ui-monospace, monospace;
+  border: calc(1 * var(--u)) solid currentColor;
+  padding: calc(1 * var(--u)) calc(4 * var(--u));
+  border-radius: calc(3 * var(--u));
+  opacity: 0.7;
+}
+/* Icon key (header, small tools): square, outline style. */
+.bui .bui-icon-key {
+  display: inline-grid;
+  place-items: center;
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  padding: 0;
+}
+
+/* ---------- 3. Special keys ---------- */
+/* Platoon key: big number over size pips; colour is health; lost tanks rest flat. */
+.bui .bui-unit {
+  --c: var(--team);
+  display: inline-grid;
+  align-content: center;
+  justify-items: center;
+  gap: calc(3 * var(--u));
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+  min-height: 0;
+  padding: 0 0 calc(2 * var(--u));
+}
+.bui .bui-unit b {
+  font: 900 calc(16 * var(--u)) / 1 ui-monospace, monospace;
+  color: var(--rim);
+}
+.bui .bui-unit[data-hp="hurt"] { --c: var(--hurt); }
+.bui .bui-unit[data-hp="critical"] { --c: var(--critical); }
+.bui .bui-unit.active {
+  outline: calc(2 * var(--u)) solid #f6f3ff;
+  outline-offset: calc(2 * var(--u));
+}
+.bui .bui-unit:disabled {
+  --c: #4a4566;
+  transform: translateY(var(--py));
+  box-shadow: 0 0 0 var(--edge);
+}
+.bui .bui-unit:disabled b {
+  text-decoration: line-through;
+}
+.bui .bui-pips {
+  display: flex;
+  gap: calc(3 * var(--u));
+}
+.bui .bui-pips s {
+  width: calc(6 * var(--u));
+  height: calc(6 * var(--u));
+  border-radius: calc(1 * var(--u));
+  background: var(--rim);
+}
+/* Pager: back / star / forward as one bar of three. */
+.bui .bui-pager {
+  display: inline-flex;
+}
+.bui .bui-pager button {
+  --c: var(--k-sys);
+  justify-content: center;
+  min-width: calc(44 * var(--u));
+  border-radius: 0;
+  margin-left: calc(-2 * var(--u));
+}
+.bui .bui-pager button:first-child {
+  margin-left: 0;
+  border-radius: calc(10 * var(--u)) 0 0 calc(10 * var(--u));
+}
+.bui .bui-pager button:last-child {
+  border-radius: 0 calc(10 * var(--u)) calc(10 * var(--u)) 0;
+}
+/* Segmented choice (Light / Normal / Heavy): one is always pressed. */
+.bui .bui-seg {
+  display: inline-flex;
+  gap: calc(8 * var(--u));
+}
+.bui .bui-seg button[aria-pressed="true"] {
+  color: var(--rim);
+  background: var(--k-sys);
+  border-color: var(--rim);
+}
+/* Round card key (planning steps): icon, a caption, a count badge. */
+.bui .bui-orb {
+  --py: calc(5 * var(--u));
+  --edge: var(--k-cmd-base);
+  --edge-hover: var(--edge);
+  --border-hover: var(--k-cmd);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(66 * var(--u));
+  height: calc(66 * var(--u));
+  min-height: 0;
+  padding: 0;
+  color: var(--k-sys-ink);
+  background: var(--card);
+  border: calc(3 * var(--u)) solid var(--k-cmd);
+  border-radius: 50%;
+}
+.bui .bui-orb svg,
+.bui .bui-orb canvas {
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+}
+.bui .bui-orb small {
+  position: absolute;
+  left: 50%;
+  bottom: calc(8 * var(--u));
+  translate: -50% 0;
+  font: 900 calc(9.5 * var(--u)) / 1 ui-monospace, monospace;
+  color: var(--k-cmd-ink);
+  white-space: nowrap;
+}
+.bui .bui-badge {
+  position: absolute;
+  top: calc(-9 * var(--u));
+  right: calc(-9 * var(--u));
+  min-width: calc(23 * var(--u));
+  height: calc(23 * var(--u));
+  padding: 0 calc(4 * var(--u));
+  font: 900 calc(12 * var(--u)) / calc(23 * var(--u)) ui-monospace, monospace;
+  color: var(--rim);
+  background: var(--team);
+  border: calc(2 * var(--u)) solid var(--rim);
+  border-radius: calc(12 * var(--u));
+}
+/* Planning art: drawn icons get an ink outline so they read on any face. */
+.bui .bui-outline {
+  filter: drop-shadow(calc(1.5 * var(--u)) 0 0 var(--rim)) drop-shadow(calc(-1.5 * var(--u)) 0 0 var(--rim))
+    drop-shadow(0 calc(1.5 * var(--u)) 0 var(--rim)) drop-shadow(0 calc(-1.5 * var(--u)) 0 var(--rim));
+}
+
+/* ---------- 4. Sticker keys (launch, overlay actions) ----------
+   The big keys: a dark face, a white rim and a white base, a pixel icon tile and a mono label.
+   Primary = navy face + cyan icon (Start, Keep fighting, Rematch). Plan = violet face.
+   Secondary = the dark key with a white glyph (Surrender, New campaign). */
+.bui .bui-sticker-key {
+  --py: calc(5 * var(--u));
+  --hy: calc(2 * var(--u));
+  --edge: #f6f3ff;
+  --edge-hover: #f6f3ff;
+  --border-hover: #f6f3ff;
+  display: inline-grid;
+  justify-items: center;
+  align-content: center;
+  gap: calc(6 * var(--u));
+  width: calc(132 * var(--u));
+  height: calc(84 * var(--u));
+  min-height: 0;
+  padding: calc(6 * var(--u)) 0 calc(5 * var(--u));
+  color: #19f0ff;
+  background: #10233f;
+  border: calc(3 * var(--u)) solid #f6f3ff;
+  border-radius: calc(12 * var(--u));
+}
+.bui .bui-sticker-key svg {
+  width: calc(42 * var(--u));
+  height: calc(42 * var(--u));
+  fill: currentColor;
+  stroke: none;
+}
+.bui .bui-sticker-key b {
+  font: 900 calc(10 * var(--u)) / 1 ui-monospace, monospace;
+  letter-spacing: calc(1.6 * var(--u));
+  color: #f6f3ff;
+  white-space: nowrap;
+}
+.bui .bui-sticker-key.bui-plan {
+  color: #f6f3ff;
+  background: var(--k-cmd);
+}
+.bui .bui-sticker-key.bui-plan b {
+  color: #2a1f45;
+}
+.bui .bui-sticker-key.bui-second {
+  color: var(--ink);
+  background: var(--surface);
+}
+/* Light: a white face on the ink rim and an ink base; the icon turns deep cyan, labels ink. */
+.bui[data-theme="light"] .bui-sticker-key {
+  --edge: var(--rim);
+  --edge-hover: var(--rim);
+  --border-hover: var(--rim);
+  color: #0a8fa8;
+  background: #f6f3ff;
+  border-color: var(--rim);
+}
+.bui[data-theme="light"] .bui-sticker-key b {
+  color: var(--rim);
+}
+.bui[data-theme="light"] .bui-sticker-key.bui-plan {
+  color: #f6f3ff;
+  background: var(--k-cmd);
+}
+.bui[data-theme="light"] .bui-sticker-key.bui-second {
+  color: var(--rim);
+  background: var(--k-flag);
+}
+/* The surrender icon: your team's colour in any theme, the flag always white. */
+.bui .bui-surrender .bui-cells rect { fill: var(--team); }
+.bui .bui-surrender.go .bui-cells rect { animation: bui-whiteout 160ms calc(var(--i) * 18ms) steps(2) forwards; }
+.bui .bui-surrender.go .bui-cloth { animation: bui-wave 120ms ease-in-out 4 alternate; }
+.bui .bui-cloth { transform-box: fill-box; transform-origin: 0 50%; }
+@keyframes bui-whiteout { to { fill: #f6f3ff; } }
+@keyframes bui-wave {
+  from { transform: skewY(-12deg) scaleX(0.9); }
+  to { transform: skewY(10deg) scaleX(1.05); }
+}
+
+/* ---------- 5. Overlay: grey dim, sticker slam, two keys at the map's bottom ---------- */
+.bui .bui-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, #2a2d38 82%, transparent);
+}
+.bui .bui-overlay[hidden] {
+  display: none;
+}
+.bui .bui-sticker {
+  --tone: var(--k-flag);
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: calc(4 * var(--u));
+  padding: calc(8 * var(--u)) calc(18 * var(--u)) calc(10 * var(--u));
+  color: var(--rim);
+  background: var(--tone);
+  border: calc(2.5 * var(--u)) solid var(--rim);
+  border-radius: calc(10 * var(--u));
+  box-shadow: 0 calc(5 * var(--u)) 0 var(--rim);
+  rotate: -4deg;
+  animation: bui-slam 1100ms linear both;
+}
+.bui .bui-sticker span {
+  font: 800 calc(8 * var(--u)) / 1 ui-monospace, monospace;
+  letter-spacing: calc(4 * var(--u));
+  animation: bui-blink 1s steps(2) infinite;
+}
+.bui .bui-sticker b {
+  font: 900 calc(34 * var(--u)) / 1 ui-monospace, monospace;
+  letter-spacing: calc(2 * var(--u));
+  white-space: nowrap;
+  text-shadow: 0 calc(3 * var(--u)) 0 color-mix(in srgb, var(--rim) 35%, transparent);
+}
+@keyframes bui-blink { 50% { opacity: 0.45; } }
+/* Drops from above with a soft shadow far below, hits with its hard base, presses in. */
+@keyframes bui-slam {
+  0% {
+    opacity: 0; scale: 1.9; rotate: 10deg; translate: 0 calc(-24 * var(--u));
+    box-shadow: 0 calc(46 * var(--u)) calc(34 * var(--u)) color-mix(in srgb, var(--rim) 55%, transparent);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  36% { opacity: 1; scale: 1; rotate: -4deg; translate: 0 0; box-shadow: 0 calc(5 * var(--u)) 0 var(--rim); animation-timing-function: ease-out; }
+  46% { scale: 1.04; }
+  58%, 72% { scale: 1; translate: 0 0; box-shadow: 0 calc(5 * var(--u)) 0 var(--rim); animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0); }
+  100% { opacity: 1; scale: 1; rotate: -4deg; translate: 0 calc(5 * var(--u)); box-shadow: 0 0 0 var(--rim); }
+}
+.bui .bui-overlay-keys {
+  position: absolute;
+  left: 50%;
+  bottom: calc(20 * var(--u));
+  translate: -50% 0;
+  display: flex;
+  gap: calc(16 * var(--u));
+}
+
+/* ---------- 6. Cards ---------- */
+.bui .bui-card {
+  position: relative;
+  padding: calc(14 * var(--u));
+  color: var(--ink);
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  border: calc(2.5 * var(--u)) solid var(--k-cmd);
+  border-radius: calc(10 * var(--u));
+  box-shadow: 0 calc(5 * var(--u)) 0 var(--k-cmd-base);
+}
+/* The grip: a violet tab centred on the top edge. Drag a card by it (or any empty part). */
+.bui .bui-grip {
+  position: absolute;
+  top: calc(-8 * var(--u));
+  left: 50%;
+  translate: -50% 0;
+  width: calc(36 * var(--u));
+  height: calc(12 * var(--u));
+  background: var(--k-cmd);
+  border-radius: calc(4 * var(--u));
+  background-image: radial-gradient(circle, #f6f3ff 1px, transparent 1.5px);
+  background-size: calc(6 * var(--u)) calc(6 * var(--u));
+  background-position: center;
+}
+/* The back tab: the previous step, on the card's top edge, left side. */
+.bui .bui-back-tab {
+  --py: calc(2 * var(--u));
+  --edge: var(--k-cmd-base);
+  position: absolute;
+  top: calc(-12 * var(--u));
+  left: calc(14 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(3 * var(--u));
+  height: calc(22 * var(--u));
+  min-height: 0;
+  padding: 0 calc(9 * var(--u)) 0 calc(5 * var(--u));
+  font: 800 calc(9 * var(--u)) / 1 ui-monospace, monospace;
+  letter-spacing: calc(1.2 * var(--u));
+  color: #f6f3ff;
+  background: var(--k-cmd);
+  border: calc(1.5 * var(--u)) solid var(--rim);
+  border-radius: calc(6 * var(--u));
+}
+.bui .bui-back-tab svg {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  stroke-width: 3;
+}
+/* Dock card (full screen RADIO / AIM): a 54px header row with the title and the list / grid switch. */
+.bui .bui-dock {
+  position: relative;
+  display: grid;
+  gap: calc(12 * var(--u));
+  padding: calc(54 * var(--u)) calc(14 * var(--u)) calc(14 * var(--u));
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border: calc(2 * var(--u)) solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: calc(12 * var(--u));
+  box-shadow: 0 calc(4 * var(--u)) 0 color-mix(in srgb, var(--line) 80%, transparent);
+}
+.bui .bui-dock-title {
+  position: absolute;
+  left: calc(16 * var(--u));
+  top: calc(21 * var(--u));
+  font: 700 calc(11 * var(--u)) / 1 ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+.bui .bui-dock-switch {
+  --py: calc(2 * var(--u));
+  position: absolute;
+  top: calc(12 * var(--u));
+  right: calc(12 * var(--u));
+  display: grid;
+  place-items: center;
+  width: calc(28 * var(--u));
+  height: calc(24 * var(--u));
+  min-height: 0;
+  padding: 0;
+  border-width: calc(1.5 * var(--u));
+}
+.bui .bui-dock-switch svg {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.bui .bui-dock .bui-arcade {
+  width: 100%;
+}
+.bui .bui-divider {
+  height: 0;
+  border-top: calc(1 * var(--u)) solid var(--line);
+}
+
+/* ---------- 7. Labels ---------- */
+/* Group label: FIRST WORD BOLD · detail. Mono, caps, spaced, muted. */
+.bui .bui-label {
+  font-size: calc(9 * var(--u));
+  letter-spacing: calc(1.4 * var(--u));
+  color: var(--muted);
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.bui .bui-label b {
+  font-weight: 800;
+  color: var(--ink);
+}
+
+/* ---------- 8. Comms toast ---------- */
+.bui .bui-toast {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  width: max-content;
+  max-width: min(calc(440 * var(--u)), 100%);
+  padding: calc(9 * var(--u)) calc(16 * var(--u)) calc(9 * var(--u)) calc(13 * var(--u));
+  font-size: calc(11.5 * var(--u));
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
+  border: calc(1.5 * var(--u)) solid var(--line);
+  border-left: calc(4 * var(--u)) solid var(--k-sys);
+  border-radius: calc(7 * var(--u));
+  box-shadow: 0 calc(3 * var(--u)) 0 var(--rim), 0 0 calc(18 * var(--u)) color-mix(in srgb, var(--k-sys) 22%, transparent);
+}
+.bui .bui-toast::before {
+  content: "";
+  flex: none;
+  width: calc(9 * var(--u));
+  height: calc(9 * var(--u));
+  border-radius: 50%;
+  background: var(--k-go);
+  box-shadow: 0 0 calc(8 * var(--u)) var(--k-go);
+}
+
+/* ---------- 9. Button tips ---------- */
+.bui .bui-tip-ring {
+  position: relative;
+  display: inline-block;
+  padding: calc(4 * var(--u));
+  border: calc(3 * var(--u)) dashed var(--k-sys-ink);
+  border-radius: calc(12 * var(--u));
+  box-shadow: 0 0 0 calc(2 * var(--u)) color-mix(in srgb, var(--surface) 85%, transparent),
+    inset 0 0 0 calc(2 * var(--u)) color-mix(in srgb, var(--surface) 85%, transparent);
+}
+.bui .bui-tip-label {
+  --py: calc(2 * var(--u));
+  --edge: color-mix(in srgb, var(--k-sys) 45%, var(--rim));
+  min-height: 0;
+  padding: calc(4 * var(--u)) calc(8 * var(--u));
+  font-size: calc(10 * var(--u));
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--rim);
+  background: var(--k-sys);
+  border: calc(1 * var(--u)) solid var(--rim);
+  border-radius: calc(4 * var(--u));
+}
+.bui .bui-tip-label::after {
+  content: " +";
+}
+
+/* ---------- 10. Launch burst (board-ui.ts launch()) ---------- */
+.bui-burst {
+  position: fixed;
+  z-index: 2147483000;
+  pointer-events: none;
+  user-select: none;
+}
+.bui-burst > * {
+  position: absolute;
+  pointer-events: none;
+}
+.bui-burst .bui-flash { border-radius: 50%; background: var(--tone); }
+.bui-burst .bui-ring { border-radius: 50%; border: 3px solid var(--tone); }
+.bui-burst .bui-bit { background: var(--tone); }
+.bui .bui-igniting {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bui *,
+  .bui *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .bui-burst {
+    display: none;
+  }
+}
