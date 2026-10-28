@@ -160,7 +160,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 @media (pointer:coarse){.pz span{display:none}}
 @media (max-height:460px){.ov .table{top:57%;gap:2px;padding:6px 12px;font-size:10px}.ov .table div:nth-child(n+4):not(.you){display:none}.ov.result .bui-sticker{top:22%}}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
-@media (max-height:380px){.legend{display:none}.over.intro{padding-top:0}}
+@media (max-height:460px){.legend{display:none}.over.intro{padding-top:0}}
 @media (max-height:460px){.over{gap:14px}.sticker b{font-size:36px}.sticker .ic{width:46px;height:46px}}
 .table{display:grid;gap:4px;min-width:240px;padding:12px 16px;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim)}
 .table div{display:flex;justify-content:space-between;gap:20px}.table .you{color:var(--team)}.bui[data-theme=light] .table .you{color:#0a8a55}

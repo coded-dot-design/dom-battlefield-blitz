@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3
+
+- Short screens (landscape phones): the controls strip steps aside so the start sticker and keys fit
+  (PRACTICE teaches the same keys).
+
 ## 0.6.2
 
 - The pad's drag handle is the Battlefield card grip (the kit's `.bui-grip`, Fizlet 0.2.4): a flat violet
