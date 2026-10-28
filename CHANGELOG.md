@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.5
+
+- Phones: more room between the start sticker, the mode keys and PRESS START.
+
 ## 0.6.4
 
 - Fix: the short-screen rule for the controls strip now actually applies.
