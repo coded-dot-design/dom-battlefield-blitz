@@ -523,7 +523,9 @@
   border-radius: calc(10 * var(--u));
   box-shadow: 0 calc(5 * var(--u)) 0 var(--k-cmd-base);
 }
-/* The grip: a violet tab centred on the top edge. Drag a card by it (or any empty part). */
+/* The grip: a flat violet tab centred on the top edge (no rim, no base, it never presses), with a
+   short strip of dark dots. Drag a card by it (or any empty part). A wider invisible area catches
+   thumbs. As a <button class="bui-grip"> it keeps this look in every state. */
 .bui .bui-grip {
   position: absolute;
   top: calc(-8 * var(--u));
@@ -531,11 +533,23 @@
   translate: -50% 0;
   width: calc(36 * var(--u));
   height: calc(12 * var(--u));
-  background: var(--k-cmd);
+  min-height: 0;
+  padding: calc(3.5 * var(--u)) calc(10 * var(--u));
+  background: radial-gradient(circle, var(--rim) 0 45%, transparent 55%) 0 0 / calc(4 * var(--u)) calc(2.5 * var(--u)) content-box content-box, var(--k-cmd);
+  border: 0;
   border-radius: calc(4 * var(--u));
-  background-image: radial-gradient(circle, #f6f3ff 1px, transparent 1.5px);
-  background-size: calc(6 * var(--u)) calc(6 * var(--u));
-  background-position: center;
+  box-shadow: none;
+  transform: none !important;
+  cursor: grab;
+  touch-action: none;
+}
+.bui .bui-grip::before {
+  content: "";
+  position: absolute;
+  inset: calc(-12 * var(--u)) calc(-14 * var(--u));
+}
+.bui .bui-grip:is(:active, .on) {
+  cursor: grabbing;
 }
 /* The back tab: the previous step, on the card's top edge, left side. */
 .bui .bui-back-tab {

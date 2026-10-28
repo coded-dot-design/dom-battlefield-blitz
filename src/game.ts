@@ -120,8 +120,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .tip[hidden]{display:none}@keyframes blink{50%{opacity:.6}}
 .pad{position:absolute;right:max(10px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:200px;height:256px;pointer-events:none;transform-origin:100% 100%}
 .embed .pad{bottom:max(80px,calc(env(safe-area-inset-bottom) + 64px))}
-.bui .grab{--py:3px;position:absolute;right:52px;bottom:226px;width:56px;height:18px;min-height:0;padding:0;background:var(--k-cmd) radial-gradient(circle,#f6f3ff 1px,transparent 1.5px) center/6px 6px;border:2px solid var(--rim);border-radius:6px;--edge:var(--k-cmd-base);pointer-events:auto;touch-action:none;cursor:grab}
-.bui .grab.on{cursor:grabbing}
+.bui .pad .grab{top:auto;left:auto;translate:none;right:60px;bottom:224px;pointer-events:auto}
 .bui .rk{--py:5px;position:absolute;display:grid;place-content:center;justify-items:center;gap:2px;width:62px;height:62px;min-height:0;padding:0;border-width:2.5px;border-radius:50%;pointer-events:auto;touch-action:none}
 .bui .rk svg{width:24px;height:24px;stroke-width:2.3}
 .rk small{font:900 8px/1 ui-monospace,monospace;letter-spacing:.12em}
@@ -189,7 +188,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
 <button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause or surrender (Esc)" title="Esc · Pause">${svg("flag")}<span>Surrender</span></button>
 <div class="pad" data-pad>
-<button class="grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"><i></i><i></i><i></i></button>
+<button class="bui-grip grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"></button>
 <button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
 <button class="rk bui-arcade bui-aim lock" type="button" data-k="lock" aria-pressed="false" aria-label="Aim lock: stick to one target, tap a tank to switch (T)" title="T · Aim lock">${svg("lock")}<small>LOCK</small><kbd>T</kbd></button>
 <button class="rk bui-arcade bui-attack strike" type="button" data-k="strike" aria-pressed="false" aria-label="Airstrike: then tap where the bombs go (F)" title="F · Airstrike">${svg("strike")}<small>STRIKE</small><span class="n" data-n="strike">1</span><kbd>F</kbd></button>

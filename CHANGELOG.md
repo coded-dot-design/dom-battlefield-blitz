@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+- The pad's drag handle is the Battlefield card grip (the kit's `.bui-grip`, Fizlet 0.2.4): a flat violet
+  tab with dark dots, with a bigger invisible touch area.
+
 ## 0.6.1
 
 - The SURRENDER key's white flag shows its grid lines, frame and flag outline again (Fizlet 0.2.3 kit).
