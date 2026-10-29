@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased (site only)
+
+- **Site structure and structured data** (check-html: 0 errors on both pages). Footer column titles
+  h4 → h2, same look (`.site-foot h2` keeps the old rule), so the landing page no longer jumps
+  h2 → h4. `/play/` gets a screen-reader h1 ("Play Battlefield Blitz"); the arena stays the visible
+  title. JSON-LD from facts already on the page: WebSite + VideoGame on `/`, WebPage + BreadcrumbList
+  on `/play/`. `site/engine.config.json` marks `/play/*` as a game route (scripts expected).
+- No gameplay, design or `dist/` change; the version stays 0.8.1 (a bump would rebuild `dist`).
+
 ## 0.8.1
 
 - **On Fizlet 0.12.0** (was 0.10.0): `vendor/fizlet` re-synced with `scripts/sync.mjs`.
