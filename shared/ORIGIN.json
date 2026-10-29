@@ -2,7 +2,7 @@
   "note": "Generated snapshot. Edit coded-dot-design/sherman-bytes, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/sherman-bytes",
   "version": "0.5.2",
-  "commit": "caa1dbf2cf5c6524887babd83ac2851f9bf24039",
+  "commit": "66000fba00e8874313ec50d6561a76556650351f",
   "files": [
     {
       "path": "src/sprites.ts",

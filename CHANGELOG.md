@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.0
+
+- **On Fizlet 0.10.0** (was 0.2.4): `vendor/fizlet` re-synced with `scripts/sync.mjs`. No API
+  changes were needed; the browser test passes unchanged.
+- **Replayable:** every random number in a match now comes from the engine's seeded random
+  (`engine.random`), and the practice dummies' turret sway runs on engine time instead of the
+  wall clock. New option `seed`: the same seed and the same input give the same match. New test
+  `npm run test:replay` (also in CI): seed 41 twice is identical over 3,600 frames, seed 42
+  differs, and nothing calls `Math.random` while playing (0.7.0 made about 7,700 calls per
+  600 frames of the demo).
+- **Supply crates run on `fizlet/rules`** (`drops`): 2 at once, the 2.2 s parachute fall and
+  14 s on the ground, as before. Same kinds, odds, pickup radius and rewards; the draw code is
+  Blitz's own.
+- Size: `dist/blitz.js` 34,501 → 37,639 B gzip: +2,277 B from the newer bricks (0.2.4 → 0.10.0),
+  +861 B for the rules brick net of the crate code it replaces. Budget 40,960 B.
+
 ## 0.7.0
 
 - Blitz has its own site: the landing page at `/` and the game at `/play/`, with the drop-in at

@@ -20,18 +20,23 @@ const VARS: Record<keyof Palette, string> = {
 };
 const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
-let shared: CSSStyleSheet | null = null;
+/** One constructed sheet per distinct CSS text, shared by every board mounted with that text. */
+const sheets = new Map<string, CSSStyleSheet>();
 /**
  * Mount a board inside a shadow root on `host`, isolated both ways: the kit can't touch the page
  * and the page's CSS (a global `button {}` rule, a reset) can't touch the board. Pass the kit CSS
  * text (e.g. `import css from "board-ui/board-ui.css?raw"`). Returns the `.bui` root to build in.
- * One constructed stylesheet is shared by every board on the page.
+ * Stylesheet ownership: the kit owns one constructed sheet per CSS text (keyed by the text), so
+ * games composed independently with different CSS each get their own, and boards with the same
+ * text share one. Treat it as read-only; it is appended to the shadow root's adoptedStyleSheets,
+ * never replacing sheets you adopted there yourself.
  */
 export function mount(host: HTMLElement, css: string, opts: { theme?: "dark" | "light"; side?: 0 | 1; palette?: Palette } = {}) {
   const shadow = host.shadowRoot ?? host.attachShadow({ mode: "open" });
   if ("adoptedStyleSheets" in shadow && typeof CSSStyleSheet === "function" && "replaceSync" in CSSStyleSheet.prototype) {
-    if (!shared) (shared = new CSSStyleSheet()).replaceSync(css);
-    if (!shadow.adoptedStyleSheets.includes(shared)) shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, shared];
+    let sheet = sheets.get(css);
+    if (!sheet) (sheet = new CSSStyleSheet()).replaceSync(css), sheets.set(css, sheet);
+    if (!shadow.adoptedStyleSheets.includes(sheet)) shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
   } else {
     const style = document.createElement("style");
     style.textContent = css;
@@ -39,6 +44,9 @@ export function mount(host: HTMLElement, css: string, opts: { theme?: "dark" | "
   }
   const root = document.createElement("div");
   root.className = "bui";
+  // Contract rule 8: style containment only (counters and quotes stay inside). The root is static,
+  // so layout or paint containment would move or clip a board's own absolute layers.
+  root.style.contain = "style";
   root.dataset.theme = opts.theme ?? "dark";
   root.dataset.side = String(opts.side ?? 0);
   shadow.append(root);
@@ -65,6 +73,23 @@ export function applyPalette(root: HTMLElement, palette: Palette): () => void {
  * follow an uncancellable touch is skipped. Run your state change and repaint synchronously in
  * fn: a frame between release and the new pressed state makes the key bounce.
  */
+/** Readouts (BOARD-UI.md section 18): a `.bui-readouts` group of `[label, tone?]` items, appended to
+ *  `parent`. Returns the value elements in order, for fizlet/hud (or your own change-only writes).
+ *  Text is set with textContent. The caller owns the group: add it through the engine's ledger. */
+export function readouts(parent: HTMLElement, items: [label: string, tone?: "team" | "enemy"][], onMap = false) {
+  const group = parent.ownerDocument.createElement("div");
+  group.className = onMap ? "bui-readouts bui-on-map" : "bui-readouts";
+  const values = items.map(([label, tone]) => {
+    const item = group.appendChild(parent.ownerDocument.createElement("span"));
+    item.className = "bui-readout";
+    if (tone) item.dataset.tone = tone;
+    item.append(label);
+    return item.appendChild(parent.ownerDocument.createElement("b"));
+  });
+  parent.append(group);
+  return { group, values };
+}
+
 export function press(el: HTMLElement, fn: () => void, signal: AbortSignal) {
   let touched = 0;
   el.addEventListener("touchstart", (e) => {
@@ -76,6 +101,40 @@ export function press(el: HTMLElement, fn: () => void, signal: AbortSignal) {
     if (!touched || performance.now() - touched > 800) fn();
     touched = 0;
   }, { signal });
+}
+
+/** localStorage key of the Settings "Performance overlay" switch (off by default). */
+export const PERF_KEY = "dom-virus:perf";
+/**
+ * A Settings switch: a key that is `aria-pressed` (the kit's locked state) while on, remembered
+ * in localStorage under `key` as "1" / "0". Storage that throws (private mode, blocked cookies,
+ * a sandboxed frame) is ignored: the switch still works, it just forgets. `change` runs once
+ * with the stored value and on every flip; `set(on)` flips it from code (a keyboard shortcut).
+ * Example: `setting(btn, PERF_KEY, (on) => overlay.show(on), signal)` with `fizlet/perf`.
+ */
+export function setting(button: HTMLElement, key: string, change: (on: boolean) => void, signal: AbortSignal, fallback = false) {
+  let on = fallback;
+  try {
+    const v = localStorage.getItem(key);
+    if (v === "1" || v === "0") on = v === "1";
+  } catch {}
+  const set = (next: boolean, save = true) => {
+    on = next;
+    button.setAttribute("aria-pressed", "" + on);
+    if (save)
+      try {
+        localStorage.setItem(key, on ? "1" : "0");
+      } catch {}
+    change(on);
+  };
+  button.addEventListener("click", () => set(!on), { signal });
+  set(on, false);
+  return {
+    get on() {
+      return on;
+    },
+    set,
+  };
 }
 
 /** Restart an overlay sticker's slam and press (on every entry, and on return to a hidden tab). */
@@ -116,7 +175,7 @@ export function launch(button: HTMLElement, action: () => void, opts: { reduced?
     layer.className = "bui-burst";
     layer.setAttribute("aria-hidden", "true");
     // Inline styles only: the burst lives on <body>, outside any shadow root the board is in.
-    Object.assign(layer.style, { position: "fixed", zIndex: "2147483000", pointerEvents: "none", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    Object.assign(layer.style, { position: "fixed", contain: "layout style", zIndex: "2147483000", pointerEvents: "none", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     document.body.append(layer);
     const sink = Number(style.boxShadow.match(/(-?[\d.]+)px\s+(-?[\d.]+)px/)?.[2] || 5);
     const copy = () => {

@@ -457,6 +457,7 @@
   position: absolute;
   inset: 0;
   z-index: 30;
+  contain: layout style; /* rule 8: already positioned and stacked, so nothing moves or clips */
   background: color-mix(in srgb, #2a2d38 82%, transparent);
 }
 .bui .bui-overlay[hidden] {
@@ -708,6 +709,151 @@
   pointer-events: none;
 }
 
+/* ---------- 11. Pad (fizlet/pad): swappable touch controls ----------
+   The move control (stick, d-pad or move keys) under one thumb, round arcade action keys under
+   the other (right by default; data-hand="left" swaps). The first action is the big primary key.
+   Stick and knob: Battlefield's cockpit stick; round keys: Blitz's pad. */
+.bui .bui-pad {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 12;
+  contain: layout style; /* rule 8: already positioned and stacked, so nothing moves or clips */
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: calc(16 * var(--u));
+  padding: 0 max(calc(14 * var(--u)), env(safe-area-inset-right)) max(calc(14 * var(--u)), env(safe-area-inset-bottom)) max(calc(14 * var(--u)), env(safe-area-inset-left));
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.bui .bui-pad[data-hand="left"] {
+  flex-direction: row-reverse;
+}
+.bui .bui-pad-move,
+.bui .bui-pad-keys {
+  display: flex;
+  align-items: flex-end;
+  gap: calc(10 * var(--u));
+}
+.bui .bui-pad-keys {
+  flex-flow: row-reverse wrap-reverse;
+  max-width: calc(240 * var(--u));
+}
+.bui .bui-pad[data-hand="left"] .bui-pad-keys {
+  flex-direction: row;
+}
+.bui .bui-pad :is(.bui-stick, .bui-dpad, button) {
+  pointer-events: auto;
+  touch-action: none;
+}
+.bui .bui-pad .bui-arcade {
+  --py: calc(5 * var(--u));
+  position: relative;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(2 * var(--u));
+  width: calc(62 * var(--u));
+  height: calc(62 * var(--u));
+  min-height: 0;
+  padding: 0;
+  border-width: calc(2.5 * var(--u));
+  border-radius: 50%;
+}
+.bui .bui-pad .bui-arcade svg {
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  stroke-width: 2.3;
+}
+.bui .bui-pad small {
+  font: 900 calc(8 * var(--u)) / 1 ui-monospace, monospace;
+  letter-spacing: 0.12em;
+}
+.bui .bui-pad kbd {
+  position: absolute;
+  left: calc(-6 * var(--u));
+  top: calc(-6 * var(--u));
+  margin: 0;
+  padding: calc(1 * var(--u)) calc(4 * var(--u));
+  font: 800 calc(8 * var(--u)) / 1.3 ui-monospace, monospace;
+  color: var(--muted);
+  background: var(--surface);
+  border: calc(1 * var(--u)) solid var(--line);
+  border-radius: calc(4 * var(--u));
+  opacity: 1;
+}
+@media (pointer: coarse) {
+  .bui .bui-pad kbd { display: none; }
+}
+.bui .bui-pad .bui-primary {
+  width: calc(96 * var(--u));
+  height: calc(96 * var(--u));
+}
+.bui .bui-pad .bui-primary svg {
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+}
+.bui .bui-stick {
+  position: relative;
+  width: calc(128 * var(--u));
+  height: calc(128 * var(--u));
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 0 34%, color-mix(in srgb, var(--k-sys) 14%, transparent) 34% 35%, transparent 35%), color-mix(in srgb, var(--k-sys) 8%, var(--bg));
+  border: calc(2.5 * var(--u)) solid var(--k-sys);
+  box-shadow: 0 calc(4 * var(--u)) 0 color-mix(in srgb, var(--k-sys) 35%, var(--rim)), inset 0 0 calc(18 * var(--u)) color-mix(in srgb, var(--k-sys) 14%, transparent);
+}
+.bui .bui-stick::before,
+.bui .bui-stick::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  border: calc(6 * var(--u)) solid transparent;
+  border-bottom-color: color-mix(in srgb, var(--k-sys) 55%, transparent);
+  translate: -50% 0;
+  pointer-events: none;
+}
+.bui .bui-stick::after {
+  top: auto;
+  bottom: 8%;
+  border-bottom-color: transparent;
+  border-top-color: color-mix(in srgb, var(--k-sys) 55%, transparent);
+}
+.bui .bui-knob {
+  position: absolute;
+  inset: 31%;
+  border-radius: 50%;
+  background: var(--k-sys);
+  border: calc(2 * var(--u)) solid var(--rim);
+  box-shadow: 0 calc(4 * var(--u)) 0 color-mix(in srgb, var(--k-sys) 45%, var(--rim)), 0 0 calc(14 * var(--u)) color-mix(in srgb, var(--k-sys) 40%, transparent);
+  transition: translate 160ms var(--bui-spring);
+  pointer-events: none;
+}
+.bui .bui-stick.down .bui-knob {
+  transition: none;
+  box-shadow: 0 calc(1 * var(--u)) 0 color-mix(in srgb, var(--k-sys) 45%, var(--rim)), 0 0 calc(22 * var(--u)) color-mix(in srgb, var(--k-sys) 65%, transparent);
+}
+.bui .bui-dpad {
+  display: grid;
+  grid-template: repeat(3, calc(44 * var(--u))) / repeat(3, calc(44 * var(--u)));
+  gap: calc(4 * var(--u));
+}
+.bui .bui-pad .bui-dpad .bui-arcade {
+  width: auto;
+  height: auto;
+  border-radius: calc(10 * var(--u));
+}
+.bui .bui-dpad [data-d="0"] { grid-area: 1 / 2; }
+.bui .bui-dpad [data-d="1"] { grid-area: 3 / 2; }
+.bui .bui-dpad [data-d="2"] { grid-area: 2 / 1; }
+.bui .bui-dpad [data-d="3"] { grid-area: 2 / 3; }
+/* One arrow icon (pointing up), turned per direction; move keys in a row read left to right. */
+.bui .bui-pad [data-d="1"] svg { rotate: 180deg; }
+.bui .bui-pad [data-d="2"] svg { rotate: -90deg; }
+.bui .bui-pad [data-d="3"] svg { rotate: 90deg; }
+.bui .bui-pad-move > [data-d="2"] { order: -1; }
+
 @media (prefers-reduced-motion: reduce) {
   .bui *,
   .bui *::after {
@@ -717,4 +863,40 @@
   .bui-burst {
     display: none;
   }
+}
+
+/* ---------- 12. Readouts: DOM Battlefield's metrics (ARMOR, FRIENDLY, HOSTILE, ELAPSED) ----------
+   A readout is not a key: flat, no hard shadow, never pressed. A muted caps label over a big value
+   (tabular numbers so a ticking clock never jiggles); team and enemy tints come from the palette.
+   readouts() in board-ui.ts builds the markup; fizlet/hud writes the values. */
+.bui .bui-readouts {
+  display: flex;
+  gap: calc(30 * var(--u));
+}
+.bui .bui-readout {
+  font-size: calc(8 * var(--u));
+  letter-spacing: calc(1.4 * var(--u));
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bui .bui-readout b {
+  display: block;
+  margin-top: calc(6 * var(--u));
+  font-size: calc(20 * var(--u));
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.bui .bui-readout[data-tone="team"] b {
+  color: var(--team-ink);
+}
+.bui .bui-readout[data-tone="enemy"] b {
+  color: var(--team-b);
+}
+/* On the map (Battlefield's phone cockpit panel): a flat see-through plate under the readouts. */
+.bui .bui-readouts.bui-on-map {
+  gap: calc(3 * var(--u)) calc(12 * var(--u));
+  padding: calc(5 * var(--u)) calc(9 * var(--u));
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  border: calc(1.5 * var(--u)) solid var(--line);
+  border-radius: calc(5 * var(--u));
 }

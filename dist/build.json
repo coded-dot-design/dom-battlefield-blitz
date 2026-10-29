@@ -1,8 +1,8 @@
 {
-  "version": "0.7.0",
+  "version": "0.8.0",
   "files": {
-    "blitz.js": "217081bcae6ea33411ef03b4f1e54b8a8bb59d1db777c783dfaf51f2babed202",
-    "blitz.mjs": "6df3be998b406d7687c2d0b7e559b4bbc6bfeaedf330a82ae15da44d4d5ed2b0",
-    "blitz.d.ts": "363d36a9fb7d56f86477eb3d587e87747d802c33279b709f71b7e2b2cad088fa"
+    "blitz.js": "13468dc4908d4d67bde65fe9e12f1685c570b79427b2d260b25e2343d3eb1afa",
+    "blitz.mjs": "6406df0c5c936c8ba39e08e4b794669ea245184f86fd190eaa004ed8db10b1e3",
+    "blitz.d.ts": "e32f8e1f985ea95cfa0ccb0dff9020d504e170ff380cd8a895fc08e0073cace2"
   }
 }

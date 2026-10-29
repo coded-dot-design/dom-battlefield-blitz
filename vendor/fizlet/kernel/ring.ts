@@ -1,3 +1,5 @@
+import { need } from "./need";
+
 /** One event in the ring. Slots are reused; copy what you need before the next frame. */
 export interface FizEvent {
   type: string;
@@ -15,7 +17,7 @@ export class EventRing {
   dropped = 0;
   private readonly slots: FizEvent[] = [];
   constructor(cap = 64) {
-    this.cap = cap;
+    this.cap = need(cap, "events capacity", 2);
     for (let i = 0; i < cap; i++) this.slots.push({ type: "", a: 0, b: 0, x: 0, y: 0, v: 0 });
   }
   emit(type: string, a = 0, b = 0, x = 0, y = 0, v = 0): boolean {
