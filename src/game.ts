@@ -272,16 +272,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const bombs: Bomb[] = Array.from({ length: 40 }, () => ({ x: 0, y: 0, wait: 0, fall: 0, owner: 0, main: false, on: false }));
   const booms: Boom[] = Array.from({ length: 48 }, () => ({ x: 0, y: 0, t: 0, p: 0, c: 0, on: false }));
   // Supply crates are fizlet/rules drops: 2 at once, a 2.2 s parachute fall of 170 px, 14 s on the
-  // ground (life counts from the spawn). The brick holds where they are; `born` keeps each crate's
-  // spawn time by its x (crates never move sideways) for the fall shadow, the landing puff and the
-  // blink. A taken crate leaves it; an expired one stays until the next reset (a few per match).
+  // ground (life counts from the spawn). The brick keeps where each one is, where it lands (`landY`)
+  // and how old it is (`age`): the fall shadow and the blink read those, the landing puff is its
+  // `drop:land` event.
   const CRATE_FALL = 170, CRATE_DROP = 2.2;
   const supply = drops(e, { kinds: ["repair", "long", "strike", "jackpot"], cap: 2, life: 14 + CRATE_DROP, fall: CRATE_FALL, speed: CRATE_FALL / CRATE_DROP });
-  const born = new Map<number, number>();
-  /** One reused view of a crate for drawing (no allocation per frame). */
-  const crateView = { x: 0, y: 0, kind: 0, drop: 0, life: 0 };
-  /** Seconds since crate i spawned. */
-  const crateAge = (i: number) => e.time - (born.get(supply.x[i]!) ?? e.time);
   const blocks: Block[] = [];
   let covers: Cover[] = [], coverDirty = true, coverAt = 0;
   const anims = new Set<Animation>();
@@ -672,7 +667,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     openSpot(spot);
     const x = spot[0]!, y = spot[1]!, r = R(), kind = r < 0.38 ? 0 : r < 0.66 ? 1 : r < 0.9 ? 2 : 3;
     supply.spawn(x, y, kind);
-    born.set(x, e.time);
     fx.word(x, y - 130, W_SUPPLY, 1, 18);
     feedK[feedN % 8] = -2;
     feedV[feedN % 8] = kind;
@@ -683,7 +677,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function takeCrate(i: number, t: Tank) {
     const x = supply.x[i]!, y = supply.y[i]!, kind = supply.kind[i]!;
     supply.collect(x, y, 0.5);
-    born.delete(x);
     const c = { x, y, kind };
     if (t.you) cCrate++;
     if (c.kind === 0 || c.kind === 3) (t.hp = MAXHP), (t.shield = Math.max(t.shield, 2));
@@ -909,12 +902,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           if (s.type === MINE) takeTile(s, you); // a mine left alone goes off by itself
         }
       }
+      // The brick moves and expires the crates (and says when one lands: render puffs its dust).
       if ((crateIn -= dt) <= 0) (dropCrate(), (crateIn = 18 + R() * 8));
-      // The brick moves and expires the crates; a crate that lands this step gets its dust puff.
-      for (let i = 0; i < supply.count; i++) {
-        const age = crateAge(i);
-        if (age >= CRATE_DROP && age - dt < CRATE_DROP) fx.spawn(2, supply.x[i]!, supply.y[i]!, 0, 0, 16, 0.4, 7);
-      }
       for (const b of blocks) if (b.hp <= 0 && (b.back -= dt) <= 0 && !tanks.some((t) => t.alive && circleRect(t.x, t.y, 20, b.x, b.y, b.w, b.h))) b.hp = 3;
       // Tanks.
       for (const t of tanks) {
@@ -1034,6 +1023,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (nukeT > 0 && (nukeT -= dt) <= 0) nukeGoesOff();
     },
     render() {
+      // A crate that landed this frame raises a dust puff.
+      for (let i = 0; i < e.events.size; i++) {
+        const ev = e.events.at(i)!;
+        if (ev.type === "drop:land") fx.spawn(2, ev.x, ev.y, 0, 0, 16, 0.4, 7);
+      }
       hudFrame();
       draw();
       if (buzz > 0) {
@@ -1127,7 +1121,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const t of tanks) t.alive = false;
     for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
     supply.reset();
-    born.clear();
     targeting = false;
     nukeT = whiteout = quakeAmt = 0;
     fx.clear();
@@ -1209,7 +1202,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const t of tanks) Object.assign(t, { kills: 0, deaths: 0, alive: false, dead: platoon ? 0.2 + t.team * 0.45 + t.slot * 0.12 : 0.2 + t.i * 0.15, strikes: t.you ? 1 : 0, carpet: 0, rail: t.you ? RAIL_START : 1, run: 0 });
     for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
     supply.reset();
-    born.clear();
     nukeT = whiteout = 0;
     crateIn = 12;
     lockT = -1;
@@ -1541,33 +1533,28 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     // Supply crates.
     for (let i = 0; i < supply.count; i++) {
-      const age = crateAge(i), c = crateView;
-      c.drop = Math.min(1, age / CRATE_DROP);
-      c.life = 14 + CRATE_DROP - age;
-      c.x = supply.x[i]!;
-      c.y = supply.y[i]! + (1 - c.drop) * CRATE_FALL; // where it lands
-      c.kind = supply.kind[i]!;
-      if (c.drop < 1) {
-        const k = 1 - c.drop, y = c.y - k * 170;
+      const x = supply.x[i]!, y = supply.y[i]!, land = supply.landY[i]!, kind = supply.kind[i]!;
+      if (!supply.landed(i)) {
+        // Falling: the shadow on the landing spot grows as the crate comes down.
+        const drop = Math.min(1, supply.age[i]! / CRATE_DROP), k = 1 - drop;
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = "#000";
         ctx.beginPath();
-        ctx.ellipse(c.x, c.y + 4, 14 * (0.5 + c.drop * 0.5), 7 * (0.5 + c.drop * 0.5), 0, 0, TAU);
+        ctx.ellipse(x, land + 4, 14 * (0.5 + drop * 0.5), 7 * (0.5 + drop * 0.5), 0, 0, TAU);
         ctx.fill();
         ctx.globalAlpha = 1;
-        chute(c.x, y, scale * 0.8, "#ffc21a", Math.sin(now * 3) * 0.12 * k);
-        crate(c.x, y, scale * 0.9, c.kind);
-      } else {
-        if (c.life > 3 || ((now * 8) | 0) % 2) {
-          ctx.globalAlpha = 0.5 + 0.4 * Math.abs(Math.sin(now * 4));
-          ctx.strokeStyle = "#ffc21a";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, 22 * scale, 0, TAU);
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-          crate(c.x, c.y, scale * 0.9, c.kind);
-        }
+        chute(x, y, scale * 0.8, "#ffc21a", Math.sin(now * 3) * 0.12 * k);
+        crate(x, y, scale * 0.9, kind);
+      } else if (supply.life - supply.age[i]! > 3 || ((now * 8) | 0) % 2) {
+        // On the ground: it blinks in its last 3 seconds.
+        ctx.globalAlpha = 0.5 + 0.4 * Math.abs(Math.sin(now * 4));
+        ctx.strokeStyle = "#ffc21a";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 22 * scale, 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        crate(x, y, scale * 0.9, kind);
       }
     }
     // Tanks (and their parachutes).
