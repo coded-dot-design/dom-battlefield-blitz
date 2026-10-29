@@ -352,88 +352,60 @@ a.bui-sticker-key {
   }
 }
 
-/* ---------- START BATTLE: the game's sticker key, page size ----------
-   Skull tile + two-line word on the deep navy face, a white base straight below. */
-.start-key {
+/* ---------- START BATTLE: the kit's sticker key (bui-key bui-sticker-key bui-call), page size ----------
+   Skull tile + two-line word on the deep navy face, a white base straight below. This only sizes
+   the key and sets its variables; rest, hover, press, focus and the call ring are the kit's. */
+.bui .start-key {
   --py: 8px;
+  --hy: 3px;
+  --glow: 0 0 40px color-mix(in srgb, #19f0ff 25%, transparent);
+  --glow-hover: 0 0 56px color-mix(in srgb, #19f0ff 40%, transparent);
+  --glow-press: 0 0 30px color-mix(in srgb, #19f0ff 30%, transparent);
   display: inline-flex;
   align-items: center;
   gap: 20px;
+  width: auto;
+  height: auto;
   padding: 16px 30px 16px 18px;
-  color: #19f0ff;
-  background: #10233f;
-  border: 4px solid #f6f3ff;
+  border-width: 4px;
   border-radius: 18px;
-  box-shadow: 0 var(--py) 0 #f6f3ff, 0 0 40px color-mix(in srgb, #19f0ff 25%, transparent);
-  text-decoration: none;
-  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
 }
-.start-key svg {
+.bui .start-key svg {
   width: 64px;
   height: 64px;
   border: 3px solid #19f0ff;
   background: #0b1830;
 }
-.start-key b {
+.bui .start-key b {
   font: 900 30px/1.05 var(--mono);
   letter-spacing: 0.12em;
   color: #f6f3ff;
   text-align: left;
 }
-@media (hover: hover) and (pointer: fine) {
-  .start-key:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 calc(var(--py) + 3px) 0 #f6f3ff, 0 0 56px color-mix(in srgb, #19f0ff 40%, transparent);
-  }
-}
-.start-key:active {
-  transform: translateY(var(--py));
-  box-shadow: 0 0 0 #f6f3ff, 0 0 30px color-mix(in srgb, #19f0ff 30%, transparent);
-  transition-duration: 50ms;
-}
-/* Call: a ring leaves the base, "press me" (as the game's Start). */
-.start-key {
-  position: relative;
-  isolation: isolate;
-}
-.start-key::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  z-index: -1;
-  border-radius: 20px;
-  box-shadow: 0 var(--py) 0 0 #f6f3ff;
-  animation: start-call 1.6s ease-out infinite;
-}
-@keyframes start-call {
-  from {
-    opacity: 0.8;
-    box-shadow: 0 var(--py) 0 0 color-mix(in srgb, #19f0ff 70%, transparent);
-  }
-  to {
-    opacity: 0;
-    box-shadow: 0 calc(var(--py) + 10px) 0 12px color-mix(in srgb, #19f0ff 0%, transparent);
-  }
-}
 html.bui[data-theme="light"] .start-key {
-  border-color: #1b1636;
-  box-shadow: 0 var(--py) 0 #1b1636;
+  --edge: var(--ink);
+  --edge-hover: var(--ink);
+  --border-hover: var(--ink);
+  --glow: 0 0 0 transparent;
+  --glow-hover: 0 0 0 transparent;
+  --glow-press: 0 0 0 transparent;
+  color: #19f0ff;
+  background: #10233f;
+  border-color: var(--ink);
+}
+html.bui[data-theme="light"] .start-key b {
+  color: #f6f3ff;
 }
 @media (max-width: 520px) {
-  .start-key {
+  .bui .start-key {
     gap: 14px;
     padding: 12px 22px 12px 12px;
   }
-  .start-key svg {
+  .bui .start-key svg {
     width: 52px;
     height: 52px;
   }
-  .start-key b {
+  .bui .start-key b {
     font-size: 24px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .start-key::after {
-    animation: none;
   }
 }

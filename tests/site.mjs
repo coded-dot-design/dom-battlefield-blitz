@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, extname, resolve } from "node:path";
 import { chromium } from "playwright";
+import { checkKeys, checkTaps } from "./keys.mjs";
 
 const root = resolve("artifacts/pages");
 const PREFIX = "/dom-battlefield-blitz";
@@ -118,7 +119,18 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
   assert.deepEqual(derr, []);
   await dp.close();
-  console.log("Site: landing + live demo, board match, phone app mode, drop-in passed.");
+  // Page keys (Fizlet BOARD-UI.md "Page keys"): every in-page key presses (face drops by its base)
+  // and clicks on its face, top edge and base; Enter shows the press; phones: a tap on the base clicks.
+  where = "page keys";
+  let keys = 0;
+  for (const [opts, check] of [[{ viewport: { width: 1440, height: 900 } }, checkKeys], [{ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, checkTaps]]) {
+    const kc = await browser.newContext(opts);
+    const kp = await kc.newPage();
+    await kp.goto(base);
+    keys += await check(kp, where);
+    await kc.close();
+  }
+  console.log(`Site: landing + live demo, board match, phone app mode, drop-in, ${keys} page keys passed.`);
 } catch (e) {
   console.error(`site test failed at ${where}`);
   throw e;

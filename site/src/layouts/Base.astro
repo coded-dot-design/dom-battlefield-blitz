@@ -56,7 +56,7 @@ const nav = [
         </nav>
         <div class="head-keys">
           <a class="bui-key bui-icon-key gh" href={REPO} aria-label="Source on GitHub"><Icon name="github" /></a>
-          <button class="bui-icon-key" type="button" data-theme-toggle aria-label="Switch light or dark">
+          <button class="bui-key bui-icon-key" type="button" data-theme-toggle aria-label="Switch light or dark">
             <span class="theme-dark"><Icon name="moon" /></span><span class="theme-light"><Icon name="sun" /></span>
           </button>
           <a class="bui-key bui-arcade bui-go play-key" href={base('play/')} data-play><Icon name="play" size={16} />Play</a>
@@ -102,6 +102,8 @@ const nav = [
       for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, function (e) { if (matchMedia("(pointer: coarse)").matches) e.preventDefault(); }, { passive: false });
     </script>}
     <script>
+      import { pressCue } from "../../../vendor/fizlet/ui/board-ui";
+      pressCue(document); // page keys: keyboard press and iOS :active (Fizlet BOARD-UI.md "Page keys")
       const html = document.documentElement;
       document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
         const next = html.dataset.theme === "light" ? "dark" : "light";

@@ -111,8 +111,9 @@
   stroke-linejoin: round;
 }
 @media (hover: hover) and (pointer: fine) {
-  .bui button:not(:disabled, [aria-pressed="true"], [aria-expanded="true"], .active):hover,
-  .bui .bui-key:not([aria-pressed="true"], .active):hover {
+  /* Never while pressed: a hover rule that outranks press keeps a pressed face lifted. */
+  .bui button:not(:disabled, :active, .down, [aria-pressed="true"], [aria-expanded="true"], .active):hover,
+  .bui .bui-key:not(:disabled, :active, .down, [aria-disabled="true"], [aria-pressed="true"], [aria-expanded="true"], .active):hover {
     border-color: var(--border-hover);
     transform: translateY(calc(-1 * var(--hy)));
     box-shadow: 0 calc(var(--py) + var(--hy)) 0 var(--edge-hover), var(--glow-hover);
@@ -121,18 +122,44 @@
 .bui button:not(:disabled):active,
 .bui button.down,
 .bui button:is([aria-pressed="true"], [aria-expanded="true"], .active),
-.bui .bui-key:is(:active, .down, [aria-pressed="true"], .active) {
+.bui .bui-key:not(:disabled, [aria-disabled="true"]):is(:active, .down),
+.bui .bui-key:is([aria-pressed="true"], [aria-expanded="true"], .active) {
   transform: translateY(var(--py));
   box-shadow: 0 0 0 var(--edge), var(--glow-press);
 }
 .bui button:not(:disabled):active,
 .bui button.down,
-.bui .bui-key:active {
+.bui .bui-key:is(:active, .down) {
   transition-duration: 50ms;
 }
-.bui button:disabled {
+.bui button:disabled,
+.bui .bui-key[aria-disabled="true"] {
   opacity: 0.45;
   cursor: not-allowed;
+}
+.bui .bui-key[aria-disabled="true"] {
+  pointer-events: none;
+}
+/* Page keys (.bui-key, <a> or <button>): the face AND its base take the press, and the hit area
+   stays where the key rests while the face travels, so a press on the base, or near the top edge
+   (which the dropping face leaves), still clicks. An invisible ::before, counter-moved. */
+:where(.bui .bui-key) {
+  position: relative;
+}
+.bui .bui-key::before {
+  content: "";
+  position: absolute;
+  inset: calc(-4 * var(--u)) 0 calc(-1 * (var(--py) + 4 * var(--u)));
+  transition: inherit;
+}
+@media (hover: hover) and (pointer: fine) {
+  .bui .bui-key:not(:disabled, :active, .down, [aria-disabled="true"], [aria-pressed="true"], [aria-expanded="true"], .active):hover::before {
+    transform: translateY(var(--hy));
+  }
+}
+.bui .bui-key:not(:disabled, [aria-disabled="true"]):is(:active, .down)::before,
+.bui .bui-key:is([aria-pressed="true"], [aria-expanded="true"], .active)::before {
+  transform: translateY(calc(-1 * var(--py)));
 }
 /* Keyboard focus wraps the face AND its base (an outline stops short of the base). */
 .bui button:focus-visible,
@@ -146,7 +173,7 @@
     0 var(--py) 0 calc(6 * var(--u)) var(--k-sys-ink);
 }
 .bui button:focus-visible:is(:active, .down, .active, [aria-pressed="true"], [aria-expanded="true"]),
-.bui .bui-key:focus-visible:is(:active, .down, .active, [aria-pressed="true"]) {
+.bui .bui-key:focus-visible:is(:active, .down, .active, [aria-pressed="true"], [aria-expanded="true"]) {
   box-shadow: 0 0 0 calc(3 * var(--u)) var(--bg), 0 0 0 calc(6 * var(--u)) var(--k-sys-ink);
 }
 
@@ -859,6 +886,10 @@
   .bui *::after {
     animation: none !important;
     transition: none !important;
+  }
+  /* Press without motion: the face still lands on its base (no tween), and it darkens. */
+  .bui :is(button:not(:disabled), .bui-key:not([aria-disabled="true"])):is(:active, .down) {
+    filter: brightness(0.82);
   }
   .bui-burst {
     display: none;

@@ -170,7 +170,7 @@ canvas{position:absolute;inset:0;pointer-events:none}
 .ar .bui-readouts{justify-content:space-between;gap:12px}
 .mt{display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:10px;letter-spacing:.08em;color:var(--muted)}.mt b{color:var(--ink)}
 .mt i{grid-column:1/-1;height:6px;border-radius:3px;background:var(--surface);border:1.5px solid var(--line);overflow:hidden}.mt u{display:block;height:100%;width:0;background:var(--team-a)}
-.ar nav{display:flex;flex-wrap:wrap;gap:6px}.ar nav button{flex:1;min-height:0;padding:7px 4px;font:800 10px/1 ui-monospace,monospace;letter-spacing:.08em}
+.ar nav{display:flex;flex-wrap:wrap;gap:6px}.ar nav button{flex:1 1 auto;white-space:nowrap;min-height:0;padding:7px 6px;font:800 10px/1 ui-monospace,monospace;letter-spacing:.08em}
 .ar.compact .mt,.ar.compact nav,.ar.compact [data-fold]{display:none}
 .bui .msg{position:absolute;left:50%;bottom:max(16px,env(safe-area-inset-bottom));translate:-50% 0;max-width:calc(100% - 24px);pointer-events:none}
 .bui .msg[hidden]{display:none}
