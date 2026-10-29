@@ -44,6 +44,17 @@ export interface BlitzOptions {
 }
 
 const TAU = Math.PI * 2;
+/**
+ * Length of (x, y), bit for bit what Math.hypot returns for finite x, y, without its allocation
+ * (V8's Math.hypot allocates on every call, even optimized). It scales by the larger side as V8 does,
+ * so a seed replays the same match as before; a plain Math.sqrt(x * x + y * y) can differ in the last bit.
+ */
+function dist(x: number, y: number) {
+  if (x < 0) x = -x;
+  if (y < 0) y = -y;
+  const m = x > y ? x : y, r = x > y ? y / m : x / m;
+  return m === 0 ? 0 : m * Math.sqrt(1 + r * r);
+}
 const MAXHP = 5, RAIL_MAX = 9, STRIKE_MAX = 5, RAIL_START = 3;
 // Platoon mode: one colour per platoon; your wingmen have names, the others are numbered.
 const TEAM_COLORS = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"];
@@ -215,7 +226,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   };
   const feed = [...wrap.querySelectorAll<HTMLLIElement>(".feed li")];
 
-  const e = createEngine({ root: wrap, seed: o.seed ?? (Math.random() * 1e9) | 0, events: 128 });
+  const e = createEngine({ root: wrap, seed: o.seed ?? (Math.random() * 1e9) | 0, events: 128 }); // port-check: ok setup: the seed when none is given, before any step
   const input = controls(e, {
     keys: {
       up: ["KeyW", "ArrowUp"], down: ["KeyS", "ArrowDown"], left: ["KeyA", "ArrowLeft"], right: ["KeyD", "ArrowRight"], fire: ["Space"],
@@ -278,7 +289,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const CRATE_FALL = 170, CRATE_DROP = 2.2;
   const supply = drops(e, { kinds: ["repair", "long", "strike", "jackpot"], cap: 2, life: 14 + CRATE_DROP, fall: CRATE_FALL, speed: CRATE_FALL / CRATE_DROP });
   const blocks: Block[] = [];
-  let covers: Cover[] = [], coverDirty = true, coverAt = 0;
+  let covers: Cover[] = [], coverDirty = true, coverAt = 0, matchT = 0;
   const anims = new Set<Animation>();
   let tileIn = 1.2, crateIn = 12, lightTheme = false;
   // Your controls: auto-aim (on by default on phones), aim lock and the airstrike target mode.
@@ -342,10 +353,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       covers.push({ el, x: b.left, y: b.top, w: b.width, h: b.height, busy: 0 });
     }
   }
+  // A knock runs in the step (it draws engine.random), so its cool-down is on match time, not the wall clock.
   function knock(c: Cover, nx: number, ny: number, power: number, flat: boolean) {
-    const now = performance.now();
-    if (now < c.busy || typeof c.el.animate !== "function") return;
-    c.busy = now + (flat ? 1100 : 800);
+    if (matchT < c.busy || typeof c.el.animate !== "function") return;
+    c.busy = matchT + (flat ? 1.1 : 0.8);
     const p = Math.min(2, power), dx = nx * 18 * p, dy = ny * 14 * p - 10 * p, spin = (nx >= 0 ? 1 : -1) * (6 + R() * 10) * p;
     const a = c.el.animate(
       flat
@@ -359,7 +370,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function knockAround(x: number, y: number, rad: number, power: number) {
     if (!embed) return;
     for (const c of covers) {
-      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, d = Math.hypot(cx - x, cy - y);
+      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, d = dist(cx - x, cy - y);
       if (d < rad) knock(c, (cx - x) / (d || 1), (cy - y) / (d || 1), power * (1 - d / rad) + 0.4, false);
     }
   }
@@ -382,7 +393,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         y = Math.max(70, Math.min(H - 60, hy + Math.sin(a) * r));
       } else (x = 40 + R() * (W - 80)), (y = 70 + R() * (H - 130));
       let ok = !blocked(x, y, 22 * scale);
-      for (const o2 of tanks) if (o2 !== t && o2.alive && Math.hypot(o2.x - x, o2.y - y) < (o2.team === t.team ? 44 : 160)) ok = false;
+      for (const o2 of tanks) if (o2 !== t && o2.alive && dist(o2.x - x, o2.y - y) < (o2.team === t.team ? 44 : 160)) ok = false;
       if (ok) break;
     }
     Object.assign(t, { x, y, a: R() * TAU, hp: MAXHP, alive: true, drop: 0, shield: 0, rapid: 0, triple: 0, cool: 0.6, recoil: 0, think: 0, target: -1, gx: x, gy: y, streak: 0, run: 0, heat: 0, hot: 0, charge: 0, chargeT: -1 });
@@ -393,7 +404,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   let quakeAmt = 0, buzz = 0;
   function quake(x: number, y: number, power: number) {
     if (demo || !you.alive || state !== "play") return;
-    const reach = 250 * (scale / 1.4), d = Math.hypot(x - you.x, y - you.y);
+    const reach = 250 * (scale / 1.4), d = dist(x - you.x, y - you.y);
     if (d < reach) quakeAmt = Math.min(18, quakeAmt + power * 3.5 * (1 - d / reach) ** 1.5);
   }
   function boom(x: number, y: number, power: number, tint: number) {
@@ -541,8 +552,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const carpet = t.carpet > 0;
     if (carpet) t.carpet--;
     // The bomber comes in over the caller's shoulder.
-    const d0 = Math.hypot(x - t.x, y - t.y), a = d0 > 40 ? Math.atan2(y - t.y, x - t.x) : R() * TAU;
-    const ca = Math.cos(a), sa = Math.sin(a), speed = 820, reach = Math.hypot(W, H) * 0.65;
+    const d0 = dist(x - t.x, y - t.y), a = d0 > 40 ? Math.atan2(y - t.y, x - t.x) : R() * TAU;
+    const ca = Math.cos(a), sa = Math.sin(a), speed = 820, reach = dist(W, H) * 0.65;
     p.on = true;
     p.owner = owner;
     p.a = a;
@@ -598,10 +609,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const rad = (b.main ? 95 : 80) * (scale / 1.4);
     for (const t of tanks) {
       if (t.team === tanks[b.owner]!.team) continue;
-      const d = Math.hypot(t.x - b.x, t.y - b.y);
+      const d = dist(t.x - b.x, t.y - b.y);
       if (d < rad) damage(t, b.owner, d < rad * 0.6 ? MAXHP : 3, W_STRIKE);
     }
-    for (const k of blocks) if (k.hp > 0 && Math.hypot(k.x + k.w / 2 - b.x, k.y + k.h / 2 - b.y) < rad + 20) wreckBlock(k);
+    for (const k of blocks) if (k.hp > 0 && dist(k.x + k.w / 2 - b.x, k.y + k.h / 2 - b.y) < rad + 20) wreckBlock(k);
     knockAround(b.x, b.y, rad * 2, 2.4);
     e.events.emit("boom", -1, 0, 0, 0, 1.4);
   }
@@ -648,7 +659,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (s.type === MINE) {
       boom(cx, cy, 2.6, 3);
       fx.word(cx, cy - 26, W_MINE, 3, 20);
-      for (const o2 of tanks) if (Math.hypot(o2.x - cx, o2.y - cy) < 80 * (scale / 1.4)) damage(o2, -1, 3);
+      for (const o2 of tanks) if (dist(o2.x - cx, o2.y - cy) < 80 * (scale / 1.4)) damage(o2, -1, 3);
       e.events.emit("boom", -1);
       return;
     }
@@ -698,7 +709,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     let best = -1, bd = range;
     for (const o2 of tanks) {
       if (o2.team === t.team || !o2.alive || o2.drop < 1) continue;
-      const d = Math.hypot(o2.x - t.x, o2.y - t.y);
+      const d = dist(o2.x - t.x, o2.y - t.y);
       if (d < bd) (bd = d), (best = o2.i);
     }
     return best;
@@ -708,7 +719,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     let best = -1, bd = range;
     for (const o2 of tanks) {
       if (o2.team === team || !o2.alive || o2.drop < 1) continue;
-      const d = Math.hypot(o2.x - x, o2.y - y);
+      const d = dist(o2.x - x, o2.y - y);
       if (d < bd) (bd = d), (best = o2.i);
     }
     return best;
@@ -718,7 +729,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     return from + Math.sign(d) * Math.min(Math.abs(d), max);
   };
   function drive(t: Tank, ax: number, ay: number, dt: number) {
-    const m = Math.min(1, Math.hypot(ax, ay));
+    const m = Math.min(1, dist(ax, ay));
     if (m < 0.05) return;
     t.a = turn(t.a, Math.atan2(ay, ax), 7 * dt);
     const sp = 150 * m * (scale / 1.4) * dt, nx = t.x + Math.cos(t.a) * sp, ny = t.y + Math.sin(t.a) * sp, rad = 14 * scale;
@@ -739,10 +750,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (t.think <= 0) {
       t.think = 0.35 + R() * 0.4;
       const h = lead.lastHit;
-      t.target = live(h) && tanks[h]!.team !== t.team && Math.hypot(tanks[h]!.x - lead.x, tanks[h]!.y - lead.y) < 560 ? h : nearestTo(lead.x, lead.y, 420, t.team);
+      t.target = live(h) && tanks[h]!.team !== t.team && dist(tanks[h]!.x - lead.x, tanks[h]!.y - lead.y) < 560 ? h : nearestTo(lead.x, lead.y, 420, t.team);
       if (t.target < 0) t.target = nearestEnemy(t, 360);
       if (t.target >= 0) {
-        const o2 = tanks[t.target]!, d = Math.hypot(o2.x - t.x, o2.y - t.y);
+        const o2 = tanks[t.target]!, d = dist(o2.x - t.x, o2.y - t.y);
         if (t.strikes > 0 && R() < 0.2) callStrike(t.i, o2.x, o2.y);
         else if (t.rail > 0 && d > 380 && R() < 0.3) charge(t, o2.i);
       }
@@ -751,13 +762,13 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const back = lead.a + Math.PI, off = t.slot === 1 ? 0.85 : t.slot === 2 ? -0.85 : 0, r = (t.slot === 3 ? 78 : 58) * scale;
     let gx = lead.x + Math.cos(back + off) * r, gy = lead.y + Math.sin(back + off) * r;
     const o2 = t.target >= 0 ? tanks[t.target]! : null;
-    if (o2 && Math.hypot(o2.x - lead.x, o2.y - lead.y) < 300) (gx += (o2.x - gx) * 0.25), (gy += (o2.y - gy) * 0.25); // step up between the leader and the threat
+    if (o2 && dist(o2.x - lead.x, o2.y - lead.y) < 300) (gx += (o2.x - gx) * 0.25), (gy += (o2.y - gy) * 0.25); // step up between the leader and the threat
     if (t.hp <= 2)
       for (const s of tiles)
-        if (s.on && s.roll <= 0 && s.type === HEAL && Math.hypot((s.c + 0.5) * T - t.x, (s.r + 0.5) * T - t.y) < 220) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
+        if (s.on && s.roll <= 0 && s.type === HEAL && dist((s.c + 0.5) * T - t.x, (s.r + 0.5) * T - t.y) < 220) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
     gx = Math.max(30, Math.min(W - 30, gx));
     gy = Math.max(60, Math.min(H - 30, gy));
-    const dx = gx - t.x, dy = gy - t.y, d = Math.hypot(dx, dy);
+    const dx = gx - t.x, dy = gy - t.y, d = dist(dx, dy);
     if (d > 14) drive(t, dx / d, dy / d, dt * (d > 140 ? 1.05 : 0.8));
     gun(t, dt);
   }
@@ -766,7 +777,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       // Practice dummies: TARGETs stand still, MOVERs roll about. Nobody shoots.
       if (t.i <= 3) return void (t.ta = turn(t.ta, t.a + Math.sin(e.time / 0.9 + t.i), 1.5 * dt));
       if ((t.think -= dt) <= 0) (t.think = 2 + R() * 2), (t.gx = 60 + R() * (W - 120)), (t.gy = 90 + R() * (H - 160));
-      const dx = t.gx - t.x, dy = t.gy - t.y, d = Math.hypot(dx, dy);
+      const dx = t.gx - t.x, dy = t.gy - t.y, d = dist(dx, dy);
       if (d > 16) drive(t, dx / d, dy / d, dt * 0.55);
       t.ta = turn(t.ta, t.a, 3 * dt);
       return;
@@ -781,11 +792,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       t.target = nearestEnemy(t, 9999);
       // Hurt bots go for health; everyone likes a supply crate.
       let gx = -1, gy = 0;
-      for (let i = 0; i < supply.count; i++) if (supply.landed(i) && Math.hypot(supply.x[i]! - t.x, supply.y[i]! - t.y) < 520 && R() < 0.6) (gx = supply.x[i]!), (gy = supply.y[i]!);
+      for (let i = 0; i < supply.count; i++) if (supply.landed(i) && dist(supply.x[i]! - t.x, supply.y[i]! - t.y) < 520 && R() < 0.6) (gx = supply.x[i]!), (gy = supply.y[i]!);
       if (gx < 0)
         for (const s of tiles) {
           if (!s.on || s.roll > 0 || s.type === MINE) continue;
-          const sx = (s.c + 0.5) * T, sy = (s.r + 0.5) * T, d = Math.hypot(sx - t.x, sy - t.y);
+          const sx = (s.c + 0.5) * T, sy = (s.r + 0.5) * T, d = dist(sx - t.x, sy - t.y);
           if (d < 380 && (s.type === HEAL ? t.hp <= 3 || R() < 0.3 : R() < 0.45)) (gx = sx), (gy = sy);
         }
       if (gx >= 0) (t.gx = gx), (t.gy = gy);
@@ -795,12 +806,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         t.gy = Math.max(60, Math.min(H - 30, o2.y + Math.sin(a) * keep));
       } else (t.gx = 40 + R() * (W - 80)), (t.gy = 70 + R() * (H - 120));
       if (t.target >= 0) {
-        const o2 = tanks[t.target]!, d = Math.hypot(o2.x - t.x, o2.y - t.y);
+        const o2 = tanks[t.target]!, d = dist(o2.x - t.x, o2.y - t.y);
         if (t.strikes > 0 && R() < 0.35) callStrike(t.i, o2.x, o2.y);
         else if (t.rail > 0 && d > 380 && R() < 0.4) charge(t, o2.i);
       }
     }
-    const dx = t.gx - t.x, dy = t.gy - t.y, d = Math.hypot(dx, dy);
+    const dx = t.gx - t.x, dy = t.gy - t.y, d = dist(dx, dy);
     if (d > 16) {
       const before = t.x + t.y;
       drive(t, dx / d, dy / d, dt * 0.85);
@@ -815,7 +826,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       const aim = Math.atan2(o2.y - t.y, o2.x - t.x);
       t.ta = turn(t.ta, aim, 4.5 * dt);
       const err = Math.abs(Math.atan2(Math.sin(aim - t.ta), Math.cos(aim - t.ta)));
-      if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && Math.hypot(o2.x - t.x, o2.y - t.y) < 460) fire(t);
+      if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && dist(o2.x - t.x, o2.y - t.y) < 460) fire(t);
     } else t.ta = turn(t.ta, t.a, 3 * dt);
   }
   /** What your turret is on: the lock, else auto-aim's pick, else nothing (-1). */
@@ -850,11 +861,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (t.strikes <= 0) targeting = false;
   }
 
-  e.add({
+  const sim = e.add({
     read() {
-      if (embed && coverDirty && performance.now() - coverAt > 120) {
+      if (embed && coverDirty && performance.now() - coverAt > 120) { // port-check: ok read phase: throttles page measurement, never feeds the step
         coverDirty = false;
-        coverAt = performance.now();
+        coverAt = performance.now(); // port-check: ok read phase: as above
         measureCovers();
       }
       if (input.hit("pause")) {
@@ -868,6 +879,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (input.hit("lock")) (lockOn = !lockOn), (lockT = -1);
     },
     step(_, dt) {
+      matchT += dt;
       fx.step(dt);
       quakeAmt = Math.max(0, quakeAmt - dt * 40);
       whiteout = Math.max(0, whiteout - dt * 0.9);
@@ -950,7 +962,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         t.y = Math.max(54, Math.min(H - 18, t.y));
         // Tiles and crates under the tracks.
         for (const s of tiles) if (s.on && s.roll <= 0 && inRect(t.x, t.y, s.c * T, s.r * T, T, T)) takeTile(s, t);
-        for (let i = supply.count - 1; i >= 0; i--) if (supply.landed(i) && Math.hypot(supply.x[i]! - t.x, supply.y[i]! - t.y) < 26 * scale) takeCrate(i, t);
+        for (let i = supply.count - 1; i >= 0; i--) if (supply.landed(i) && dist(supply.x[i]! - t.x, supply.y[i]! - t.y) < 26 * scale) takeCrate(i, t);
         // Treads flatten the page (embed).
         if (embed) for (const c of covers) if (inRect(t.x, t.y, c.x, c.y + c.h * 0.2, c.w, c.h * 0.7)) knock(c, 0, 0, 1, true);
       }
@@ -959,7 +971,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         for (let j = i + 1; j < N; j++) {
           const p = tanks[i]!, q = tanks[j]!;
           if (!p.alive || !q.alive || p.drop < 1 || q.drop < 1) continue;
-          const dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy), min = 26 * scale;
+          const dx = q.x - p.x, dy = q.y - p.y, d = dist(dx, dy), min = 26 * scale;
           if (d > 0 && d < min) {
             // Practice TARGETs are immovable: whoever bumps them gets the whole push.
             const pf = practice && p.i >= 1 && p.i <= 3 ? 0 : 1, qf = practice && q.i >= 1 && q.i <= 3 ? 0 : 1, k = (min - d) / (pf + qf || 1) / d;
@@ -970,7 +982,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       for (const s of shells) {
         if (!s.on) continue;
         if (s.rail && live(s.tgt)) {
-          const o2 = tanks[s.tgt]!, va = Math.atan2(s.vy, s.vx), na = turn(va, Math.atan2(o2.y - s.y, o2.x - s.x), 5 * dt), sp = Math.hypot(s.vx, s.vy);
+          const o2 = tanks[s.tgt]!, va = Math.atan2(s.vy, s.vx), na = turn(va, Math.atan2(o2.y - s.y, o2.x - s.x), 5 * dt), sp = dist(s.vx, s.vy);
           s.vx = Math.cos(na) * sp;
           s.vy = Math.sin(na) * sp;
         }
@@ -997,7 +1009,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         if (!done && embed)
           for (const c of covers)
             if (inRect(nx, ny, c.x, c.y, c.w, c.h) && (s.rail || R() < 0.5)) {
-              const d = Math.hypot(s.vx, s.vy) || 1;
+              const d = dist(s.vx, s.vy) || 1;
               knock(c, s.vx / d, s.vy / d, s.rail ? 2 : 1.2, false);
               if (!s.rail) {
                 done = true;
@@ -1478,7 +1490,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       for (let r = 0; r <= rows; r++) (ctx.moveTo(0, r * T + 0.5), ctx.lineTo(W, r * T + 0.5));
       ctx.stroke();
     }
-    const now = performance.now() / 1000;
+    const now = performance.now() / 1000; // port-check: ok render: the tiles' colour cycle and pulse, drawn only
     // Lit tiles: slot-machine colours, then the settled power-up pulses.
     for (const s of tiles) {
       if (!s.on) continue;
@@ -1887,6 +1899,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         return tanks;
       },
       tiles, shells, blocks, planes, bombs, marks,
+      /** Run `n` fixed steps (1/60 s) with no read or render: the zero-allocation test counts the step alone. */
+      steps(n: number) {
+        for (let k = 0; k < n; k++) sim.step(e, 1 / 60);
+      },
       /** Supply crates on the board (a snapshot of the fizlet/rules drops). */
       get crates() {
         return Array.from({ length: supply.count }, (_, i) => ({ x: supply.x[i]!, y: supply.y[i]!, kind: supply.kind[i]!, landed: supply.landed(i), on: true }));

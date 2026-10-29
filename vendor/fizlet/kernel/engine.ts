@@ -245,7 +245,8 @@ export function createEngine(o: EngineOptions = {}) {
       const ms = (n[WORK] = performance.now() - t0);
       n[FRAMES]!++;
       n[MS]! += ms;
-      if (ms > n[MAX]!) n[MAX] = ms;
+      // Written every frame: a store that runs only on a new maximum would deopt this hot function each time.
+      n[MAX] = ms > n[MAX]! ? ms : n[MAX]!;
     },
     stats(): EngineStats {
       const p: EngineStats["pools"] = {};
