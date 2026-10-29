@@ -76,7 +76,9 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     CSS.highlights.set(name, hl);
   }
 
-  const mine = (node: Node) => !!host?.contains(node);
+  // Ours: the engine's root, or any Fizlet host on the page (a game's in-page art). Its mutations
+  // never make the board rescan, and its text is never terrain.
+  const mine = (node: Node) => !!host?.contains(node) || !!(node.nodeType === 1 ? (node as Element) : node.parentElement)?.closest("[data-fizlet-host]");
   const drop = (r: Rec) => (byNode.delete(r[0]), r[5].forEach((g) => g && hl!.delete(g)));
   const ours = (r: Rec) => r[0].isConnected && r[0].data === r[1];
   const visible = (el: Element, b: DOMRect) => {

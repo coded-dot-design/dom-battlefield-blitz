@@ -4,7 +4,7 @@
  * - `drops`: pickups that fall, wait to be collected and expire;
  * - `score`: points, a combo that decays, and levels from XP thresholds.
  * Each is DOM-free, steps without allocating (state lives in typed arrays) and says what happened
- * on the event ring (`wave:start`, `wave:clear`, `drop:spawn`, `drop:collect`, `drop:expire`,
+ * on the event ring (`wave:start`, `wave:clear`, `drop:spawn`, `drop:land`, `drop:collect`, `drop:expire`,
  * `score`, `combo:end`, `level`), so the HUD, sound, fx and coach layers react without reaching
  * into the game. Defaults are the DOM VIRUS core's (WaveDirector, SupplyDrops) and Null Invaders'
  * numbers, so a port keeps its feel. The game still decides where and what to spawn. Call
@@ -102,18 +102,18 @@ export interface DropOptions<K extends string> {
 export function drops<K extends string>(e: Engine, o: DropOptions<K>) {
   const cap = Math.max(1, Math.floor(o.cap ?? 6)), every = o.every ?? 0, life = o.life ?? 14;
   const fall = o.fall ?? 60, speed = o.speed ?? 90, kinds = o.kinds;
-  const x = new Float64Array(cap), y = new Float64Array(cap), to = new Float64Array(cap), left = new Float64Array(cap);
+  const x = new Float64Array(cap), y = new Float64Array(cap), to = new Float64Array(cap), left = new Float64Array(cap), age = new Float64Array(cap);
   const kind = new Uint8Array(cap), at = new Float64Array(2);
   // drops on the board, time to the next timed drop, timed drops so far
   const s = new Float64Array([0, every, 0]);
   const remove = (i: number) => {
     const j = --s[0]!;
-    x[i] = x[j]!; y[i] = y[j]!; to[i] = to[j]!; left[i] = left[j]!; kind[i] = kind[j]!;
+    x[i] = x[j]!; y[i] = y[j]!; to[i] = to[j]!; left[i] = left[j]!; age[i] = age[j]!; kind[i] = kind[j]!;
   };
   const spawn = (px: number, py: number, k = 0) => {
     if (s[0] === cap || k < 0 || k >= kinds.length) return false;
     const i = s[0]!++;
-    x[i] = px; y[i] = py - fall; to[i] = py; left[i] = life; kind[i] = k;
+    x[i] = px; y[i] = py - fall; to[i] = py; left[i] = life; age[i] = 0; kind[i] = k;
     e.events.emit("drop:spawn", k, 0, px, py);
     return true;
   };
@@ -125,7 +125,10 @@ export function drops<K extends string>(e: Engine, o: DropOptions<K>) {
         s[2]!++;
       }
       for (let i = s[0]! - 1; i >= 0; i--) {
+        const air = y[i]! < to[i]!;
         y[i] = Math.min(to[i]!, y[i]! + speed * dt);
+        age[i]! += dt;
+        if (air && y[i]! >= to[i]!) e.events.emit("drop:land", kind[i], 0, x[i], y[i]);
         if ((left[i]! -= dt) <= 0) {
           e.events.emit("drop:expire", kind[i], 0, x[i], y[i]);
           remove(i);
@@ -138,6 +141,12 @@ export function drops<K extends string>(e: Engine, o: DropOptions<K>) {
     system,
     /** Positions and kinds of the drops on the board, for drawing: index 0 to `count` − 1. */
     x, y, kind,
+    /** Seconds since each drop spawned (fall shadow, blink: `life` − age is the time left). */
+    age,
+    /** Where each drop lands: (x[i], landY[i]). Moves with `scroll`. */
+    landY: to,
+    /** Seconds a drop lasts, as configured. */
+    life,
     get count() { return s[0]!; },
     /** Has drop i landed (only landed drops can be collected)? */
     landed: (i: number) => y[i]! >= to[i]!,

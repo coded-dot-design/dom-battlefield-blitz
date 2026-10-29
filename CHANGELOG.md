@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.1
+
+- **On Fizlet 0.12.0** (was 0.10.0): `vendor/fizlet` re-synced with `scripts/sync.mjs`.
+- **Supply crates read the brick, not a side table.** Blitz no longer keeps each crate's spawn time
+  by its x: the fall shadow is drawn at the brick's landing spot (`landY`) and scaled by its `age`,
+  the blink counts `life` − `age`, and the landing puff comes from the `drop:land` event
+  (fizlet/rules 0.10.1). Gameplay is unchanged: five seeds × 7,200 frames give the same tanks,
+  shells, bombs and crates, value for value, as 0.8.0; `npm run test:replay` passes.
+- Size: `dist/blitz.js` 37,639 → 37,614 B gzip (`dist/blitz.mjs` 37,740 → 37,707). Budget 40,960 B.
+
 ## 0.8.0
 
 - **On Fizlet 0.10.0** (was 0.2.4): `vendor/fizlet` re-synced with `scripts/sync.mjs`. No API
