@@ -1,0 +1,439 @@
+/* DOM Battlefield site. The page itself is a Board UI root (<html class="bui">), so every colour,
+   key, sticker and card here is the game's own: vertical hard bases, ink rims, neon faces.
+   This file only adds page furniture (grid, type, panels) on top of board-ui.css. */
+:root {
+  --sans: Inter, "SF Pro Display", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --page: 1200px;
+  --gutter: 30px;
+  /* A panel's base: the card colour pushed into the rim, straight below (never to the side). */
+  --base: color-mix(in srgb, var(--k-cmd) 38%, var(--rim));
+  --grid: color-mix(in srgb, var(--k-sys) 9%, transparent);
+}
+html.bui[data-theme="light"] {
+  --base: color-mix(in srgb, var(--k-cmd) 30%, var(--line));
+  --grid: color-mix(in srgb, var(--k-cmd) 9%, transparent);
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+  -webkit-text-size-adjust: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  font: 16px/1.6 var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  overflow-x: hidden;
+}
+a {
+  color: inherit;
+}
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+code,
+kbd,
+pre {
+  font-family: var(--mono);
+}
+code {
+  font-size: 0.88em;
+  color: var(--k-sys-ink);
+}
+:focus-visible {
+  outline: 3px solid var(--k-sys-ink);
+  outline-offset: 3px;
+}
+.wrap {
+  width: 100%;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--k-sys);
+  color: var(--rim);
+  font: 700 12px var(--mono);
+  border-radius: 8px;
+}
+.skip:focus {
+  top: 12px;
+}
+
+/* ---------- Type ---------- */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 700 11px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eyebrow b,
+.eyebrow .index {
+  color: var(--k-sys-ink);
+  font-weight: 800;
+}
+.eyebrow .dot {
+  width: 8px;
+  height: 8px;
+  background: var(--team-a);
+  box-shadow: 0 0 12px var(--team-a);
+}
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+h2 {
+  font-size: clamp(30px, 4.2vw, 50px);
+}
+h3 {
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.lead {
+  margin: 0;
+  max-width: 600px;
+  font-size: 18px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.mono-caps {
+  font: 700 11px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ---------- Panels: the game's card. Ink rim, coloured border, a hard base straight below. ---------- */
+.panel {
+  position: relative;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 0 var(--base);
+}
+.panel.lit {
+  border-color: var(--k-cmd);
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--k-cmd) 55%, var(--rim)), 0 0 28px color-mix(in srgb, var(--k-cmd) 22%, transparent);
+}
+html.bui[data-theme="light"] .panel.lit {
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--k-cmd) 55%, var(--line));
+}
+
+/* ---------- Header ---------- */
+.site-head {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid var(--line);
+}
+.site-head .wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 76px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--team-a);
+  background: var(--rim);
+  border: 2px solid color-mix(in srgb, var(--k-sys) 70%, transparent);
+}
+.brand-mark svg {
+  width: 40px;
+  height: 40px;
+}
+.brand-text {
+  display: grid;
+  line-height: 1.05;
+  font-family: var(--mono);
+}
+.brand-text small {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.brand-text small i {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 9px;
+  color: var(--k-sys-ink);
+  letter-spacing: 0.12em;
+}
+.brand-text b {
+  font-size: 19px;
+  letter-spacing: 0.1em;
+}
+.site-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.site-nav a {
+  padding: 8px 12px;
+  font: 700 11px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--muted);
+  border-radius: 8px;
+}
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: var(--surface);
+}
+.head-keys {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.head-keys .bui-icon-key {
+  width: 42px;
+  height: 42px;
+}
+.head-keys .bui-icon-key svg {
+  width: 20px;
+  height: 20px;
+}
+.play-key {
+  text-decoration: none;
+}
+@media (max-width: 900px) {
+  .site-nav {
+    display: none;
+  }
+  .head-keys {
+    margin-left: auto;
+  }
+}
+@media (max-width: 380px) {
+  .site-head .wrap {
+    gap: 10px;
+  }
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+  .brand-mark svg {
+    width: 34px;
+    height: 34px;
+  }
+  .brand-text b {
+    font-size: 16px;
+  }
+  .head-keys {
+    gap: 8px;
+  }
+  .play-key {
+    padding-inline: 10px;
+  }
+}
+@media (max-width: 520px) {
+  :root {
+    --gutter: 18px;
+  }
+  .brand-text small i,
+  .head-keys .gh {
+    display: none;
+  }
+}
+
+/* Theme icon swap. */
+html.bui[data-theme="dark"] .theme-light,
+html.bui[data-theme="light"] .theme-dark {
+  display: none;
+}
+
+/* ---------- Link keys: the kit's arcade key as a link ---------- */
+a.bui-arcade,
+a.bui-sticker-key {
+  text-decoration: none;
+}
+
+/* ---------- Footer ---------- */
+.site-foot {
+  margin-top: 40px;
+  border-top: 2px solid var(--line);
+  background: var(--surface);
+}
+.site-foot .wrap {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 28px;
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+.site-foot p {
+  margin: 10px 0 0;
+  max-width: 340px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.site-foot h4 {
+  margin: 0 0 10px;
+  font: 700 11px var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.site-foot ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.site-foot ul a {
+  text-decoration: none;
+}
+.site-foot ul a:hover {
+  color: var(--k-sys-ink);
+}
+.foot-base {
+  border-top: 1px solid var(--line);
+}
+.foot-base .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 16px;
+  padding-bottom: 20px;
+  font: 11px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .site-foot .wrap {
+    grid-template-columns: 1fr 1fr;
+  }
+  .site-foot .foot-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---------- START BATTLE: the game's sticker key, page size ----------
+   Skull tile + two-line word on the deep navy face, a white base straight below. */
+.start-key {
+  --py: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 30px 16px 18px;
+  color: #19f0ff;
+  background: #10233f;
+  border: 4px solid #f6f3ff;
+  border-radius: 18px;
+  box-shadow: 0 var(--py) 0 #f6f3ff, 0 0 40px color-mix(in srgb, #19f0ff 25%, transparent);
+  text-decoration: none;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+.start-key svg {
+  width: 64px;
+  height: 64px;
+  border: 3px solid #19f0ff;
+  background: #0b1830;
+}
+.start-key b {
+  font: 900 30px/1.05 var(--mono);
+  letter-spacing: 0.12em;
+  color: #f6f3ff;
+  text-align: left;
+}
+@media (hover: hover) and (pointer: fine) {
+  .start-key:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 calc(var(--py) + 3px) 0 #f6f3ff, 0 0 56px color-mix(in srgb, #19f0ff 40%, transparent);
+  }
+}
+.start-key:active {
+  transform: translateY(var(--py));
+  box-shadow: 0 0 0 #f6f3ff, 0 0 30px color-mix(in srgb, #19f0ff 30%, transparent);
+  transition-duration: 50ms;
+}
+/* Call: a ring leaves the base, "press me" (as the game's Start). */
+.start-key {
+  position: relative;
+  isolation: isolate;
+}
+.start-key::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  z-index: -1;
+  border-radius: 20px;
+  box-shadow: 0 var(--py) 0 0 #f6f3ff;
+  animation: start-call 1.6s ease-out infinite;
+}
+@keyframes start-call {
+  from {
+    opacity: 0.8;
+    box-shadow: 0 var(--py) 0 0 color-mix(in srgb, #19f0ff 70%, transparent);
+  }
+  to {
+    opacity: 0;
+    box-shadow: 0 calc(var(--py) + 10px) 0 12px color-mix(in srgb, #19f0ff 0%, transparent);
+  }
+}
+html.bui[data-theme="light"] .start-key {
+  border-color: #1b1636;
+  box-shadow: 0 var(--py) 0 #1b1636;
+}
+@media (max-width: 520px) {
+  .start-key {
+    gap: 14px;
+    padding: 12px 22px 12px 12px;
+  }
+  .start-key svg {
+    width: 52px;
+    height: 52px;
+  }
+  .start-key b {
+    font-size: 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .start-key::after {
+    animation: none;
+  }
+}

@@ -1,0 +1,384 @@
+---
+// Battlefield Blitz, the landing page: the Blitz version of DOM Battlefield, with DOM Battlefield's
+// brand and styling; the hero is a live bot battle (the game's demo mode).
+// The game code is this repo's committed build (dist/).
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import Skull from '../components/Skull.astro';
+import { base, VERSION, BATTLEFIELD, BATTLEFIELD_PLAY } from '../site';
+const script = new URL(base('blitz.js'), Astro.site).href;
+const snippet = `<script src="${script}" defer></script>`;
+const eggSnippet = `<script src="${script}" data-easter-egg="true" defer></script>`;
+const tiles = [
+  ['»', '#39ffb0', '', 'Rapid', 'rapid fire for 8 seconds'],
+  ['≡', '#19f0ff', '', 'Triple', 'three shells a shot for 8 seconds'],
+  ['✈', '#ff2e88', '', 'Airstrike', 'one more strike: tap a spot, a bomber does the rest'],
+  ['◆', '#f6f3ff', '#07060f', 'Shield', 'six seconds of nothing hurts'],
+  ['✚', '#a8ff3e', '#07060f', 'Health', 'two armour back'],
+  ['◎', '#ffc21a', '#07060f', 'Long', 'one more long shot'],
+  ['!', '#ff2b4e', '', 'Mine', 'blows up whoever drives on it, or goes off on its own'],
+];
+const rules = [
+  ['SOLO OR PLATOON', 'Every tank, or every platoon', 'Solo: eight tanks, every tank for itself. Platoon: you and three wingmen in your colour against two other platoons. Your wingmen cover you.'],
+  ['PRACTICE', 'Learn the keys first', 'Targets that stand still, movers that never shoot back, and a coach that walks you through every key, reward and trick.'],
+  ['PARACHUTE IN', 'Die, drop back in', 'Every tank respawns by parachute, invulnerable on the way down. Nobody is ever out.'],
+  ['THE GRID BLINKS', 'Slot-machine squares', 'A lit square rolls through colours, then settles: a power-up, or a mine. Get there first.'],
+  ['TWO GUNS', 'Spray, or snipe', 'The cannon fires fast and overheats. The LONG gun locks on and wrecks in one hit from across the field. Three to start.'],
+  ['AIRSTRIKES', 'Tap the spot', 'A bomber flies in over your shoulder; the bombs fall and the blasts leave black scorch. Carpet bombs at a five-kill streak.'],
+  ['KILL STREAKS', 'Two, three, five, eight', 'A long shot, an airstrike, a carpet bomb, then a NUKE. Supply crates parachute in too.'],
+  ['THREE MINUTES', 'Most kills wins', 'Double kills, rampages, airstrikes. When the clock hits zero, the standings decide.'],
+];
+---
+<Base title="Battlefield Blitz · the Blitz version of DOM Battlefield" description="Battlefield Blitz is the arcade version of DOM Battlefield: solo or platoon-vs-platoon, where every tank parachutes in, the grid blinks with power-ups and mines, and most kills in three minutes wins. Drop it onto any website with one line." page="home">
+  <section class="bz-hero" aria-labelledby="bz-title">
+    <div class="bz-demo" id="bz-demo" aria-hidden="true"></div>
+    <div class="wrap bz-hero-inner">
+      <p class="eyebrow"><span class="dot"></span> DOM BATTLEFIELD <span>/</span> <b>BLITZ VERSION</b> · V{VERSION}</p>
+      <h1 id="bz-title">Battlefield Blitz.<br /><em>Every tank for itself.</em></h1>
+      <p class="lead">The arcade version of DOM Battlefield. No planning, no radio: eight tanks parachute onto a blinking grid and blow each other up for three minutes. Most kills wins.</p>
+      <div class="bz-ctas">
+        <a class="start-key" href={base('play/')} data-launch-link><Skull size={64} /><b>PLAY<br />BLITZ</b></a>
+        <div class="bz-side">
+          <a class="bui-key bui-arcade bui-sys" href="#drop"><Icon name="out" size={16} />Put it on your site</a>
+          <a class="bz-og" href={BATTLEFIELD}><Icon name="cart" size={16} />The original: DOM Battlefield</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow"><span class="index">01</span> HOW BLITZ PLAYS</p>
+        <h2>Same tanks.<br /><em>No mercy.</em></h2>
+      </div>
+      <ol class="bz-rules">
+        {rules.map(([k, t, b], i) => (
+          <li class="panel"><span class="bz-n">0{i + 1}</span><p class="eyebrow"><b>{k}</b></p><h3>{t}</h3><p>{b}</p></li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap bz-grid">
+      <div>
+        <p class="eyebrow"><span class="index">02</span> THE BLINKING GRID</p>
+        <h2>Read the square. Then run.</h2>
+        <ul class="tiles">
+          {tiles.map(([icon, c, ink, name, what]) => <li><i style={`--c:${c};${ink ? `--t:${ink}` : ''}`}>{icon}</i><span><b>{name}</b> {what}</span></li>)}
+        </ul>
+        <p class="keys-line"><kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> / <kbd>space</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike, then click the spot · <kbd>Q</kbd> auto-aim · <kbd>T</kbd> aim lock · <kbd>Esc</kbd> pause. Phones: drag on the left to drive; AUTO and LOCK ride on FIRE, LONG and STRIKE sit above, and the grab bar moves the keys.</p>
+      </div>
+      <a class="panel lit shot" href={base('play/')} aria-label="Play Battlefield Blitz">
+        <img src={base('shots/blitz.webp')} alt="Battlefield Blitz: eight tanks in a free-for-all, an airstrike exploding, a parachute dropping a tank in, the kill feed on the right." width="1440" height="820" loading="lazy" decoding="async" />
+      </a>
+    </div>
+  </section>
+
+  <section class="section" id="drop">
+    <div class="wrap bz-grid">
+      <div class="panel lit drop">
+        <p class="eyebrow"><b>DROP-IN</b> · ANY WEBSITE</p>
+        <h2>Put Blitz on your page.</h2>
+        <p>One line. A <b>PLAY BLITZ</b> key appears; press it and your page becomes the arena: shells knock your headings around, treads flatten them. Escape gives the page back exactly as it was.</p>
+        <pre><code>{snippet}</code></pre>
+        <p>Or hide it as an easter egg: the Konami code on desktop, a hold-then-tap on any <code>data-blitz-trigger</code> element on phones.</p>
+        <pre><code>{eggSnippet}</code></pre>
+        <button class="bui-arcade bui-attack" type="button" data-drop><Icon name="bolt" size={16} />Drop Blitz on this page</button>
+      </div>
+      <div class="bz-family">
+        <p class="eyebrow"><span class="index">03</span> TWO WAYS TO FIGHT</p>
+        <a class="panel bz-version" href={BATTLEFIELD_PLAY}>
+          <b>DOM Battlefield</b><span>The original. Squad tactics: plan with time frozen, radio your platoon, take the HQ.</span><em>Play the original ↗</em>
+        </a>
+        <a class="panel lit bz-version" href={base('play/')}>
+          <b>Battlefield Blitz</b><span>The arcade version. Solo or platoons, parachutes, power-ups, airstrikes. Three minutes.</span><em>Play Blitz ↗</em>
+        </a>
+        <p class="bz-built">Built on <a href="https://github.com/coded-dot-design/fizlet">Fizlet</a>, the tiny engine behind the DOM VIRUS arcade. Game code: <a href="https://github.com/coded-dot-design/dom-battlefield-blitz">dom-battlefield-blitz</a>.</p>
+      </div>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { createBlitz, install } from "../../../dist/blitz.mjs";
+  import { launch } from "../../../vendor/fizlet/ui/board-ui";
+  const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // The hero is a live bot battle (attract mode); it pauses itself when scrolled away.
+  const demoHost = document.getElementById("bz-demo")!;
+  let demo = reduced() ? null : createBlitz(demoHost, { mode: "board", demo: true, bots: 6 });
+  (window as unknown as { blitzDemo: unknown }).blitzDemo = demo;
+  for (const a of document.querySelectorAll<HTMLAnchorElement>("[data-launch-link]"))
+    a.addEventListener("click", (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+      e.preventDefault();
+      launch(a, () => {}, { reduced: reduced(), done: () => (location.href = a.href) });
+    });
+  // Try the drop-in right here: the hero battle stops, the page itself becomes the arena.
+  let dropped: ReturnType<typeof install> | null = null;
+  document.querySelector("[data-drop]")?.addEventListener("click", () => {
+    demo?.destroy();
+    demo = null;
+    dropped ??= install({});
+    void dropped.open();
+  });
+</script>
+
+<style>
+  .bz-hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    min-height: min(820px, calc(100svh - 78px));
+    display: grid;
+    align-items: center;
+    border-bottom: 2px solid var(--line);
+    background: #090818;
+  }
+  .bz-demo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.85;
+  }
+  .bz-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, #090818ee 0%, #090818aa 45%, transparent 75%);
+  }
+  .bz-hero-inner {
+    position: relative;
+    z-index: 1;
+    padding-top: 50px;
+    padding-bottom: 70px;
+    pointer-events: none;
+  }
+  .bz-hero-inner a,
+  .bz-hero-inner button {
+    pointer-events: auto;
+  }
+  .bz-hero .eyebrow,
+  .bz-hero h1 {
+    color: #f6f3ff;
+  }
+  .bz-hero .eyebrow {
+    display: block;
+  }
+  .bz-hero .eyebrow .dot {
+    display: inline-block;
+    margin-right: 10px;
+  }
+  .bz-hero h1 {
+    margin: 22px 0 20px;
+    font-size: clamp(48px, 8vw, 112px);
+    line-height: 0.95;
+    letter-spacing: -0.05em;
+    text-shadow: 0 4px 30px #090818;
+  }
+  .bz-hero h1 em {
+    font-style: normal;
+    color: #ff2e88;
+  }
+  .bz-hero .lead {
+    color: #cfc7f0;
+    max-width: 540px;
+  }
+  .bz-ctas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 22px 30px;
+    margin-top: 34px;
+  }
+  .bz-side {
+    display: grid;
+    gap: 14px;
+    justify-items: start;
+  }
+  .bz-og {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: 700 12px var(--mono);
+    letter-spacing: 0.06em;
+    color: #cfc7f0;
+    text-decoration: none;
+  }
+  .bz-og:hover {
+    color: #fff;
+  }
+  .section {
+    padding: clamp(70px, 10vw, 120px) 0 0;
+  }
+  .section-head {
+    max-width: 760px;
+    margin-bottom: 40px;
+  }
+  .section h2 {
+    margin-top: 14px;
+  }
+  .section h2 em {
+    font-style: normal;
+    color: var(--k-attack);
+  }
+  .bz-rules {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 22px;
+  }
+  .bz-rules li {
+    padding: 22px 20px;
+  }
+  .bz-rules h3 {
+    margin: 8px 0;
+    font-size: 21px;
+  }
+  .bz-rules p:not(.eyebrow) {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .bz-n {
+    float: right;
+    font: 900 26px var(--mono);
+    color: var(--k-attack);
+  }
+  .bz-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: clamp(26px, 5vw, 60px);
+    align-items: center;
+  }
+  .tiles {
+    list-style: none;
+    margin: 22px 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+  }
+  .tiles li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+  }
+  .tiles b {
+    color: var(--ink);
+  }
+  .tiles i {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    font: 900 18px var(--mono);
+    font-style: normal;
+    color: var(--t, #f6f3ff);
+    background: color-mix(in srgb, var(--c) 45%, transparent);
+    border: 2.5px solid var(--c);
+    border-radius: 4px;
+  }
+  .keys-line {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  kbd {
+    padding: 1px 6px;
+    font-size: 12px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+  .shot {
+    display: block;
+    margin: 0;
+    overflow: hidden;
+  }
+  .shot img {
+    width: 100%;
+    height: auto;
+  }
+  .drop {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    padding: 26px;
+  }
+  #drop {
+    scroll-margin-top: 90px;
+  }
+  .drop h2 {
+    margin: 0;
+    font-size: clamp(26px, 3vw, 34px);
+  }
+  .drop p {
+    margin: 0;
+    color: var(--muted);
+  }
+  .drop pre {
+    margin: 0;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-size: 12px;
+    background: var(--bg);
+    border: 2px solid var(--line);
+    border-radius: 10px;
+  }
+  .drop button {
+    justify-self: start;
+    margin-top: 6px;
+  }
+  .bz-family {
+    display: grid;
+    gap: 16px;
+  }
+  .bz-version {
+    display: grid;
+    gap: 6px;
+    padding: 20px 22px;
+    text-decoration: none;
+    color: var(--ink);
+    transition: transform 0.12s ease-out;
+  }
+  .bz-version:hover {
+    transform: translateY(-2px);
+  }
+  .bz-version b {
+    font-size: 20px;
+  }
+  .bz-version span {
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .bz-version em {
+    font: 800 11px var(--mono);
+    font-style: normal;
+    letter-spacing: 0.1em;
+    color: var(--k-sys-ink);
+    text-transform: uppercase;
+  }
+  .bz-built {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .bz-built a {
+    color: var(--k-sys-ink);
+  }
+  @media (max-width: 860px) {
+    .bz-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .bz-hero::after {
+      background: linear-gradient(180deg, #090818dd 0%, #090818aa 60%, #09081866 100%);
+    }
+  }
+</style>

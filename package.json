@@ -1,6 +1,6 @@
 {
   "name": "@coded-design/dom-battlefield-blitz",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "private": true,
   "type": "module",
   "description": "Battlefield Blitz: free-for-all tank chaos on any web page. The arcade version of DOM Battlefield, built on the Fizlet engine.",
@@ -10,9 +10,13 @@
     "build": "npm run typecheck && node scripts/build.mjs",
     "check": "npm run build",
     "size": "node scripts/size.mjs",
-    "test:browser": "node tests/browser.mjs"
+    "test:browser": "node tests/browser.mjs",
+    "site:dev": "astro dev --config site/astro.config.mjs",
+    "site:build": "astro build --config site/astro.config.mjs && node scripts/pages.mjs",
+    "test:site": "node tests/site.mjs"
   },
   "devDependencies": {
+    "astro": "7.4.2",
     "esbuild": "0.28.2",
     "playwright": "1.58.2",
     "typescript": "7.0.2"

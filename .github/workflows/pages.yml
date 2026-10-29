@@ -1,0 +1,55 @@
+name: Deploy Blitz site
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      # The committed dist is what the site and the drop-in ship.
+      - run: git diff --exit-code -- dist
+      # Landing page (/), the game (/play/) and the drop-in (/blitz.js).
+      - run: npm run site:build
+        env:
+          # Custom domain: repo variables SITE_URL=https://blitz.domvirus.com and SITE_BASE=/
+          # (unset, the site builds for coded-dot-design.github.io/dom-battlefield-blitz/).
+          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_BASE: ${{ vars.SITE_BASE }}
+      # Pages reads the custom domain from a CNAME file in the output: its host comes from SITE_URL.
+      - name: CNAME for the custom domain
+        if: vars.SITE_URL != ''
+        run: node -e 'console.log(new URL(process.env.SITE_URL).host)' > artifacts/pages/CNAME && cat artifacts/pages/CNAME
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/pages
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish the site
+        id: deployment
+        uses: actions/deploy-pages@v4

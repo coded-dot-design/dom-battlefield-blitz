@@ -1,18 +1,25 @@
 # Battlefield Blitz
 
-**Free-for-all tank chaos. The arcade version of [DOM Battlefield](https://coded-dot-design.github.io/dom-battlefield/).**
+**Free-for-all tank chaos. The arcade version of [DOM Battlefield](https://battlefield.domvirus.com/).**
 
 Every tank for itself. Parachute in, grab the blinking power tiles, call airstrikes, dodge the
 mines. Die, drop back in. Most kills in three minutes wins. Drop it onto any website and the page
 itself becomes the arena: shells knock your headings around, treads flatten them, and Escape gives
 the page back exactly as it was.
 
-- **Play:** https://coded-dot-design.github.io/dom-battlefield/blitz/play/
-- **About:** https://coded-dot-design.github.io/dom-battlefield/blitz/
-- **Drop-in:** `<script src="https://coded-dot-design.github.io/dom-battlefield/blitz/blitz.js" defer></script>`
+- **Play:** https://blitz.domvirus.com/play/
+- **About:** https://blitz.domvirus.com/
+- **Drop-in:** `<script src="https://blitz.domvirus.com/blitz.js" defer></script>`
 
-Blitz is part of the DOM Battlefield brand: its pages live on the Battlefield site and share its
-styling. This repo is the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
+Until the domain is live, the site is at https://coded-dot-design.github.io/dom-battlefield-blitz/ ,
+and the old Battlefield copy (`https://coded-dot-design.github.io/dom-battlefield/blitz/blitz.js`)
+keeps working for existing embeds.
+
+Blitz is part of the DOM Battlefield brand: its own site (`site/`, Astro, dev only) wears the
+Battlefield styling and the Board UI kit. `npm run site:build` builds it into `artifacts/pages`;
+`npm run test:site` checks it. Custom domain: set the repo variables `SITE_URL=https://blitz.domvirus.com`
+and `SITE_BASE=/`, then the custom domain in Settings → Pages; the Pages build writes `CNAME` from
+`SITE_URL`. This repo is also the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
 (the engine) and draws tanks with [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes)
 sprites. No runtime dependencies; everything first-party is snapshotted with provenance.
 
