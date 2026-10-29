@@ -1,3 +1,5 @@
+import { need } from "./need";
+
 /** A bounded pool. Every item is made up front, so acquiring and releasing never allocates and
  *  the pool never grows: when it's full, `acquire()` returns undefined (refuse new work). */
 export class Pool<T> {
@@ -5,8 +7,7 @@ export class Pool<T> {
   readonly items: T[] = [];
   private readonly free: T[] = [];
   constructor(cap: number, create: () => T) {
-    if (!(cap > 0) || cap % 1) throw new RangeError("Pool cap must be a positive integer");
-    this.cap = cap;
+    this.cap = need(cap, "pool cap", 2);
     for (let i = 0; i < cap; i++) this.free.push(create());
   }
   get size() {

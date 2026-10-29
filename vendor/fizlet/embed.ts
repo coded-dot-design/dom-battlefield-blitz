@@ -44,11 +44,15 @@ export function embed(load: () => Promise<Mount> | Mount, cfg: EmbedConfig) {
   let host: HTMLElement | null = null, game: Mounted | null = null, pending: Promise<unknown> | null = null;
   let toggle: HTMLButtonElement | null = null, unlocked = !egg;
 
+  // Each open() is one generation; close() and destroy() end it, so a load still in flight never
+  // mounts after the player closed it.
+  let gen = 0;
   async function open() {
-    if (game || pending || ctl.signal.aborted) return;
-    pending = (async () => {
+    if (game || pending || ctl.signal.aborted) return pending;
+    const my = ++gen;
+    const p: Promise<unknown> = (async () => {
       const mount = await load();
-      if (ctl.signal.aborted) return;
+      if (my !== gen || ctl.signal.aborted) return;
       host = document.createElement("div");
       host.setAttribute(`data-${cfg.name}-ignore`, "");
       host.setAttribute("data-fizlet-host", cfg.name);
@@ -56,10 +60,12 @@ export function embed(load: () => Promise<Mount> | Mount, cfg: EmbedConfig) {
       if (cfg.palette) applyPalette(host, cfg.palette);
       game = mount(host, cfg);
       paint();
-    })().finally(() => (pending = null));
-    return pending;
+    })().finally(() => pending === p && (pending = null));
+    return (pending = p);
   }
   function close() {
+    gen++;
+    pending = null;
     game?.destroy();
     host?.remove();
     game = host = null;
@@ -90,7 +96,7 @@ export function embed(load: () => Promise<Mount> | Mount, cfg: EmbedConfig) {
   }
 
   addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && game) return close();
+    if (ev.key === "Escape" && (game || pending)) return close();
   }, on);
 
   if (egg) {

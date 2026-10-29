@@ -32,22 +32,28 @@ export interface SoundOptions {
 }
 
 export function sound(e: Engine, o: SoundOptions) {
+  const ctl = new AbortController(), sig = { signal: ctl.signal };
   let ctx: AudioContext | undefined, master: GainNode | undefined, on = o.on ?? true, voices = 0;
   const last = new Map<string, number>();
+  const wake = () => void ctx?.resume().catch(() => {});
+  // The built-in synth's unlock: a trusted gesture creates the context, or resumes it whenever the
+  // browser or the OS suspended it. Muted, gestures leave it asleep. A custom player gets none of it.
   const unlock = (ev: Event) => {
-    if (!on || !ev.isTrusted || ctx) return void ctx?.resume?.().catch(() => {});
+    if (!on || !ev.isTrusted) return;
+    if (ctx) return ctx.state === "running" || wake();
     try {
       ctx = new AudioContext();
       master = ctx.createGain();
       master.gain.value = o.volume ?? 0.12;
       master.connect(ctx.destination);
+      wake();
     } catch {}
   };
-  for (const t of ["pointerdown", "keydown"]) addEventListener(t, unlock, { signal: e.signal, capture: true });
-  e.signal.addEventListener("abort", () => void ctx?.close().catch(() => {}));
+  // pointerup: on touch, Chrome grants the gesture on release, not on pointerdown.
+  if (!o.play) for (const t of ["pointerdown", "pointerup", "keydown"]) addEventListener(t, unlock, { signal: ctl.signal, capture: true });
 
   function play(cue: Cue, intensity = 1) {
-    if (!on || !e.running) return;
+    if (!on || !e.running || ctl.signal.aborted) return;
     if (o.play) return o.play(cue, intensity);
     if (!ctx || !master || ctx.state !== "running") return;
     const now = ctx.currentTime;
@@ -70,23 +76,32 @@ export function sound(e: Engine, o: SoundOptions) {
     }
   }
   // Read the ring after the steps (render phase): events → cues.
-  e.add({
-    render(eng) {
+  const system = e.add({
+    render(eng: Engine) {
       for (let i = 0; i < eng.events.size; i++) {
         const ev = eng.events.at(i)!, cue = o.cues[ev.type];
         if (cue) play(cue, ev.v || 1);
       }
     },
   });
+  /** Remove this sound provider only (listeners, system, its AudioContext); the engine keeps running. */
+  function dispose() {
+    ctl.abort();
+    e.remove(system);
+    void ctx?.close().catch(() => {});
+    ctx = master = undefined;
+  }
+  e.signal.addEventListener("abort", dispose, sig);
   return {
     play,
+    dispose,
     get on() {
       return on;
     },
     set on(v: boolean) {
       on = v;
-      if (!v) void ctx?.suspend?.().catch(() => {});
-      else void ctx?.resume?.().catch(() => {});
+      if (!v) void ctx?.suspend().catch(() => {});
+      else wake();
     },
   };
 }

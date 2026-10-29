@@ -21,6 +21,7 @@ import { sound } from "../vendor/fizlet/sound";
 import { segCircle, inRect, circleRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
+import { drops } from "../vendor/fizlet/rules";
 
 /** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
 declare const __KIT_CSS__: string;
@@ -36,6 +37,8 @@ export interface BlitzOptions {
   /** Platoons: you and 3 wingmen in your colour against two other platoons (default: solo, or
    *  the last mode picked on the start screen). */
   platoons?: boolean;
+  /** Seed for the match's randomness (engine.random). Same seed + same input = the same match. Default: random. */
+  seed?: number;
   /** Called when a board match ends. */
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
@@ -76,7 +79,6 @@ interface Plane { x: number; y: number; vx: number; vy: number; a: number; t: nu
 interface Bomb { x: number; y: number; wait: number; fall: number; owner: number; main: boolean; on: boolean }
 /** A follow-up blast a beat after the first (the hero's triple boom). */
 interface Boom { x: number; y: number; t: number; p: number; c: number; on: boolean }
-interface Crate { x: number; y: number; drop: number; life: number; kind: number; on: boolean }
 interface Cover { el: HTMLElement; x: number; y: number; w: number; h: number; busy: number }
 
 const ICON = {
@@ -213,7 +215,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   };
   const feed = [...wrap.querySelectorAll<HTMLLIElement>(".feed li")];
 
-  const e = createEngine({ root: wrap, seed: (Math.random() * 1e9) | 0, events: 128 });
+  const e = createEngine({ root: wrap, seed: o.seed ?? (Math.random() * 1e9) | 0, events: 128 });
   const input = controls(e, {
     keys: {
       up: ["KeyW", "ArrowUp"], down: ["KeyS", "ArrowDown"], left: ["KeyA", "ArrowLeft"], right: ["KeyD", "ArrowRight"], fire: ["Space"],
@@ -225,7 +227,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const fx = effects({ cap: 700, words: WORDS, colors: FX_COLORS, scorch: 48 });
   const sfx = sound(e, { cues: { shot: "fire", boom: "boom", hit: "hit", power: "power", strike: "hurt", land: "click", lock: "click", win: "win", end: "end", ready: "ready", streak: "win", nuke: "end" } });
   const drawTank = tankSprites(document);
-  const R = Math.random;
+  // Every random number in the match comes from the engine's seeded random, so a seed replays a match.
+  const R = e.random;
   const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)");
 
   // ---------- World ----------
@@ -268,7 +271,17 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const planes: Plane[] = Array.from({ length: 6 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, a: 0, t: 0, owner: 0, on: false }));
   const bombs: Bomb[] = Array.from({ length: 40 }, () => ({ x: 0, y: 0, wait: 0, fall: 0, owner: 0, main: false, on: false }));
   const booms: Boom[] = Array.from({ length: 48 }, () => ({ x: 0, y: 0, t: 0, p: 0, c: 0, on: false }));
-  const crates: Crate[] = Array.from({ length: 2 }, () => ({ x: 0, y: 0, drop: 0, life: 0, kind: 0, on: false }));
+  // Supply crates are fizlet/rules drops: 2 at once, a 2.2 s parachute fall of 170 px, 14 s on the
+  // ground (life counts from the spawn). The brick holds where they are; `born` keeps each crate's
+  // spawn time by its x (crates never move sideways) for the fall shadow, the landing puff and the
+  // blink. A taken crate leaves it; an expired one stays until the next reset (a few per match).
+  const CRATE_FALL = 170, CRATE_DROP = 2.2;
+  const supply = drops(e, { kinds: ["repair", "long", "strike", "jackpot"], cap: 2, life: 14 + CRATE_DROP, fall: CRATE_FALL, speed: CRATE_FALL / CRATE_DROP });
+  const born = new Map<number, number>();
+  /** One reused view of a crate for drawing (no allocation per frame). */
+  const crateView = { x: 0, y: 0, kind: 0, drop: 0, life: 0 };
+  /** Seconds since crate i spawned. */
+  const crateAge = (i: number) => e.time - (born.get(supply.x[i]!) ?? e.time);
   const blocks: Block[] = [];
   let covers: Cover[] = [], coverDirty = true, coverAt = 0;
   const anims = new Set<Animation>();
@@ -655,25 +668,23 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     e.events.emit("power", t.i);
   }
   function dropCrate() {
-    let c: Crate | null = null;
-    for (const q of crates) if (!q.on) (c = q);
-    if (!c) return;
+    if (supply.count === 2) return;
     openSpot(spot);
-    c.on = true;
-    c.x = spot[0]!;
-    c.y = spot[1]!;
-    c.drop = 0;
-    c.life = 14;
-    const r = R();
-    c.kind = r < 0.38 ? 0 : r < 0.66 ? 1 : r < 0.9 ? 2 : 3;
-    fx.word(c.x, c.y - 130, W_SUPPLY, 1, 18);
+    const x = spot[0]!, y = spot[1]!, r = R(), kind = r < 0.38 ? 0 : r < 0.66 ? 1 : r < 0.9 ? 2 : 3;
+    supply.spawn(x, y, kind);
+    born.set(x, e.time);
+    fx.word(x, y - 130, W_SUPPLY, 1, 18);
     feedK[feedN % 8] = -2;
-    feedV[feedN % 8] = c.kind;
+    feedV[feedN % 8] = kind;
     feedN++;
     e.events.emit("ready", -1);
   }
-  function takeCrate(c: Crate, t: Tank) {
-    c.on = false;
+  /** Tank t drives over landed crate i: take it (the brick removes it). */
+  function takeCrate(i: number, t: Tank) {
+    const x = supply.x[i]!, y = supply.y[i]!, kind = supply.kind[i]!;
+    supply.collect(x, y, 0.5);
+    born.delete(x);
+    const c = { x, y, kind };
     if (t.you) cCrate++;
     if (c.kind === 0 || c.kind === 3) (t.hp = MAXHP), (t.shield = Math.max(t.shield, 2));
     if (c.kind === 1) t.rail = Math.min(RAIL_MAX, t.rail + 2);
@@ -760,7 +771,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function bot(t: Tank, dt: number) {
     if (practice) {
       // Practice dummies: TARGETs stand still, MOVERs roll about. Nobody shoots.
-      if (t.i <= 3) return void (t.ta = turn(t.ta, t.a + Math.sin(performance.now() / 900 + t.i), 1.5 * dt));
+      if (t.i <= 3) return void (t.ta = turn(t.ta, t.a + Math.sin(e.time / 0.9 + t.i), 1.5 * dt));
       if ((t.think -= dt) <= 0) (t.think = 2 + R() * 2), (t.gx = 60 + R() * (W - 120)), (t.gy = 90 + R() * (H - 160));
       const dx = t.gx - t.x, dy = t.gy - t.y, d = Math.hypot(dx, dy);
       if (d > 16) drive(t, dx / d, dy / d, dt * 0.55);
@@ -777,7 +788,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       t.target = nearestEnemy(t, 9999);
       // Hurt bots go for health; everyone likes a supply crate.
       let gx = -1, gy = 0;
-      for (const c of crates) if (c.on && c.drop >= 1 && Math.hypot(c.x - t.x, c.y - t.y) < 520 && R() < 0.6) (gx = c.x), (gy = c.y);
+      for (let i = 0; i < supply.count; i++) if (supply.landed(i) && Math.hypot(supply.x[i]! - t.x, supply.y[i]! - t.y) < 520 && R() < 0.6) (gx = supply.x[i]!), (gy = supply.y[i]!);
       if (gx < 0)
         for (const s of tiles) {
           if (!s.on || s.roll > 0 || s.type === MINE) continue;
@@ -899,11 +910,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         }
       }
       if ((crateIn -= dt) <= 0) (dropCrate(), (crateIn = 18 + R() * 8));
-      for (const c of crates) {
-        if (!c.on) continue;
-        if (c.drop < 1) {
-          if ((c.drop += dt / 2.2) >= 1) (c.drop = 1), fx.spawn(2, c.x, c.y, 0, 0, 16, 0.4, 7);
-        } else if ((c.life -= dt) <= 0) c.on = false;
+      // The brick moves and expires the crates; a crate that lands this step gets its dust puff.
+      for (let i = 0; i < supply.count; i++) {
+        const age = crateAge(i);
+        if (age >= CRATE_DROP && age - dt < CRATE_DROP) fx.spawn(2, supply.x[i]!, supply.y[i]!, 0, 0, 16, 0.4, 7);
       }
       for (const b of blocks) if (b.hp <= 0 && (b.back -= dt) <= 0 && !tanks.some((t) => t.alive && circleRect(t.x, t.y, 20, b.x, b.y, b.w, b.h))) b.hp = 3;
       // Tanks.
@@ -951,7 +961,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         t.y = Math.max(54, Math.min(H - 18, t.y));
         // Tiles and crates under the tracks.
         for (const s of tiles) if (s.on && s.roll <= 0 && inRect(t.x, t.y, s.c * T, s.r * T, T, T)) takeTile(s, t);
-        for (const c of crates) if (c.on && c.drop >= 1 && Math.hypot(c.x - t.x, c.y - t.y) < 26 * scale) takeCrate(c, t);
+        for (let i = supply.count - 1; i >= 0; i--) if (supply.landed(i) && Math.hypot(supply.x[i]! - t.x, supply.y[i]! - t.y) < 26 * scale) takeCrate(i, t);
         // Treads flatten the page (embed).
         if (embed) for (const c of covers) if (inRect(t.x, t.y, c.x, c.y + c.h * 0.2, c.w, c.h * 0.7)) knock(c, 0, 0, 1, true);
       }
@@ -1097,7 +1107,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (COACH[cStep]?.[0] === "SUPPLY CRATE") dropCrate();
     }
     // The crate step: if the crate timed out (or someone else took it), drop another.
-    if (COACH[cStep]?.[0] === "SUPPLY CRATE" && !crates.some((c) => c.on)) dropCrate();
+    if (COACH[cStep]?.[0] === "SUPPLY CRATE" && supply.count === 0) dropCrate();
   }
   function coachFrame() {
     const key = cStep < COACH.length ? cStep : COACH.length + (((cT / 6) | 0) % TRICKS.length);
@@ -1115,7 +1125,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function toIntro() {
     closeOverlay();
     for (const t of tanks) t.alive = false;
-    for (const pool of [shells, tiles, marks, planes, bombs, booms, crates] as { on: boolean }[][]) for (const s of pool) s.on = false;
+    for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
+    supply.reset();
+    born.clear();
     targeting = false;
     nukeT = whiteout = quakeAmt = 0;
     fx.clear();
@@ -1195,7 +1207,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function rematch() {
     clock = o.seconds ?? 180;
     for (const t of tanks) Object.assign(t, { kills: 0, deaths: 0, alive: false, dead: platoon ? 0.2 + t.team * 0.45 + t.slot * 0.12 : 0.2 + t.i * 0.15, strikes: t.you ? 1 : 0, carpet: 0, rail: t.you ? RAIL_START : 1, run: 0 });
-    for (const pool of [shells, tiles, marks, planes, bombs, booms, crates] as { on: boolean }[][]) for (const s of pool) s.on = false;
+    for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
+    supply.reset();
+    born.clear();
     nukeT = whiteout = 0;
     crateIn = 12;
     lockT = -1;
@@ -1526,8 +1540,13 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       ctx.globalAlpha = 1;
     }
     // Supply crates.
-    for (const c of crates) {
-      if (!c.on) continue;
+    for (let i = 0; i < supply.count; i++) {
+      const age = crateAge(i), c = crateView;
+      c.drop = Math.min(1, age / CRATE_DROP);
+      c.life = 14 + CRATE_DROP - age;
+      c.x = supply.x[i]!;
+      c.y = supply.y[i]! + (1 - c.drop) * CRATE_FALL; // where it lands
+      c.kind = supply.kind[i]!;
       if (c.drop < 1) {
         const k = 1 - c.drop, y = c.y - k * 170;
         ctx.globalAlpha = 0.3;
@@ -1880,7 +1899,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       get tanks() {
         return tanks;
       },
-      tiles, shells, blocks, planes, bombs, crates, marks,
+      tiles, shells, blocks, planes, bombs, marks,
+      /** Supply crates on the board (a snapshot of the fizlet/rules drops). */
+      get crates() {
+        return Array.from({ length: supply.count }, (_, i) => ({ x: supply.x[i]!, y: supply.y[i]!, kind: supply.kind[i]!, landed: supply.landed(i), on: true }));
+      },
     },
     get platoons() {
       return platoon;

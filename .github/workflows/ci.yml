@@ -20,6 +20,8 @@ jobs:
       - run: node -e "const p=require('./package.json'); if (Object.keys(p.dependencies||{}).length) { console.error('Blitz ships no runtime dependencies'); process.exit(1) }"
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      # Same seed, same match: no Math.random in play (Fizlet multiplayer needs this).
+      - run: npm run test:replay
       # The site (landing, /play/, /blitz.js), built for github.io; pages.yml deploys it.
       - run: npm run site:build
       - run: npm run test:site
