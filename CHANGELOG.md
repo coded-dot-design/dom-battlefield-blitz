@@ -6,7 +6,7 @@
   `/blitz.js`. They're the pages that lived on the Battlefield site under `/blitz/`, moved over
   unchanged with DOM Battlefield's brand and the Board UI kit. They're built with Astro (dev only)
   and deployed to GitHub Pages by `pages.yml`.
-- Ready for blitz.domvirus.com: with the repo variables `SITE_URL=https://blitz.domvirus.com` and
+- Ready for battlefieldblitz.domvirus.com: with the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com` and
   `SITE_BASE=/`, the Pages build writes `CNAME` and every canonical and og URL is on that host.
   The site links to DOM Battlefield (battlefield.domvirus.com) and DOM VIRUS (domvirus.com).
 

@@ -7,9 +7,9 @@ mines. Die, drop back in. Most kills in three minutes wins. Drop it onto any web
 itself becomes the arena: shells knock your headings around, treads flatten them, and Escape gives
 the page back exactly as it was.
 
-- **Play:** https://blitz.domvirus.com/play/
-- **About:** https://blitz.domvirus.com/
-- **Drop-in:** `<script src="https://blitz.domvirus.com/blitz.js" defer></script>`
+- **Play:** https://battlefieldblitz.domvirus.com/play/
+- **About:** https://battlefieldblitz.domvirus.com/
+- **Drop-in:** `<script src="https://battlefieldblitz.domvirus.com/blitz.js" defer></script>`
 
 Until the domain is live, the site is at https://coded-dot-design.github.io/dom-battlefield-blitz/ ,
 and the old Battlefield copy (`https://coded-dot-design.github.io/dom-battlefield/blitz/blitz.js`)
@@ -17,7 +17,7 @@ keeps working for existing embeds.
 
 Blitz is part of the DOM Battlefield brand: its own site (`site/`, Astro, dev only) wears the
 Battlefield styling and the Board UI kit. `npm run site:build` builds it into `artifacts/pages`;
-`npm run test:site` checks it. Custom domain: set the repo variables `SITE_URL=https://blitz.domvirus.com`
+`npm run test:site` checks it. Custom domain: set the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com`
 and `SITE_BASE=/`, then the custom domain in Settings → Pages; the Pages build writes `CNAME` from
 `SITE_URL`. This repo is also the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
 (the engine) and draws tanks with [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes)

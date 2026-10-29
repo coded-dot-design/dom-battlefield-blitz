@@ -8,7 +8,7 @@ export default defineConfig({
   srcDir: root + "site/src",
   publicDir: root + "site/public",
   outDir: root + "artifacts/pages",
-  // Custom domain: SITE_URL=https://blitz.domvirus.com and SITE_BASE=/ (repo variables).
+  // Custom domain: SITE_URL=https://battlefieldblitz.domvirus.com and SITE_BASE=/ (repo variables).
   site: process.env.SITE_URL || "https://coded-dot-design.github.io",
   base: process.env.SITE_BASE || "/dom-battlefield-blitz",
   trailingSlash: "always",

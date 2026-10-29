@@ -27,7 +27,7 @@ jobs:
       # Landing page (/), the game (/play/) and the drop-in (/blitz.js).
       - run: npm run site:build
         env:
-          # Custom domain: repo variables SITE_URL=https://blitz.domvirus.com and SITE_BASE=/
+          # Custom domain: repo variables SITE_URL=https://battlefieldblitz.domvirus.com and SITE_BASE=/
           # (unset, the site builds for coded-dot-design.github.io/dom-battlefield-blitz/).
           SITE_URL: ${{ vars.SITE_URL }}
           SITE_BASE: ${{ vars.SITE_BASE }}
