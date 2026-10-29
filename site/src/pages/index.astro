@@ -6,7 +6,9 @@ import Base from '../layouts/Base.astro';
 import Icon from '../components/Icon.astro';
 import Skull from '../components/Skull.astro';
 import { base, VERSION, BATTLEFIELD, BATTLEFIELD_PLAY } from '../site';
+import { homeLd } from '../schema';
 const script = new URL(base('blitz.js'), Astro.site).href;
+const description = 'Battlefield Blitz is the arcade version of DOM Battlefield: solo or platoon-vs-platoon, where every tank parachutes in, the grid blinks with power-ups and mines, and most kills in three minutes wins. Drop it onto any website with one line.';
 const snippet = `<script src="${script}" defer></script>`;
 const eggSnippet = `<script src="${script}" data-easter-egg="true" defer></script>`;
 const tiles = [
@@ -29,7 +31,7 @@ const rules = [
   ['THREE MINUTES', 'Most kills wins', 'Double kills, rampages, airstrikes. When the clock hits zero, the standings decide.'],
 ];
 ---
-<Base title="Battlefield Blitz · the Blitz version of DOM Battlefield" description="Battlefield Blitz is the arcade version of DOM Battlefield: solo or platoon-vs-platoon, where every tank parachutes in, the grid blinks with power-ups and mines, and most kills in three minutes wins. Drop it onto any website with one line." page="home">
+<Base title="Battlefield Blitz · the Blitz version of DOM Battlefield" description={description} page="home" jsonld={homeLd(Astro.site, description)}>
   <section class="bz-hero" aria-labelledby="bz-title">
     <div class="bz-demo" id="bz-demo" aria-hidden="true"></div>
     <div class="wrap bz-hero-inner">

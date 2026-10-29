@@ -39,6 +39,10 @@ try {
   assert.match(await lp.locator(".bz-hero .eyebrow").textContent(), /BLITZ VERSION/);
   assert.match(await lp.locator('link[rel="canonical"]').getAttribute("href"), /^https:\/\/.+\/dom-battlefield-blitz\/$/);
   assert.match(await lp.locator('meta[property="og:image"]').getAttribute("content"), /^https:\/\/.+\/dom-battlefield-blitz\/shots\/og\.png$/);
+  // Structured data: the site and the game, from facts on the page.
+  const ld = JSON.parse(await lp.locator('script[type="application/ld+json"]').textContent());
+  assert.deepEqual(ld["@graph"].map((g) => g["@type"]), ["WebSite", "VideoGame"]);
+  assert.equal(ld["@graph"][1].url, await lp.locator('link[rel="canonical"]').getAttribute("href"));
   await lp.waitForFunction(() => window.blitzDemo?.world.tanks.filter((t) => t.alive).length >= 5, null, { timeout: 8000 });
   assert.equal(await lp.evaluate(() => window.blitzDemo.world.tanks.some((t) => t.you)), false, "the hero battle is all bots");
   assert.equal(new URL(await lp.locator(".start-key").getAttribute("href"), base).pathname, `${PREFIX}/play/`);
@@ -56,6 +60,9 @@ try {
   const berr = [];
   bp.on("pageerror", (e) => berr.push(e.message));
   await bp.goto(base + "play/?seconds=6");
+  assert.equal(await bp.locator("h1").count(), 1, "the play page has one h1");
+  const pld = JSON.parse(await bp.locator('script[type="application/ld+json"]').textContent());
+  assert.deepEqual(pld["@graph"].map((g) => g["@type"]), ["WebPage", "BreadcrumbList"]);
   assert.equal(await bp.evaluate(() => window.blitz.state), "intro");
   await bp.evaluate(() => window.blitz.start());
   await bp.waitForFunction(() => window.blitz.state === "play", null, { timeout: 5000 });

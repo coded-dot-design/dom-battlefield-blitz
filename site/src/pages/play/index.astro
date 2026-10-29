@@ -3,9 +3,13 @@
 // The game code is this repo's committed build (dist/blitz.mjs).
 import Base from '../../layouts/Base.astro';
 import { base, BATTLEFIELD } from '../../site';
+import { playLd } from '../../schema';
+const title = 'Play Battlefield Blitz';
+const description = 'Battlefield Blitz: free-for-all tank chaos. Parachute in, grab the blinking power tiles, call airstrikes. Most kills in three minutes wins.';
 ---
-<Base title="Play Battlefield Blitz" description="Battlefield Blitz: free-for-all tank chaos. Parachute in, grab the blinking power tiles, call airstrikes. Most kills in three minutes wins." page="play" app>
-  <section class="blitz-stage" aria-label="Battlefield Blitz arena">
+<Base title={title} description={description} page="play" app jsonld={playLd(Astro.site, title, description)}>
+  <section class="blitz-stage" aria-labelledby="blitz-play-title">
+    <h1 id="blitz-play-title" class="blitz-title">Play Battlefield Blitz</h1>
     <div id="blitz" class="blitz-host"></div>
   </section>
   <div class="wrap blitz-bar">
@@ -21,6 +25,16 @@ import { base, BATTLEFIELD } from '../../site';
 </script>
 
 <style>
+  /* Page heading for screen readers and outlines; the arena is the visible title. */
+  .blitz-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
   .blitz-stage {
     position: relative;
     height: calc(100svh - 78px);

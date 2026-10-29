@@ -309,7 +309,7 @@ a.bui-sticker-key {
   font-size: 14px;
   color: var(--muted);
 }
-.site-foot h4 {
+.site-foot h2 {
   margin: 0 0 10px;
   font: 700 11px var(--mono);
   letter-spacing: 0.14em;

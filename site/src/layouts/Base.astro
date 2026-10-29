@@ -6,8 +6,10 @@ import '../styles/site.css';
 import Icon from '../components/Icon.astro';
 import Skull from '../components/Skull.astro';
 import { VERSION, REPO, HUB, BATTLEFIELD, base } from '../site';
+import { ldJson } from '../schema';
 // app: a game page. On phones it loads like the Battlefield app: no header or footer, no scroll, no zoom.
-const { title, description, page = 'home', app = false } = Astro.props;
+// jsonld: the page's structured data (site/src/schema.ts), facts already on the page only.
+const { title, description, page = 'home', app = false, jsonld } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const nav = [
   ['home', 'Blitz', base()],
@@ -31,6 +33,7 @@ const nav = [
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href={base('icon.svg')} type="image/svg+xml" />
     <link rel="apple-touch-icon" href={base('icon-180.png')} />
+    {jsonld && <script is:inline type="application/ld+json" set:html={ldJson(jsonld)} />}
     <script is:inline>
       try {
         var t = localStorage.getItem("dom-virus:theme");
@@ -73,7 +76,7 @@ const nav = [
           <p>Every tank for itself, in a browser tab. The arcade version of DOM Battlefield, a DOM VIRUS cartridge by coded.design.</p>
         </div>
         <div>
-          <h4>GAME</h4>
+          <h2>GAME</h2>
           <ul>
             <li><a href={base('play/')}>Play now</a></li>
             <li><a href={base('#drop')}>Put it on your site</a></li>
@@ -82,7 +85,7 @@ const nav = [
           </ul>
         </div>
         <div>
-          <h4>DOM VIRUS</h4>
+          <h2>DOM VIRUS</h2>
           <ul>
             <li><a href={HUB}>The arcade ↗</a></li>
             <li><a href={BATTLEFIELD}>DOM Battlefield ↗</a></li>
