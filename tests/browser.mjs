@@ -116,7 +116,7 @@ try {
   where = "platoons";
   await page.evaluate(async () => {
     const { createBlitz } = await import("/blitz.mjs");
-    window.pl = createBlitz(document.getElementById("board"), { mode: "board", seconds: 6, platoons: true });
+    window.pl = createBlitz(document.getElementById("board"), { mode: "board", seconds: 6, platoons: true, seed: 7 });
   });
   assert.deepEqual(await page.evaluate(() => [pl.platoons, pl.world.tanks.length, pl.world.tanks.map((t) => t.team).join("")]), [true, 12, "000011112222"]);
   // The start screen switches modes (and back).
@@ -125,12 +125,21 @@ try {
   assert.equal(await page.evaluate(() => pl.platoons), false);
   await pick("platoon");
   assert.equal(await page.evaluate(() => pl.world.tanks.length), 12);
-  await page.evaluate(() => pl.start());
-  await page.waitForFunction(() => pl.world.tanks.filter((t) => t.alive && t.drop >= 1).length >= 9, null, { timeout: 15000 });
-  // No friendly fire: a shell from a wingman passes through you.
-  const shot = await page.evaluate(() => { const [you, wing] = pl.world.tanks; const s = pl.world.shells.find((q) => !q.on); Object.assign(s, { on: true, rail: false, tgt: -1, owner: wing.i, x: you.x - 30, y: you.y, vx: 600, vy: 0, life: 1 }); return [pl.world.shells.indexOf(s), you.x]; });
-  await page.waitForTimeout(120);
-  assert.ok(await page.evaluate(([i, x]) => { const s = pl.world.shells[i]; return s.on && s.owner === 1 && s.x > x; }, shot), "a wingman's shell passes through you");
+  // No friendly fire: a shell from a wingman passes through you. Seeded, and stepped by hand (no wall
+  // clock), so the board is the same on every run.
+  const shot = await page.evaluate(() => {
+    pl.start();
+    pl.engine.stop();
+    for (let f = 0; f < 60 * 15 && pl.world.tanks.filter((t) => t.alive && t.drop >= 1).length < 9; f++) pl.engine.advance(1 / 60);
+    const [you, wing] = pl.world.tanks, s = pl.world.shells.find((q) => !q.on);
+    Object.assign(s, { on: true, rail: false, tgt: -1, owner: wing.i, x: you.x - 30, y: you.y, vx: 600, vy: 0, life: 1 });
+    for (let f = 0; f < 4; f++) pl.engine.advance(1 / 60); // 40 px: from 30 px behind you to 10 px past
+    const r = { landed: pl.world.tanks.filter((t) => t.alive && t.drop >= 1).length, on: s.on, owner: s.owner, past: s.x > you.x, alive: you.alive };
+    pl.engine.start();
+    return r;
+  });
+  assert.ok(shot.landed >= 9, "the platoons are on the board " + JSON.stringify(shot));
+  assert.deepEqual([shot.on, shot.owner, shot.past, shot.alive], [true, 1, true, true], "a wingman's shell passes through you " + JSON.stringify(shot));
   // SURRENDER: the white flag whites out, waves, bursts, and the match ends as GAME OVER.
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => pl.state === "paused");
