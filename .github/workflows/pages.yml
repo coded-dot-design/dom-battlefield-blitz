@@ -27,16 +27,15 @@ jobs:
       # Landing page (/), the game (/play/) and the drop-in (/blitz.js).
       - run: npm run site:build
         env:
-          # Custom domain: repo variables SITE_URL=https://battlefieldblitz.domvirus.com and SITE_BASE=/
+          # Custom domain (defaults here; repo variables override): SITE_URL=https://battlefieldblitz.domvirus.com and SITE_BASE=/
           # (unset, the site builds for coded-dot-design.github.io/dom-battlefield-blitz/).
-          SITE_URL: ${{ vars.SITE_URL }}
-          SITE_BASE: ${{ vars.SITE_BASE }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://battlefieldblitz.domvirus.com' }}
+          SITE_BASE: ${{ vars.SITE_BASE || '/' }}
       # Pages reads the custom domain from a CNAME file in the output: its host comes from SITE_URL.
       - name: CNAME for the custom domain
-        if: vars.SITE_URL != ''
         run: node -e 'console.log(new URL(process.env.SITE_URL).host)' > artifacts/pages/CNAME && cat artifacts/pages/CNAME
         env:
-          SITE_URL: ${{ vars.SITE_URL }}
+          SITE_URL: ${{ vars.SITE_URL || 'https://battlefieldblitz.domvirus.com' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: artifacts/pages
