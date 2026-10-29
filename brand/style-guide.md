@@ -49,7 +49,8 @@ mono type, hard bases straight down. Blitz wears the same Board UI kit, compiled
 - **Pink is the accent, not a new role.** It is the kit's attack colour `#ff2e88`: the headline's
   second beat, the BLITZ label, the STRIKE key, the tip strip. Battlefield leans cyan.
 - **Kit keys only.** Round arcade (FIRE, AUTO, LOCK, LONG, STRIKE), sticker, segmented mode
-  picker, grip, white flag. No new key families.
+  picker, grip, white flag. No new key families. Page keys (PLAY BLITZ, Drop Blitz, header) wear
+  `bui-key` like Battlefield's: face and base take the click, press beats hover.
 - **No planning or radio UI.** No cards, orbits, pager or comms toast: Blitz has no planning stage.
 - **Tiles keep one colour each.** The landing legend and the game's tile colours are the same set.
 - **Arcade HUD, not a cockpit:** a floating KILLS · TIME · ARMOR · STREAK pill, a kill feed, a

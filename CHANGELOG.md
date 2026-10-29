@@ -1,13 +1,22 @@
 # Changelog
 
-## Unreleased (site only)
+## 0.8.2
 
+- **On Fizlet 0.14.1** (was 0.12.0): `vendor/fizlet` re-synced with `scripts/sync.mjs`, for the Board
+  UI page-key fix (fizlet#38): press beats hover, the face and its base take the click, and
+  `pressCue` (keyboard press, iOS `:active`). Also brings 0.12.1–0.14.0 (arcade scoreboard,
+  board-page `hitAt`/`nearAt`/letters, `Ledger.unstyle`); Blitz's gameplay is unchanged (`test:replay`).
+- **Site keys are the kit's.** Every in-page key wears `bui-key` (theme, Drop Blitz); PLAY BLITZ is
+  the kit sticker key (`bui-key bui-sticker-key bui-call`) at page size instead of its own
+  `.start-key` states, so it presses onto its base and clicks on the base too. `tests/keys.mjs` in
+  `test:site` presses every page key (centre, top edge, base; Enter; taps at 390).
+- Size: `dist/blitz.js` 37,614 → 37,813 B gzip (`dist/blitz.mjs` 37,707 → 37,899). Budget 40,960 B.
 - **Site structure and structured data** (check-html: 0 errors on both pages). Footer column titles
   h4 → h2, same look (`.site-foot h2` keeps the old rule), so the landing page no longer jumps
   h2 → h4. `/play/` gets a screen-reader h1 ("Play Battlefield Blitz"); the arena stays the visible
   title. JSON-LD from facts already on the page: WebSite + VideoGame on `/`, WebPage + BreadcrumbList
   on `/play/`. `site/engine.config.json` marks `/play/*` as a game route (scripts expected).
-- No gameplay, design or `dist/` change; the version stays 0.8.1 (a bump would rebuild `dist`).
+- No gameplay or design change from the SEO pass (#7); it ships in 0.8.2 with the vendor re-sync above.
 
 ## 0.8.1
 

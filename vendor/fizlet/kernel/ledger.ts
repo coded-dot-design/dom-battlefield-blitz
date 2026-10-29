@@ -68,6 +68,18 @@ export class Ledger {
     return true;
   }
 
+  /** Put one style property back now (as Recall would) and forget it: a later `style` records the
+   *  value then in place as the new original. Hands off if the host changed it since our last write. */
+  unstyle(el: El, prop: string): boolean {
+    const r = this.els.get(el)?.style?.get(prop), s = el.style;
+    if (!r) return true;
+    if (r.x || s.getPropertyValue(prop) !== r.l || s.getPropertyPriority(prop) !== r.lp) return !(r.x = true);
+    if (r.o) s.setProperty(prop, r.o, r.op);
+    else s.removeProperty(prop);
+    this.els.get(el)!.style!.delete(prop);
+    return true;
+  }
+
   /** Set (string) or remove (null) an attribute. */
   attr(el: El, name: string, value: string | null): boolean {
     const map = (this.entry(el).attr ??= new Map());

@@ -24,6 +24,8 @@ export interface BoardPageOptions {
   maxGlyphs?: number;
   /** Targets at most (default 32). */
   maxTargets?: number;
+  /** Letters only (default false: letters and digits are glyphs). */
+  letters?: boolean;
   /** Range reads per refresh at most (default 900); the rest are measured on the next refresh. */
   reads?: number;
   /** Hex colour for consumed glyphs (a CSS Custom Highlight, where supported). Off by default. */
@@ -42,7 +44,7 @@ export interface BoardTarget {
 }
 
 /** One Text node: our last value of it; per glyph offset, length, state (0, 1 binary, 2 erase), range. */
-type Rec = [node: Text, value: string, off: number[], len: number[], state: number[], ranges: (Range | undefined)[]];
+type Rec = [node: Text, value: string, off: number[], len: number[], state: number[], ranges: (Range | undefined)[], chars: string[]];
 
 /** Never a target or food: fields, editable, live regions, dialogs, opted out, a Fizlet host. */
 const SKIP = "input,textarea,select,[contenteditable],[aria-live],dialog,[role=dialog],[data-fizlet-ignore],[data-fizlet-host]";
@@ -56,6 +58,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   const targetSel = o.targets ?? "button,[role=button],a.button,a.btn,[data-fizlet-target]";
   const skip = o.exclude ? SKIP + "," + o.exclude : SKIP, skipText = skip + NOT_TEXT;
   const MAX = o.maxGlyphs ?? 8000, READS = o.reads ?? 900, MAXT = o.maxTargets ?? 32;
+  const eligible = o.letters ? /\p{L}/u : /\p{L}|\p{N}/u;
   const x = new Float32Array(MAX), y = new Float32Array(MAX), w = new Float32Array(MAX), h = new Float32Array(MAX);
   const spent = new Uint8Array(MAX), gr = new Int32Array(MAX), gk = new Int32Array(MAX), queue = new Int32Array(MAX), found = new Int32Array(MAX);
   // Queued writes name the node record and its glyph slot, so a rescan in between can't lose them.
@@ -66,6 +69,9 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   let count = 0, queued = 0, cursor = 0, reads = 0, dirty = 1, rescan = 1, mark = 0;
   let shown = new Int32Array(0);
   const n = new Float64Array([-9, -9, 2]), SCANNED = 0, MEASURED = 1, T = 2;
+  // Query scratch: the grid's typed form and the plain-number API's own copies, so the hot path
+  // never passes a number to a call V8 may not inline (each would box: one allocation).
+  const qx = new Float64Array(1), qy = new Float64Array(1), qrad = new Float64Array(1), arg = new Float64Array(4);
 
   const hex = o.color && /^#[\da-f]{3,8}$/i.test(o.color) ? o.color : "", name = "fizlet-board-" + ++seq;
   const hl = hex && typeof Highlight === "function" ? new Highlight() : null;
@@ -99,8 +105,8 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
         if (r && !ours(r)) drop(r), (r = undefined);
         if (!r) {
           if (!node.data.trim() || node.parentElement!.closest(skipText) || mine(node)) continue;
-          byNode.set(node, (r = [node, node.data, [], [], [], []]));
-          for (const p of seg.segment(node.data)) if (/\p{L}|\p{N}/u.test(p.segment)) r[2].push(p.index), r[3].push(p.segment.length), r[4].push(0);
+          byNode.set(node, (r = [node, node.data, [], [], [], [], []]));
+          for (const p of seg.segment(node.data)) if (eligible.test(p.segment)) r[2].push(p.index), r[3].push(p.segment.length), r[4].push(0), r[6].push(p.segment);
         }
         if (!seen.has(r)) seen.add(r), (total += r[2].length);
       }
@@ -224,6 +230,43 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     if (force || now - n[MEASURED]! >= (dirty ? 0.08 : 0.5)) (n[MEASURED] = now), measure();
   }
 
+  function nearIn(p: Float64Array, i: number, out: Int32Array) {
+    const px = p[i]!, py = p[i + 1]!, pr = p[i + 2]!;
+    qx[0] = px;
+    qy[0] = py;
+    qrad[0] = pr;
+    let m = 0;
+    for (let k = 0, c = grid.near(qx, qy, qrad, 0, found); k < c && m < out.length; k++) {
+      const j = found[k]!, dx = px - (px < x[j]! ? x[j]! : px > x[j]! + w[j]! ? x[j]! + w[j]! : px);
+      const dy = py - (py < y[j]! ? y[j]! : py > y[j]! + h[j]! ? y[j]! + h[j]! : py);
+      if (!spent[j] && dx * dx + dy * dy <= pr * pr) out[m++] = j;
+    }
+    return m;
+  }
+  function hitIn(p: Float64Array, i: number) {
+    const x0 = p[i]!, y0 = p[i + 1]!, dx = p[i + 2]! - x0, dy = p[i + 3]! - y0;
+    let best = -1;
+    n[T] = 2;
+    qx[0] = x0 + dx / 2;
+    qy[0] = y0 + dy / 2;
+    qrad[0] = Math.sqrt(dx * dx + dy * dy) / 2 + 2;
+    for (let k = 0, c = grid.near(qx, qy, qrad, 0, found); k < c; k++) {
+      const j = found[k]!;
+      // Slab test against the padded rect.
+      let a = 0, b = 1;
+      for (let ax = 0; ax < 2; ax++) {
+        const s0 = ax ? y0 : x0, d = ax ? dy : dx, lo = (ax ? y[j]! : x[j]!) - 2, hi = lo + (ax ? h[j]! : w[j]!) + 4;
+        if (d) {
+          const u = (lo - s0) / d, v = (hi - s0) / d;
+          a = Math.max(a, u < v ? u : v);
+          b = Math.min(b, u < v ? v : u);
+        } else if (s0 < lo || s0 > hi) a = 2;
+      }
+      if (!spent[j] && a <= b && a < n[T]!) (n[T] = a), (best = j);
+    }
+    return best;
+  }
+
   const system: System = {
     read: () => e.signal.aborted || refresh(),
     render() {
@@ -250,34 +293,28 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     targets: targets as readonly BoardTarget[],
     /** Unspent on-screen glyphs touching the circle, into `out`. Returns how many. */
     near(px: number, py: number, pr: number, out: Int32Array) {
-      let m = 0;
-      for (let k = 0, c = grid.query(px, py, pr, found); k < c && m < out.length; k++) {
-        const i = found[k]!, dx = px - (px < x[i]! ? x[i]! : px > x[i]! + w[i]! ? x[i]! + w[i]! : px);
-        const dy = py - (py < y[i]! ? y[i]! : py > y[i]! + h[i]! ? y[i]! + h[i]! : py);
-        if (!spent[i] && dx * dx + dy * dy <= pr * pr) out[m++] = i;
-      }
-      return m;
+      arg[0] = px;
+      arg[1] = py;
+      arg[2] = pr;
+      return nearIn(arg, 0, out);
     },
+    /** `near` for hot paths: the circle is p[i], p[i + 1] (centre) and p[i + 2] (radius), so no
+     *  number is passed (a number passed to a call V8 doesn't inline boxes: one allocation). */
+    nearAt: (p: Float64Array, i: number, out: Int32Array) => nearIn(p, i, out),
     /** First unspent glyph the segment touches (2 px pad), or -1; how far along it (0..1) is `t`. */
     hit(x0: number, y0: number, x1: number, y1: number) {
-      const dx = x1 - x0, dy = y1 - y0;
-      let best = -1;
-      n[T] = 2;
-      for (let k = 0, c = grid.query((x0 + x1) / 2, (y0 + y1) / 2, Math.sqrt(dx * dx + dy * dy) / 2 + 2, found); k < c; k++) {
-        const i = found[k]!;
-        // Slab test against the padded rect.
-        let a = 0, b = 1;
-        for (let ax = 0; ax < 2; ax++) {
-          const p = ax ? y0 : x0, d = ax ? dy : dx, lo = (ax ? y[i]! : x[i]!) - 2, hi = lo + (ax ? h[i]! : w[i]!) + 4;
-          if (d) {
-            const u = (lo - p) / d, v = (hi - p) / d;
-            a = Math.max(a, u < v ? u : v);
-            b = Math.min(b, u < v ? v : u);
-          } else if (p < lo || p > hi) a = 2;
-        }
-        if (!spent[i] && a <= b && a < n[T]!) (n[T] = a), (best = i);
-      }
-      return best;
+      arg[0] = x0;
+      arg[1] = y0;
+      arg[2] = x1;
+      arg[3] = y1;
+      return hitIn(arg, 0);
+    },
+    /** `hit` for hot paths: the segment is p[i .. i + 3] (x0, y0, x1, y1); how far along it the
+     *  glyph is goes in p[i + 4] (and `t`). No number is passed, so nothing boxes. */
+    hitAt(p: Float64Array, i: number) {
+      const g = hitIn(p, i);
+      p[i + 4] = n[T]!;
+      return g;
     },
     get t() {
       return n[T]!;
@@ -299,6 +336,10 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
       else (qr[queued] = recs[gr[i]!]!), (queue[queued++] = gk[i]!);
       return true;
     },
+    /** Glyph i as it was before the game changed it (the letter a bite ate). Not for a step: a string. */
+    char: (i: number) => (i >= 0 && i < count ? recs[gr[i]!]![6][gk[i]!]! : ""),
+    /** The element that holds glyph i's text (for a game's own read-phase checks, e.g. what covers it). */
+    parent: (i: number) => (i >= 0 && i < count ? recs[gr[i]!]![0].parentElement : null),
     /** Rescan and re-measure now; from a step, at the next read. */
     refresh() {
       rescan = 1;
