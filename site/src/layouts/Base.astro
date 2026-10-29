@@ -1,0 +1,112 @@
+---
+// Every page: a Board UI root (<html class="bui">), so the page wears DOM Battlefield's tokens (the kit in vendor/fizlet/ui).
+// Theme is shared with the game and DOM VIRUS (localStorage "dom-virus:theme"), dark by default.
+import '../../../vendor/fizlet/ui/board-ui.css';
+import '../styles/site.css';
+import Icon from '../components/Icon.astro';
+import Skull from '../components/Skull.astro';
+import { VERSION, REPO, HUB, BATTLEFIELD, base } from '../site';
+// app: a game page. On phones it loads like the Battlefield app: no header or footer, no scroll, no zoom.
+const { title, description, page = 'home', app = false } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const nav = [
+  ['home', 'Blitz', base()],
+  ['drop', 'Put it on your site', base('#drop')],
+];
+---
+<!doctype html>
+<html lang="en" class="bui" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content={app ? "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" : "width=device-width, initial-scale=1, viewport-fit=cover"} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <meta name="theme-color" content="#07060f" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={new URL(base('shots/og.png'), Astro.site)} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href={base('icon.svg')} type="image/svg+xml" />
+    <link rel="apple-touch-icon" href={base('icon-180.png')} />
+    <script is:inline>
+      try {
+        var t = localStorage.getItem("dom-virus:theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+  </head>
+  <body data-page={page} data-app={app ? "" : undefined}>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap">
+        <a class="brand" href={base()} aria-label="Battlefield Blitz home">
+          <span class="brand-mark"><Skull size={40} /></span>
+          <span class="brand-text"><small>DOM<i>BLITZ / V{VERSION}</i></small><b>BATTLEFIELD</b></span>
+        </a>
+        <nav class="site-nav" aria-label="Site">
+          {nav.map(([id, label, href]) => <a href={href} aria-current={id === page ? 'page' : undefined}>{label}</a>)}
+          <a href={BATTLEFIELD}>DOM Battlefield ↗</a>
+          <a href={HUB}>DOM VIRUS ↗</a>
+        </nav>
+        <div class="head-keys">
+          <a class="bui-key bui-icon-key gh" href={REPO} aria-label="Source on GitHub"><Icon name="github" /></a>
+          <button class="bui-icon-key" type="button" data-theme-toggle aria-label="Switch light or dark">
+            <span class="theme-dark"><Icon name="moon" /></span><span class="theme-light"><Icon name="sun" /></span>
+          </button>
+          <a class="bui-key bui-arcade bui-go play-key" href={base('play/')} data-play><Icon name="play" size={16} />Play</a>
+        </div>
+      </div>
+    </header>
+    <main id="main">
+      <slot />
+    </main>
+    <footer class="site-foot">
+      <div class="wrap">
+        <div class="foot-brand">
+          <a class="brand" href={base()}>
+            <span class="brand-mark"><Skull size={40} /></span>
+            <span class="brand-text"><small>DOM</small><b>BATTLEFIELD</b></span>
+          </a>
+          <p>Every tank for itself, in a browser tab. The arcade version of DOM Battlefield, a DOM VIRUS cartridge by coded.design.</p>
+        </div>
+        <div>
+          <h4>GAME</h4>
+          <ul>
+            <li><a href={base('play/')}>Play now</a></li>
+            <li><a href={base('#drop')}>Put it on your site</a></li>
+            <li><a href={BATTLEFIELD}>The original: DOM Battlefield</a></li>
+            <li><a href={`${REPO}/blob/main/CHANGELOG.md`}>Release notes</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>DOM VIRUS</h4>
+          <ul>
+            <li><a href={HUB}>The arcade ↗</a></li>
+            <li><a href={BATTLEFIELD}>DOM Battlefield ↗</a></li>
+            <li><a href={REPO}>Source on GitHub ↗</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot-base">
+        <div class="wrap"><span>© 2026 coded.design · MIT</span><span>Created by Chris Cooley</span></div>
+      </div>
+    </footer>
+    {app && <script is:inline>
+      // App pages on phones: no pinch or double-tap zoom (iOS ignores user-scalable=no).
+      for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, function (e) { if (matchMedia("(pointer: coarse)").matches) e.preventDefault(); }, { passive: false });
+    </script>}
+    <script>
+      const html = document.documentElement;
+      document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
+        const next = html.dataset.theme === "light" ? "dark" : "light";
+        html.dataset.theme = next;
+        try {
+          localStorage.setItem("dom-virus:theme", next);
+        } catch {}
+      });
+    </script>
+  </body>
+</html>

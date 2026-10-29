@@ -1,0 +1,27 @@
+{
+  "$comment": "astro-base-engine config for the Battlefield Blitz site. Run the engine with --site site. siteUrl is the live GitHub Pages address until battlefieldblitz.domvirus.com is pointed. The play page is the game (app mode) and stays outside the engine's page types.",
+  "brand": {
+    "name": "Battlefield Blitz",
+    "siteUrl": "https://coded-dot-design.github.io/dom-battlefield-blitz",
+    "defaultImage": "/shots/og.png",
+    "author": {
+      "name": "Chris Cooley",
+      "url": "https://coded.design/"
+    }
+  },
+  "inputs": {
+    "voice": "../brand/voice.md",
+    "styleGuide": "../brand/style-guide.md"
+  },
+  "pageTypes": {
+    "home": {
+      "template": "marketing",
+      "path": "/",
+      "eyebrow": "Board game",
+      "schemaPageType": "VideoGame",
+      "requires": [
+        "hero"
+      ]
+    }
+  }
+}

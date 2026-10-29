@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0
+
+- Blitz has its own site: the landing page at `/` and the game at `/play/`, with the drop-in at
+  `/blitz.js`. They're the pages that lived on the Battlefield site under `/blitz/`, moved over
+  unchanged with DOM Battlefield's brand and the Board UI kit. They're built with Astro (dev only)
+  and deployed to GitHub Pages by `pages.yml`.
+- Ready for battlefieldblitz.domvirus.com: with the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com` and
+  `SITE_BASE=/`, the Pages build writes `CNAME` and every canonical and og URL is on that host.
+  The site links to DOM Battlefield (battlefield.domvirus.com) and DOM VIRUS (domvirus.com).
+
 ## 0.6.5
 
 - Phones: more room between the start sticker, the mode keys and PRESS START.

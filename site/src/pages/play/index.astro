@@ -1,0 +1,82 @@
+---
+// Battlefield Blitz, the game: the arena fills the screen under the Battlefield header.
+// The game code is this repo's committed build (dist/blitz.mjs).
+import Base from '../../layouts/Base.astro';
+import { base, BATTLEFIELD } from '../../site';
+---
+<Base title="Play Battlefield Blitz" description="Battlefield Blitz: free-for-all tank chaos. Parachute in, grab the blinking power tiles, call airstrikes. Most kills in three minutes wins." page="play" app>
+  <section class="blitz-stage" aria-label="Battlefield Blitz arena">
+    <div id="blitz" class="blitz-host"></div>
+  </section>
+  <div class="wrap blitz-bar">
+    <p><b>BLITZ</b> · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike · <kbd>Q</kbd> auto · <kbd>T</kbd> lock · <kbd>Esc</kbd> pause · phones: drag left to drive</p>
+    <p><a href={base()}>About Blitz</a> · <a href={base('#drop')}>Put it on your site</a> · <a href={BATTLEFIELD}>The original: DOM Battlefield</a></p>
+  </div>
+</Base>
+
+<script>
+  import { createBlitz } from "../../../../dist/blitz.mjs";
+  const seconds = Number(new URLSearchParams(location.search).get("seconds")) || 180;
+  (window as unknown as { blitz: unknown }).blitz = createBlitz(document.getElementById("blitz")!, { mode: "board", seconds });
+</script>
+
+<style>
+  .blitz-stage {
+    position: relative;
+    height: calc(100svh - 78px);
+    min-height: 420px;
+    border-bottom: 2px solid var(--line);
+    background: #090818;
+  }
+  .blitz-host {
+    position: absolute;
+    inset: 0;
+  }
+  .blitz-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px 24px;
+    padding-top: 18px;
+    padding-bottom: 6px;
+    font: 12px var(--mono);
+    color: var(--muted);
+  }
+  .blitz-bar p {
+    margin: 0;
+  }
+  .blitz-bar b {
+    color: var(--k-attack);
+  }
+  .blitz-bar a {
+    color: var(--k-sys-ink);
+  }
+  /* Phones: the game is the whole screen, like the Battlefield app. No header, footer, scroll or zoom. */
+  @media (pointer: coarse), (max-width: 760px) {
+    :global(html:has(body[data-app])),
+    :global(body[data-app]) {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      -webkit-text-size-adjust: 100%;
+    }
+    :global(body[data-app] :is(.site-head, .site-foot, .skip)),
+    .blitz-bar {
+      display: none;
+    }
+    .blitz-stage {
+      position: fixed;
+      inset: 0;
+      height: auto;
+      min-height: 0;
+      border: 0;
+    }
+  }
+  kbd {
+    padding: 1px 6px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface);
+  }
+</style>
