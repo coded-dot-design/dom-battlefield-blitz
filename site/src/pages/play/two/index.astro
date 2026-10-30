@@ -1,0 +1,63 @@
+---
+// Battlefield Blitz for two players over a fizlet-rooms room server (demo). Same match on both
+// screens: only inputs travel. The invite code is the demo gate, not a login.
+import Base from '../../../layouts/Base.astro';
+import { base, ROOMS } from '../../../site';
+const title = 'Battlefield Blitz · two players';
+const description = 'Two players, one Blitz match, over the internet. Enter an invite code and pick a room.';
+---
+<Base title={title} description={description} page="play">
+  <section class="wrap two" data-rooms={ROOMS}>
+    <h1>Blitz · two players</h1>
+    <p class="hint">Both players enter an invite code and the same room number. The match starts when the second player joins.</p>
+    <form id="gate">
+      <label>Invite code <input name="code" autocomplete="off" required minlength="6" maxlength="64" /></label>
+      <label>Room (0–15) <input name="room" type="number" min="0" max="15" value="0" required /></label>
+      <button>PLAY</button>
+    </form>
+    <p id="say" role="status"></p>
+    <div id="arena"></div>
+    <p class="hint"><a href={base('play/')}>Play solo instead</a></p>
+  </section>
+</Base>
+
+<script>
+  import { createBlitz, join } from "../../../../../dist/blitz-net.mjs";
+  const host = document.querySelector<HTMLElement>(".two")!;
+  const ws = new URLSearchParams(location.search).get("rooms") ?? host.dataset.rooms!;
+  const http = ws.replace(/^ws/, "http");
+  const say = document.getElementById("say")!, gate = document.getElementById("gate") as HTMLFormElement;
+  const tell = (text: string, bad = false) => ((say.textContent = text), say.classList.toggle("bad", bad));
+  let game: { destroy(): void } | null = null;
+  gate.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const code = (gate.elements.namedItem("code") as HTMLInputElement).value.trim();
+    const room = Number((gate.elements.namedItem("room") as HTMLInputElement).value);
+    const ok = await fetch(`${http}/invite?code=${encodeURIComponent(code)}`).then((r) => r.ok, () => false);
+    if (!ok) return tell("That invite code isn't on the list.", true);
+    gate.hidden = true;
+    tell(`Room ${room}: waiting for player 2…`);
+    try {
+      const { transport, slot, players, seed } = await join(`${ws}/room/${room}?players=2&invite=${encodeURIComponent(code)}`);
+      tell(`You're player ${slot + 1} of ${players}. Same match on both screens: only inputs travel.`);
+      game?.destroy();
+      game = createBlitz(document.getElementById("arena")!, { seed, net: { transport, slot, players }, onEnd: () => tell("Match over.") });
+      (window as unknown as { blitz: unknown }).blitz = game;
+    } catch {
+      gate.hidden = false;
+      tell("The room closed (full, idle, or the server is down). Try another room.", true);
+    }
+  });
+</script>
+
+<style>
+  .two { padding-top: 24px; padding-bottom: 24px; }
+  .hint { color: var(--muted); font: 13px var(--mono); }
+  form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+  label { display: grid; gap: 4px; font: 13px var(--mono); color: var(--muted); }
+  input { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+  button { font: 700 14px var(--mono); background: var(--k-attack); color: #07060f; border: 0; border-radius: 6px; padding: 9px 18px; cursor: pointer; }
+  #say { min-height: 1.5em; font: 14px var(--mono); }
+  #say.bad { color: var(--k-attack); }
+  #arena { position: relative; width: 100%; aspect-ratio: 1100 / 640; max-height: 80vh; }
+</style>
