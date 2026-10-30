@@ -145,11 +145,11 @@ try {
     tp.on("pageerror", (e) => terr.push(e.message));
     await tp.route("https://rooms.test/**", (r) => r.fulfill({ status: 403, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: '{"ok":false}' }));
     await tp.goto(`${base}play/two/?rooms=wss://rooms.test&room=3`);
-    assert.equal(await tp.locator(".lobby").getAttribute("data-step"), "join");
+    assert.equal(await tp.locator(".room").getAttribute("data-step"), "join");
     assert.equal(await tp.locator("output[name=roomShow]").textContent(), "3", "?room= picks the room");
     const fit = await tp.evaluate(() => {
-      const card = document.querySelector('[data-for="join"]').getBoundingClientRect();
-      const small = [...document.querySelectorAll(".lobby :is(button, input:not([type=hidden]))")].filter((el) => el.offsetParent && (el.getBoundingClientRect().width < 44 || el.getBoundingClientRect().height < 44)).map((el) => el.outerHTML.slice(0, 60));
+      const card = document.querySelector(".room").getBoundingClientRect();
+      const small = [...document.querySelectorAll(".room :is(button:not(.bui-grip), input:not([type=hidden]))")].filter((el) => el.offsetParent && (el.getBoundingClientRect().width < 44 || el.getBoundingClientRect().height < 44)).map((el) => el.outerHTML.slice(0, 60));
       return { sideways: document.documentElement.scrollWidth - innerWidth, inView: card.top >= 0 && card.bottom <= innerHeight, small };
     });
     assert.equal(fit.sideways, 0, `${w}x${h}: no sideways scroll`);
@@ -158,7 +158,7 @@ try {
     await tp.fill("input[name=code]", "NOPE-NOPE-1");
     await tp.click("[data-join]");
     await tp.waitForFunction(() => /isn't on the list/.test(document.querySelector("[data-say]").textContent));
-    assert.equal(await tp.locator(".lobby").getAttribute("data-step"), "join", "a bad code stays on the join card");
+    assert.equal(await tp.locator(".room").getAttribute("data-step"), "join", "a bad code stays on the join card");
     assert.deepEqual(terr, []);
     await tc.close();
   }
