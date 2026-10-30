@@ -16,7 +16,7 @@
     "test:lockstep": "node tests/lockstep.mjs",
     "site:dev": "astro dev --config site/astro.config.mjs",
     "site:build": "astro build --config site/astro.config.mjs && node scripts/pages.mjs",
-    "test:site": "node tests/site.mjs"
+    "test:site": "node tests/site.mjs && node tests/multiplayer.mjs"
   },
   "devDependencies": {
     "astro": "7.4.2",

@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **Multiplayer page (`/play/two/`): the full board, one room card, and 2 to 4 players.**
+  - The board fills the stage like `/play/` (an attract match runs behind until yours starts). The
+    dimmed lobby is gone: everything about the room is ONE Board UI card over the board (kit card,
+    grip, keys), draggable by its grip or header (kept whole on the board, remembered on this
+    device, double-click puts it back) and foldable to its header. In a match it folds on phones.
+  - The card's header always shows the room, your seat (`ROOM 3 · P1`) and the link: a dot that is
+    grey (not connected), blinking (waiting), green (live), blinking red-orange (frames stalled:
+    "WAITING FOR THE OTHERS…") or red (left / lost).
+  - Waiting: a seat per player in its tank colour (YOU, then open seats).
+  - In the match: a live scoreboard, one row per player in its tank colour (P1..P4, `YOU` marked,
+    kills and deaths, dimmed while down), and LEAVE.
+  - Someone left: says who (`P3 left…`) with REJOIN / NEW ROOM. No moves for 8 s: CONNECTION LOST
+    with REJOIN (before, a dropped socket waited forever).
+  - **3 and 4 players:** a PLAYERS pick (2 · 3 · 4) shows when the room server says it allows more
+    than two (`/invite` returns `players`, fizlet-rooms change in its own PR). The live server says
+    nothing yet, so the page stays two-player until that change is deployed. The game already ran
+    any number of humans (`net.players`); the share link carries `players`.
+  - No game change: `dist/` is unchanged.
+- `tests/multiplayer.mjs` (in `test:site`): 2 and 4 players through a mock room server (the
+  fizlet-rooms relay over Playwright's WebSocket routing, one browser context per player) at
+  1440×900 and 390×844, light and dark: join, waiting seats, a live match with a row per player in
+  its tank colour and one YOU, no desync, the last player leaving (named to the others), REJOIN; no
+  sideways scroll, the card whole on the board, every card key ≥ 44 px. `SHOTS=<dir>` saves screenshots.
 - **Phones: taps and swipes never zoom or pan the page** (owner: "for mobile all of our pages right
   now need to lock down double tap and pinch to zoom"). The page is `touch-action: manipulation`
   (no double-tap zoom) with `text-size-adjust: 100%`; the hero battle is `[data-touch-lock]`:
