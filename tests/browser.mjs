@@ -285,8 +285,36 @@ try {
   assert.equal(await page.locator("[data-fizlet-host=blitz]").count(), 0, "Escape closes");
   assert.equal(await snap(), before, "the page is exactly as it was");
 
+  where = "reduced motion";
+  // The same seeded match, stepped by hand, with and without prefers-reduced-motion: the screen
+  // shakes only without it, and the match itself is the same (the shake is drawn, never simulated).
+  const shakes = async (reducedMotion) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion });
+    const p = await ctx.newPage();
+    await p.route(`${ORIGIN}/**`, (route) => {
+      const path = new URL(route.request().url()).pathname;
+      return path === "/" ? route.fulfill({ contentType: "text/html", body: PAGE }) : route.fulfill({ contentType: "text/javascript", body: readFileSync(`dist${path}`) });
+    });
+    await p.goto(`${ORIGIN}/`);
+    const r = await p.evaluate(async () => {
+      const { createBlitz } = await import("/blitz.mjs");
+      const g = createBlitz(document.getElementById("board"), { mode: "board", seconds: 40, seed: 11 });
+      g.start();
+      g.engine.stop();
+      let max = 0;
+      for (let f = 0; f < 60 * 30; f++) (g.engine.advance(1 / 60), (max = Math.max(max, g.shake)));
+      return { max, hash: g.hash() };
+    });
+    await ctx.close();
+    return r;
+  };
+  const moving = await shakes("no-preference"), calm = await shakes("reduce");
+  assert.ok(moving.max > 0, `the screen shakes for blasts and hits (${moving.max.toFixed(1)} px)`);
+  assert.equal(calm.max, 0, "reduced motion: the screen never shakes");
+  assert.equal(calm.hash, moving.hash, "reduced motion plays the same match");
+
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar, locate pulse; TUNE: sliders, keys, saved, copy, persist, SOLO BOTS, shell speed and reach, RESET), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: reduced motion (no shake, same match), board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar, locate pulse; TUNE: sliders, keys, saved, copy, persist, SOLO BOTS, shell speed and reach, RESET), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;
