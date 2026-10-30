@@ -24,7 +24,7 @@ try {
   /** Two peers, `frames` lockstep frames, a digest of each world every 600 frames. */
   const run = (opts) =>
     page.evaluate(async ({ frames, latency, jitter, seed, scripted }) => {
-      const { createBlitz, memory } = await import("/blitz.mjs");
+      const { createBlitz, memory } = await import("/blitz-net.mjs");
       for (const id of ["a", "b"]) document.getElementById(id).replaceChildren();
       const hub = memory({ peers: 2, latency, jitter, seed: 5 });
       let calls = 0;

@@ -105,7 +105,7 @@ frame, through [`fizlet/presence`](https://github.com/coded-dot-design/fizlet) a
 (a Cloudflare Worker + Durable Object, gated by an invite code).
 
 ```js
-import { createBlitz, join } from "./blitz.mjs";
+import { createBlitz, join } from "./blitz-net.mjs"; // blitz.mjs plus net play
 const { transport, slot, players, seed } = await join("wss://rooms.example/room/0?players=2&invite=CODE");
 createBlitz(document.querySelector("#arena"), { seed, net: { transport, slot, players } });
 ```
@@ -115,6 +115,8 @@ createBlitz(document.querySelector("#arena"), { seed, net: { transport, slot, pl
 - Controls travel as one 32-bit word: drive (8 ways), fire, long shot, airstrike at the pointer,
   aim (pointer, auto, hull) and the pointer in 256ths of the arena. Aim lock acts as auto in net play.
 - [`examples/two-player.html`](examples/two-player.html): the demo page (invite code, room, play).
+- Net play ships as its own module, `dist/blitz-net.mjs` (budget 42 KB gzip), so the drop-in and
+  `blitz.mjs` don't carry the lockstep code.
 
 ## Develop
 

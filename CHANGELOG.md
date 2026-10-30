@@ -6,19 +6,28 @@
   seed and only inputs travel, through `fizlet/presence`. A fixed 1100 × 640 arena scaled to fit (so
   any two screens play one match), humans in seats 0..players-1 and bots after, one 32-bit input word
   per player per frame (drive, fire, long shot, airstrike at the pointer, aim mode, pointer), and a
-  match hash compared every 30 frames. `join` and `memory` are exported from `blitz.mjs`;
-  `examples/two-player.html` is the demo page (invite code → room → play).
+  match hash compared every 30 frames.
+- **`dist/blitz-net.mjs`**, a new module: everything in `blitz.mjs` plus net play (fizlet/presence,
+  `join`, `memory`), with its own budget of 43,008 B gzip. The drop-in and `blitz.mjs` stay solo, so
+  they don't carry the lockstep code. `examples/two-player.html` is the demo page (invite code → room → play).
 - `npm run test:lockstep`: two peers on 1100 × 640 and 700 × 460 screens, scripted inputs, 3,600
   frames identical every 600 frames; with 6 ± 5 ticks of jitter too, giving the same match as with no
   latency; 0 desyncs, 0 `Math.random` in play. `tests/room.mjs` (needs a room server, skipped in CI):
   measured locally through `wrangler dev`, 1,800 frames identical every 300 frames.
-- Fix: screen shake drew from the match's seeded random in `draw()`, so how much your screen shook
-  changed the match (one more reason a replay with a human could drift). Shake has its own random now.
 - Crates (`fizlet/rules` drops) step inside the match step in net play, so a peer waiting for input
   doesn't move them.
-- Size: `dist/blitz.js` 37,885 → 39,697 B gzip, `dist/blitz.mjs` 37,970 → 40,460 (presence and
-  the net code). Budget 40,960 B.
+- Size: `dist/blitz.js` 39,143 → 40,251 B gzip, `dist/blitz.mjs` 39,245 → 40,355 (net hooks:
+  input word, match hash, fixed arena); `dist/blitz-net.mjs` 41,785 (budget 43,008). Budget 40,960 B.
 - Solo play is unchanged: `test:replay` still plays the pinned 0.8.2 matches value for value.
+
+## 0.8.4
+
+Still on Fizlet 0.15.0. **The step allocates nothing.** `npm test` checks it: 20,000 busy demo steps (free-for-all and platoons) make 0 minor GCs, measured on Chromium 153 (the bar is ≤ 1). 0.8.3 made 10 and 14. Gameplay is unchanged: the pinned digests (seeds 41, 42, 7 platoons) and five more seeds are the same as 0.8.2's, value for value. The one exception is below.
+
+- **The step's numbers live in typed arrays.** The match's running numbers (clock, countdown, tile and crate timers, shake, whiteout, nuke timer, coach counters) moved into `G`, a `Float64Array`: a double stored in a closure variable is a new heap number on every write. The hot helpers (`blockedF`, `turnF`, `drive`, `hyp`, `shellHits`, `callStrike`, spawn's tries) take their numbers through `F`, a register `Float64Array`, because a number passed to or returned from a call V8 doesn't inline is boxed (fizlet-engine lesson K4). `circleRect`, `segCircle` and `inRect` are inlined with the same arithmetic. Rare paths (strikes, blasts, spawns) use index loops and `F` instead of `for…of` and loop locals, because they may stay on Maglev, where both allocate. A respawn assigns fields one by one instead of `Object.assign` with a literal.
+- **Effects are queued by the step and played by render.** `fx.spawn`, `fx.word` and `fx.blast` take up to a dozen numbers each. The step stages them in a typed queue, and render plays the queue in order before it draws. Same particles, words and blasts. A particle now starts at the frame's draw instead of mid-frame, which is the same at one step per frame.
+- **The screen shake no longer draws from `engine.random`** (a determinism fix). `draw()` took the shake offset from the seeded gameplay random, so in a board, platoon or practice match where the screen shook, how often the screen was drawn changed the match. It now has its own LCG, seeded from the match's seed. Demo matches never shake, so their digests are unchanged. Board matches where you get hit now play differently from 0.8.3, and they replay. `test:replay` checks that a board match with you getting hit plays the same whether each step is drawn once or twice (0.8.3 fails that check).
+- Size: `dist/blitz.js` 37,885 → 39,143 B gzip (`dist/blitz.mjs` 37,970 → 39,245). Budget 40,960 B.
 
 ## 0.8.3
 

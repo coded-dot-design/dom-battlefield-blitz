@@ -14,12 +14,19 @@
  *   embed - dropped onto any page: the page itself is the arena; shells knock its headings and
  *           treads flatten them. Endless. Escape (or the toggle) closes and the page is untouched.
  */
-import { createEngine, seeded } from "../vendor/fizlet/index";
-import { presence, type Transport } from "../vendor/fizlet/presence";
+import { createEngine } from "../vendor/fizlet/index";
+import type { presence as Presence, Transport } from "../vendor/fizlet/presence";
+
+// Net play's lockstep (fizlet/presence) is registered by the net build (src/net.ts → dist/blitz-net.mjs),
+// so the drop-in and the solo module don't carry it.
+let lockstep: typeof Presence | null = null;
+export function useLockstep(p: typeof Presence) {
+  lockstep = p;
+}
 import { controls } from "../vendor/fizlet/input";
 import { effects } from "../vendor/fizlet/fx";
 import { sound } from "../vendor/fizlet/sound";
-import { segCircle, inRect, circleRect } from "../vendor/fizlet/collide";
+import { inRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 import { drops } from "../vendor/fizlet/rules";
@@ -234,6 +241,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const feed = [...wrap.querySelectorAll<HTMLLIElement>(".feed li")];
 
   if (net && o.seed === undefined) throw new Error("Blitz net play needs the room's seed");
+  if (net && !lockstep) throw new Error("Blitz net play: import createBlitz from blitz-net.mjs");
   const e = createEngine({ root: wrap, seed: o.seed ?? (Math.random() * 1e9) | 0, events: 128 }); // port-check: ok setup: the seed when none is given, before any step
   const input = controls(e, {
     keys: {
@@ -244,12 +252,43 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     stick: "left",
   });
   const fx = effects({ cap: 700, words: WORDS, colors: FX_COLORS, scorch: 48 });
+  // Effects the step asks for, played in render. fx is the screen's; its calls take up to a dozen
+  // numbers, and a number passed to a call V8 doesn't inline is boxed (K4). So the step stages them in
+  // FQ and queues them; render plays the queue, in order, before it draws.
+  const FX_SPAWN = 0, FX_WORD = 1, FX_BLAST = 2, FXN = 12, FXCAP = 512;
+  const FQ = new Float64Array(FXN - 1), fxq = new Float64Array(FXN * FXCAP);
+  let fxLen = 0;
+  function fxPush(op: number) {
+    if (fxLen < FXCAP) {
+      const at = fxLen++ * FXN;
+      fxq[at] = op;
+      fxq.set(FQ, at + 1);
+    }
+    FQ.fill(0); // unset optional arguments read as fx's defaults (rot, spin: 0)
+  }
+  function fxPlay() {
+    for (let i = 0; i < fxLen; i++) {
+      const q = i * FXN, op = fxq[q];
+      if (op === FX_SPAWN) fx.spawn(fxq[q + 1]!, fxq[q + 2]!, fxq[q + 3]!, fxq[q + 4]!, fxq[q + 5]!, fxq[q + 6]!, fxq[q + 7]!, fxq[q + 8]!, fxq[q + 9]!, fxq[q + 10]!);
+      else if (op === FX_WORD) fx.word(fxq[q + 1]!, fxq[q + 2]!, fxq[q + 3]!, fxq[q + 4]!, fxq[q + 5]! || 16);
+      else fx.blast(fxq[q + 1]!, fxq[q + 2]!, fxq[q + 3]!, fxq[q + 4]!);
+    }
+    fxLen = 0;
+  }
   const sfx = sound(e, { cues: { shot: "fire", boom: "boom", hit: "hit", power: "power", strike: "hurt", land: "click", lock: "click", win: "win", end: "end", ready: "ready", streak: "win", nuke: "end" } });
   const drawTank = tankSprites(document);
   // Every random number in the match comes from the engine's seeded random, so a seed replays a match.
   const R = e.random;
-  // Screen shake is a look, not the match: it has its own random so it never moves the match's.
-  const shakeR = seeded((R.state ^ 0x5bd1e995) >>> 0);
+  // The screen's own random (the shake): the same LCG, seeded off the match's seed, drawn only by render.
+  const shakeSeed = new Uint32Array([(R.state ^ 0x9e3779b9) >>> 0]);
+  const shakeRandom = () => ((shakeSeed[0] = Math.imul(shakeSeed[0]!, 1664525) + 1013904223), shakeSeed[0]! / 4294967296);
+  // The match's running numbers that the step writes each frame. A double stored in a closure variable
+  // is a new heap number on every write; in a typed array it is stored in place.
+  const G = new Float64Array(10);
+  const CLK = 0, CNT = 1, MATCH = 2, TILE_IN = 3, CRATE_IN = 4, QUAKE = 5, WHITE = 6, NUKE_T = 7, MOVED = 8, COACH_T = 9;
+  G[CLK] = o.seconds ?? 180; // the match clock (board)
+  G[TILE_IN] = 1.2; // the next power tile
+  G[CRATE_IN] = 12; // the next supply crate
   const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)");
 
   // ---------- World ----------
@@ -259,7 +298,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // Drawn as yours (ring, tag): in net play every human is a player in the match, but only one is you.
   const mine = (t: Tank) => (net ? t === you : t.you);
   const wx = (x: number) => (x - view[1]!) / view[0]!, wy = (y: number) => (y - view[2]!) / view[0]!;
-  let clock = o.seconds ?? 180, state: "intro" | "count" | "play" | "end" | "paused" = embed || demo ? "play" : "intro", count = 0;
+  let state: "intro" | "count" | "play" | "end" | "paused" = embed || demo ? "play" : "intro";
   // Solo: every tank for itself. Platoons: teams of 4 (3 on a dropped-in page), three platoons.
   const saved = (() => {
     try {
@@ -304,15 +343,15 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const CRATE_FALL = 170, CRATE_DROP = 2.2;
   const supply = drops(e, { kinds: ["repair", "long", "strike", "jackpot"], cap: 2, life: 14 + CRATE_DROP, fall: CRATE_FALL, speed: CRATE_FALL / CRATE_DROP });
   const blocks: Block[] = [];
-  let covers: Cover[] = [], coverDirty = true, coverAt = 0, matchT = 0;
+  let covers: Cover[] = [], coverDirty = true, coverAt = 0;
   const anims = new Set<Animation>();
-  let tileIn = 1.2, crateIn = 12, lightTheme = false;
+  let lightTheme = false;
   // Your controls: auto-aim (on by default on phones), aim lock and the airstrike target mode.
   let autoOn = coarse.matches, lockOn = false, lockT = -1, targeting = false;
   // Taps the step picks up: an airstrike spot, a lock target, a long shot.
   let strikeQ = false, strikeX = 0, strikeY = 0, longQ = false, strikeT = false, fireQ = false;
   // The nuke: countdown, then the flash.
-  let nukeT = 0, nukeBy = -1, whiteout = 0;
+  let nukeBy = -1;
   // Messages for the DOM, written in render: the kill feed ring and the streak banner.
   const feedK = new Int16Array(8), feedV = new Int16Array(8);
   let feedN = 0, feedShown = 0, bannerN = 0, bannerShown = 0, bannerRun = 0, bannerWho = 0;
@@ -351,10 +390,35 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       blocks.push({ x: c * T + 3, y: r * T + 3, w: (long ? 2 : 1) * T - 6, h: T - 6, hp: 3, back: 0 });
     }
   }
-  const blocked = (x: number, y: number, rad: number) => {
-    for (const b of blocks) if (b.hp > 0 && circleRect(x, y, rad, b.x, b.y, b.w, b.h)) return b;
+  // The step's number registers. A double passed to, or returned from, a call V8 doesn't inline is
+  // boxed (a new heap number each time), so the step's hot helpers take and give their numbers here
+  // (fizlet-engine lesson K4). Each helper has its own slots, so a nested call never clobbers them.
+  const F = new Float64Array(21);
+  const BX = 0, BY = 1, BR = 2; // blockedF: the point and the radius
+  const TF = 3, TT = 4, TM = 5, TO = 6; // turnF: from, to, max turn → out
+  const DX = 7, DY = 8, DT = 9; // drive: the stick and dt
+  const SX = 10, SY = 11, SR = 12; // shellHits: where the shell is going, the hit radius
+  const HX = 13, HY = 14, HO = 15; // hyp: dist(F[HX], F[HY]) → F[HO]
+  const KX = 16, KY = 17; // callStrike: the target
+  const PX = 18, PY = 19; // spawn: where the platoon drops
+  const LAST = 20; // callStrike: when its last bomb lands
+  function hyp() {
+    F[HO] = dist(F[HX]!, F[HY]!);
+  }
+  /** a and b (tanks, shells) are closer than r (a constant: a literal never boxes). */
+  const within = (a: { x: number; y: number }, b: { x: number; y: number }, r: number) => dist(a.x - b.x, a.y - b.y) < r;
+  /** The live block that a circle at (F[BX], F[BY]) of radius F[BR] touches (fizlet/collide circleRect, inline), or null. */
+  function blockedF() {
+    const cx = F[BX]!, cy = F[BY]!, r = F[BR]!;
+    for (const b of blocks) {
+      if (b.hp <= 0) continue;
+      const x = b.x, y = b.y, w = b.w, h = b.h;
+      const dx = cx - (cx < x ? x : cx > x + w ? x + w : cx), dy = cy - (cy < y ? y : cy > y + h ? y + h : cy);
+      if (dx * dx + dy * dy < r * r) return b;
+    }
     return null;
-  };
+  }
+  const blocked = (x: number, y: number, rad: number) => ((F[BX] = x), (F[BY] = y), (F[BR] = rad), blockedF());
   function openSpot(out: Float64Array) {
     let x = 0, y = 0;
     for (let k = 0; k < 24; k++) {
@@ -382,8 +446,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   // A knock runs in the step (it draws engine.random), so its cool-down is on match time, not the wall clock.
   function knock(c: Cover, nx: number, ny: number, power: number, flat: boolean) {
-    if (matchT < c.busy || typeof c.el.animate !== "function") return;
-    c.busy = matchT + (flat ? 1.1 : 0.8);
+    if (G[MATCH]! < c.busy || typeof c.el.animate !== "function") return;
+    c.busy = G[MATCH]! + (flat ? 1.1 : 0.8);
     const p = Math.min(2, power), dx = nx * 18 * p, dy = ny * 14 * p - 10 * p, spin = (nx >= 0 ? 1 : -1) * (6 + R() * 10) * p;
     const a = c.el.animate(
       flat
@@ -403,45 +467,65 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
 
   // ---------- Spawning: everyone parachutes in ----------
+  /** The spot (F[BX], F[BY]) is clear for tank t to drop on: no block within 22 × scale, no tank too close. */
+  function clearFor(t: Tank) {
+    const x = F[BX]!, y = F[BY]!;
+    F[BR] = 22 * scale;
+    if (blockedF()) return false;
+    let ok = true;
+    for (const o2 of tanks) if (o2 !== t && o2.alive && ((F[HX] = o2.x - x), (F[HY] = o2.y - y), hyp(), F[HO]! < (o2.team === t.team ? 44 : 160))) ok = false;
+    return ok;
+  }
   function spawn(t: Tank) {
-    let x = 0, y = 0, hx = 0, hy = 0;
+    // The tries are written to F, not to locals: spawn runs a few times a second, so V8 may not
+    // optimize it fully, and a number kept in a local across a loop is then a heap number per try.
     if (platoon) {
       // Platoons drop together: next to the platoon's lead tank, else at the platoon's corner.
       let anchor: Tank | null = null;
       for (const o2 of tanks) if (o2 !== t && o2.team === t.team && o2.alive && (!anchor || o2.slot < anchor.slot)) anchor = o2;
       const a = Math.PI * 0.75 + (t.team * TAU) / 3;
-      hx = anchor ? anchor.x : W / 2 + Math.cos(a) * W * 0.32;
-      hy = anchor ? anchor.y : H / 2 + Math.sin(a) * H * 0.3;
+      F[PX] = anchor ? anchor.x : W / 2 + Math.cos(a) * W * 0.32;
+      F[PY] = anchor ? anchor.y : H / 2 + Math.sin(a) * H * 0.3;
     }
     for (let k = 0; k < 24; k++) {
       if (platoon) {
         const a = R() * TAU, r = 55 + R() * 70;
-        x = Math.max(40, Math.min(W - 40, hx + Math.cos(a) * r));
-        y = Math.max(70, Math.min(H - 60, hy + Math.sin(a) * r));
-      } else (x = 40 + R() * (W - 80)), (y = 70 + R() * (H - 130));
-      let ok = !blocked(x, y, 22 * scale);
-      for (const o2 of tanks) if (o2 !== t && o2.alive && dist(o2.x - x, o2.y - y) < (o2.team === t.team ? 44 : 160)) ok = false;
-      if (ok) break;
+        F[BX] = Math.max(40, Math.min(W - 40, F[PX]! + Math.cos(a) * r));
+        F[BY] = Math.max(70, Math.min(H - 60, F[PY]! + Math.sin(a) * r));
+      } else (F[BX] = 40 + R() * (W - 80)), (F[BY] = 70 + R() * (H - 130));
+      if (clearFor(t)) break;
     }
-    Object.assign(t, { x, y, a: R() * TAU, hp: MAXHP, alive: true, drop: 0, shield: 0, rapid: 0, triple: 0, cool: 0.6, recoil: 0, think: 0, target: -1, gx: x, gy: y, streak: 0, run: 0, heat: 0, hot: 0, charge: 0, chargeT: -1 });
+    const x = F[BX]!, y = F[BY]!;
+    // Field by field (an object literal for Object.assign would be a new object every respawn).
+    t.x = x;
+    t.y = y;
+    t.a = R() * TAU;
+    t.hp = MAXHP;
+    t.alive = true;
+    t.drop = t.shield = t.rapid = t.triple = t.recoil = t.think = 0;
+    t.cool = 0.6;
+    t.target = -1;
+    t.gx = x;
+    t.gy = y;
+    t.streak = t.run = t.heat = t.hot = t.charge = 0;
+    t.chargeT = -1;
     t.ta = t.a;
   }
 
   // ---------- Shake: only what lands near you (or hits you) moves the screen ----------
-  let quakeAmt = 0, buzz = 0;
-  function quake(x: number, y: number, power: number) {
+  let buzz = 0;
+  /** A blast at (FQ[0], FQ[1]) of power FQ[2], tint FQ[3]: the effect (played in render), and the shake if it's near you. */
+  function boomQ() {
+    const x = FQ[0]!, y = FQ[1]!, power = FQ[2]!;
+    fxPush(FX_BLAST);
     if (demo || !you.alive || state !== "play") return;
     const reach = 250 * (scale / 1.4), d = dist(x - you.x, y - you.y);
-    if (d < reach) quakeAmt = Math.min(18, quakeAmt + power * 3.5 * (1 - d / reach) ** 1.5);
-  }
-  function boom(x: number, y: number, power: number, tint: number) {
-    fx.blast(x, y, power, tint);
-    quake(x, y, power);
+    if (d < reach) G[QUAKE] = Math.min(18, G[QUAKE]! + power * 3.5 * (1 - d / reach) ** 1.5);
   }
 
   // ---------- Combat ----------
   function freeShell() {
-    for (const s of shells) if (!s.on) return s;
+    for (let i = 0; i < shells.length; i++) if (!shells[i]!.on) return shells[i]!;
     return null;
   }
   function fire(t: Tank) {
@@ -467,9 +551,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     t.cool = t.you ? (t.rapid > 0 ? 0.1 : 0.19) : t.rapid > 0 ? 0.22 : 0.5 + R() * 0.35;
     if (t.you && t.rapid <= 0 && (t.heat += 0.16) >= 1) {
       t.hot = 1.4;
-      fx.word(t.x, t.y - 34, W_HOT, 2, 16);
+      ((FQ[0] = t.x), (FQ[1] = t.y - 34), (FQ[2] = W_HOT), (FQ[3] = 2), (FQ[4] = 16), fxPush(FX_WORD));
     }
-    fx.spawn(1, t.x + Math.cos(t.ta) * len, t.y + Math.sin(t.ta) * len, 0, 0, 9, 0.12, 0);
+    ((FQ[0] = 1), (FQ[1] = t.x + Math.cos(t.ta) * len), (FQ[2] = t.y + Math.sin(t.ta) * len), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 9), (FQ[6] = 0.12), (FQ[7] = 0), fxPush(FX_SPAWN));
     e.events.emit("shot", t.i);
   }
   /** Long shot: lock on for a beat (laser sight), then a guided round crosses the field. */
@@ -477,7 +561,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (t.rail <= 0 || t.charge > 0 || target < 0 || !t.alive || t.drop < 1) return;
     t.charge = 0.45;
     t.chargeT = target;
-    if (t.you) fx.word(tanks[target]!.x, tanks[target]!.y - 34, W_LOCK, 4, 14);
+    if (t.you) ((FQ[0] = tanks[target]!.x), (FQ[1] = tanks[target]!.y - 34), (FQ[2] = W_LOCK), (FQ[3] = 4), (FQ[4] = 14), fxPush(FX_WORD));
     e.events.emit("lock", t.i);
   }
   function fireRail(t: Tank) {
@@ -499,9 +583,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     s.owner = t.i;
     t.recoil = 11;
     t.flash = 0.14;
-    fx.spawn(1, s.x, s.y, 0, 0, 16, 0.16, 1);
-    fx.spawn(2, s.x, s.y, 0, 0, 8, 0.3, 1);
-    if (t.you) quakeAmt = Math.min(18, quakeAmt + 3);
+    ((FQ[0] = 1), (FQ[1] = s.x), (FQ[2] = s.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 16), (FQ[6] = 0.16), (FQ[7] = 1), fxPush(FX_SPAWN));
+    ((FQ[0] = 2), (FQ[1] = s.x), (FQ[2] = s.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 8), (FQ[6] = 0.3), (FQ[7] = 1), fxPush(FX_SPAWN));
+    if (t.you) G[QUAKE] = Math.min(18, G[QUAKE]! + 3);
     e.events.emit("shot", t.i, 0, 0, 0, 1.5);
   }
   function kill(t: Tank, by: number, word = W_BOOM) {
@@ -519,19 +603,19 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       k.hp = Math.min(MAXHP, k.hp + 1); // scavenge: every kill patches you up a little
       k.streak = k.streakT > 0 ? k.streak + 1 : 1;
       k.streakT = 3;
-      if (k.streak === 2) fx.word(k.x, k.y - 40, W_DOUBLE, 1, 18);
-      if (k.streak >= 3) fx.word(k.x, k.y - 40, W_RAMPAGE, 3, 20);
-      if (k.you) fx.word(k.x, k.y - 26, W_PLUS, 5, 18);
+      if (k.streak === 2) ((FQ[0] = k.x), (FQ[1] = k.y - 40), (FQ[2] = W_DOUBLE), (FQ[3] = 1), (FQ[4] = 18), fxPush(FX_WORD));
+      if (k.streak >= 3) ((FQ[0] = k.x), (FQ[1] = k.y - 40), (FQ[2] = W_RAMPAGE), (FQ[3] = 3), (FQ[4] = 20), fxPush(FX_WORD));
+      if (k.you) ((FQ[0] = k.x), (FQ[1] = k.y - 26), (FQ[2] = W_PLUS), (FQ[3] = 5), (FQ[4] = 18), fxPush(FX_WORD));
       reward(k);
     }
-    boom(t.x, t.y, 2.2, 3);
-    boom(t.x + (R() - 0.5) * 30, t.y + (R() - 0.5) * 30, 1.2, 1);
+    ((FQ[0] = t.x), (FQ[1] = t.y), (FQ[2] = 2.2), (FQ[3] = 3), boomQ());
+    ((FQ[0] = t.x + (R() - 0.5) * 30), (FQ[1] = t.y + (R() - 0.5) * 30), (FQ[2] = 1.2), (FQ[3] = 1), boomQ());
     for (let n = 0; n < 9; n++) {
       const a = R() * TAU, sp = 90 + R() * 140;
-      fx.spawn(0, t.x, t.y, Math.cos(a) * sp, Math.sin(a) * sp, (7 + R() * 7) * (scale / 1.4), 1.1, n % 3 ? 5 : 7, R() * TAU, (R() - 0.5) * 24);
+      ((FQ[0] = 0), (FQ[1] = t.x), (FQ[2] = t.y), (FQ[3] = Math.cos(a) * sp), (FQ[4] = Math.sin(a) * sp), (FQ[5] = (7 + R() * 7) * (scale / 1.4)), (FQ[6] = 1.1), (FQ[7] = n % 3 ? 5 : 7), (FQ[8] = R() * TAU), (FQ[9] = (R() - 0.5) * 24), fxPush(FX_SPAWN));
     }
-    fx.word(t.x, t.y - 18, word === W_BOOM ? (R() * 5) | 0 : word, 3, word === W_NUKE ? 24 : 18);
-    if (t.you) (quakeAmt = 16), (buzz += 220);
+    ((FQ[0] = t.x), (FQ[1] = t.y - 18), (FQ[2] = word === W_BOOM ? (R() * 5) | 0 : word), (FQ[3] = 3), (FQ[4] = word === W_NUKE ? 24 : 18), fxPush(FX_WORD));
+    if (t.you) (G[QUAKE] = 16), (buzz += 220);
     e.events.emit("boom", t.i, by);
     feedK[feedN % 8] = k ? k.i : -1;
     feedV[feedN % 8] = t.i;
@@ -555,32 +639,39 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function damage(t: Tank, by: number, amount: number, word = W_BOOM) {
     if (!t.alive || t.drop < 1) return false;
     if (t.shield > 0) {
-      fx.spawn(2, t.x, t.y, 0, 0, 18, 0.3, 4);
+      ((FQ[0] = 2), (FQ[1] = t.x), (FQ[2] = t.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 18), (FQ[6] = 0.3), (FQ[7] = 4), fxPush(FX_SPAWN));
       return false;
     }
     t.hp -= amount;
     t.lastHit = by;
-    if (t.you) (quakeAmt = Math.min(18, quakeAmt + amount * 2.5)), (buzz += 35 * amount); // worse the harder you're hit
+    if (t.you) (G[QUAKE] = Math.min(18, G[QUAKE]! + amount * 2.5)), (buzz += 35 * amount); // worse the harder you're hit
     e.events.emit("hit", t.i);
     if (t.hp <= 0) kill(t, by, word);
     return true;
   }
 
   // ---------- Airstrikes: a bomber crosses the field and the bombs walk over the target ----------
-  function callStrike(owner: number, x: number, y: number) {
-    const t = tanks[owner]!;
+  /** owner calls an airstrike on (F[KX], F[KY]). */
+  function callStrike(owner: number) {
+    const x = F[KX]!, y = F[KY]!, t = tanks[owner]!;
     if (t.strikes <= 0 || !t.alive || t.drop < 1) return false;
     let m: Mark | null = null, p: Plane | null = null;
-    for (const q of marks) if (!q.on) (m = q);
-    for (const q of planes) if (!q.on) (p = q);
+    for (let i = 0; i < marks.length; i++) if (!marks[i]!.on) m = marks[i]!;
+    for (let i = 0; i < planes.length; i++) if (!planes[i]!.on) p = planes[i]!;
     if (!m || !p) return false;
     t.strikes--;
     if (owner === 0) cStrike++;
     const carpet = t.carpet > 0;
     if (carpet) t.carpet--;
     // The bomber comes in over the caller's shoulder.
-    const d0 = dist(x - t.x, y - t.y), a = d0 > 40 ? Math.atan2(y - t.y, x - t.x) : R() * TAU;
-    const ca = Math.cos(a), sa = Math.sin(a), speed = 820, reach = dist(W, H) * 0.65;
+    F[HX] = x - t.x;
+    F[HY] = y - t.y;
+    hyp();
+    const a = F[HO]! > 40 ? Math.atan2(y - t.y, x - t.x) : R() * TAU;
+    F[HX] = W;
+    F[HY] = H;
+    hyp();
+    const ca = Math.cos(a), sa = Math.sin(a), speed = 820, reach = F[HO]! * 0.65;
     p.on = true;
     p.owner = owner;
     p.a = a;
@@ -590,10 +681,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     p.vy = sa * speed;
     p.t = (reach * 2) / speed;
     const n = carpet ? 7 : 3, gap = (carpet ? 56 : 42) * (scale / 1.4);
-    let last = 0;
+    F[LAST] = 0; // when the last bomb lands
     for (let k = 0; k < n; k++) {
       let b: Bomb | null = null;
-      for (const q of bombs) if (!q.on) (b = q);
+      for (let i = 0; i < bombs.length; i++) if (!bombs[i]!.on) b = bombs[i]!;
       if (!b) break;
       const off = (k - (n - 1) / 2) * gap, side = (R() - 0.5) * 26;
       b.on = true;
@@ -603,73 +694,83 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       b.y = y + sa * off + ca * side;
       b.wait = (reach + off) / speed;
       b.fall = 0.5;
-      last = Math.max(last, b.wait + b.fall);
+      F[LAST] = Math.max(F[LAST]!, b.wait + b.fall);
     }
     m.on = true;
     m.owner = owner;
     m.x = x;
     m.y = y;
-    m.t = m.max = last + 0.1;
-    if (carpet) fx.word(x, y - 70, W_CARPET, 3, 22);
+    m.t = m.max = F[LAST]! + 0.1;
+    if (carpet) ((FQ[0] = x), (FQ[1] = y - 70), (FQ[2] = W_CARPET), (FQ[3] = 3), (FQ[4] = 22), fxPush(FX_WORD));
     e.events.emit("strike", owner);
     return true;
   }
-  function later(x: number, y: number, p: number, c: number, t: number) {
-    for (const b of booms)
+  /** A follow-up blast at (FQ[0], FQ[1]), power FQ[2], tint FQ[3], FQ[4] seconds from now. */
+  function laterQ() {
+    for (let i = 0; i < booms.length; i++) {
+      const b = booms[i]!;
       if (!b.on) {
         b.on = true;
-        b.x = x;
-        b.y = y;
-        b.p = p;
-        b.c = c;
-        b.t = t;
+        b.x = FQ[0]!;
+        b.y = FQ[1]!;
+        b.p = FQ[2]!;
+        b.c = FQ[3]!;
+        b.t = FQ[4]!;
         return;
       }
+    }
   }
   function detonate(b: Bomb) {
     // The Battlefield hero's airstrike: one big blast, two more a beat later, black scorch.
     const p = b.main ? 3.2 : 2.4;
-    boom(b.x, b.y, p, 3);
-    later(b.x + (R() - 0.5) * 60, b.y + (R() - 0.5) * 48, 1.6, 1, 0.09);
-    later(b.x + (R() - 0.5) * 60, b.y + (R() - 0.5) * 48, 1.3, 4, 0.19);
-    if (b.main && R() < 0.6) fx.word(b.x, b.y - 30, W_STRIKE, 3, 22);
+    ((FQ[0] = b.x), (FQ[1] = b.y), (FQ[2] = p), (FQ[3] = 3), boomQ());
+    ((FQ[0] = b.x + (R() - 0.5) * 60), (FQ[1] = b.y + (R() - 0.5) * 48), (FQ[2] = 1.6), (FQ[3] = 1), (FQ[4] = 0.09), laterQ());
+    ((FQ[0] = b.x + (R() - 0.5) * 60), (FQ[1] = b.y + (R() - 0.5) * 48), (FQ[2] = 1.3), (FQ[3] = 4), (FQ[4] = 0.19), laterQ());
+    if (b.main && R() < 0.6) ((FQ[0] = b.x), (FQ[1] = b.y - 30), (FQ[2] = W_STRIKE), (FQ[3] = 3), (FQ[4] = 22), fxPush(FX_WORD));
     const rad = (b.main ? 95 : 80) * (scale / 1.4);
-    for (const t of tanks) {
+    // Index loops and F, not for-of and locals: a rare function may run unoptimized-ish (Maglev), where both allocate.
+    for (let i = 0; i < tanks.length; i++) {
+      const t = tanks[i]!;
       if (t.team === tanks[b.owner]!.team) continue;
-      const d = dist(t.x - b.x, t.y - b.y);
-      if (d < rad) damage(t, b.owner, d < rad * 0.6 ? MAXHP : 3, W_STRIKE);
+      F[HX] = t.x - b.x;
+      F[HY] = t.y - b.y;
+      hyp();
+      if (F[HO]! < rad) damage(t, b.owner, F[HO]! < rad * 0.6 ? MAXHP : 3, W_STRIKE);
     }
-    for (const k of blocks) if (k.hp > 0 && dist(k.x + k.w / 2 - b.x, k.y + k.h / 2 - b.y) < rad + 20) wreckBlock(k);
-    knockAround(b.x, b.y, rad * 2, 2.4);
+    for (let i = 0; i < blocks.length; i++) {
+      const k = blocks[i]!;
+      if (k.hp > 0 && ((F[HX] = k.x + k.w / 2 - b.x), (F[HY] = k.y + k.h / 2 - b.y), hyp(), F[HO]! < rad + 20)) wreckBlock(k);
+    }
+    if (embed) knockAround(b.x, b.y, rad * 2, 2.4);
     e.events.emit("boom", -1, 0, 0, 0, 1.4);
   }
   function nuke(owner: number) {
-    if (nukeT > 0) return;
-    nukeT = 2.6;
+    if (G[NUKE_T]! > 0) return;
+    G[NUKE_T] = 2.6;
     nukeBy = owner;
     e.events.emit("nuke", owner);
   }
   function nukeGoesOff() {
-    whiteout = 1;
+    G[WHITE] = 1;
     for (const t of tanks) if (t.team !== tanks[nukeBy]!.team && t.alive && t.drop >= 1) (t.shield = 0), kill(t, nukeBy, W_NUKE);
     for (const b of blocks) if (b.hp > 0) wreckBlock(b);
-    for (let k = 0; k < 9; k++) later(40 + R() * (W - 80), 70 + R() * (H - 120), 2.4 + R() * 1.6, (k % 4) + 1, k * 0.08);
-    knockAround(W / 2, H / 2, Math.max(W, H), 2.6);
-    if (!demo) quakeAmt = 18;
+    for (let k = 0; k < 9; k++) ((FQ[0] = 40 + R() * (W - 80)), (FQ[1] = 70 + R() * (H - 120)), (FQ[2] = 2.4 + R() * 1.6), (FQ[3] = (k % 4) + 1), (FQ[4] = k * 0.08), laterQ());
+    if (embed) knockAround(W / 2, H / 2, Math.max(W, H), 2.6);
+    if (!demo) G[QUAKE] = 18;
   }
   function wreckBlock(b: Block) {
     b.hp = 0;
     b.back = 12;
     for (let n = 0; n < 8; n++) {
       const a = R() * TAU, sp = 60 + R() * 140;
-      fx.spawn(0, b.x + b.w / 2, b.y + b.h / 2, Math.cos(a) * sp, Math.sin(a) * sp, 6 + R() * 6, 0.8, 6, R() * TAU, (R() - 0.5) * 18);
+      ((FQ[0] = 0), (FQ[1] = b.x + b.w / 2), (FQ[2] = b.y + b.h / 2), (FQ[3] = Math.cos(a) * sp), (FQ[4] = Math.sin(a) * sp), (FQ[5] = 6 + R() * 6), (FQ[6] = 0.8), (FQ[7] = 6), (FQ[8] = R() * TAU), (FQ[9] = (R() - 0.5) * 18), fxPush(FX_SPAWN));
     }
   }
 
   // ---------- Power tiles (the blinking grid) and supply crates ----------
   function lightTile(show = false) {
     let s: Tile | null = null, n = 0;
-    for (const q of tiles) q.on ? n++ : (s = q);
+    for (let i = 0; i < tiles.length; i++) tiles[i]!.on ? n++ : (s = tiles[i]!);
     if (!s || cols < 3 || rows < 3 || (!show && n >= 8)) return;
     s.on = true;
     s.c = 1 + Math.floor(R() * (cols - 2));
@@ -684,8 +785,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (t.you) cTile++;
     const cx = (s.c + 0.5) * T, cy = (s.r + 0.5) * T;
     if (s.type === MINE) {
-      boom(cx, cy, 2.6, 3);
-      fx.word(cx, cy - 26, W_MINE, 3, 20);
+      ((FQ[0] = cx), (FQ[1] = cy), (FQ[2] = 2.6), (FQ[3] = 3), boomQ());
+      ((FQ[0] = cx), (FQ[1] = cy - 26), (FQ[2] = W_MINE), (FQ[3] = 3), (FQ[4] = 20), fxPush(FX_WORD));
       for (const o2 of tanks) if (dist(o2.x - cx, o2.y - cy) < 80 * (scale / 1.4)) damage(o2, -1, 3);
       e.events.emit("boom", -1);
       return;
@@ -696,8 +797,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (s.type === STRIKE) t.strikes = Math.min(STRIKE_MAX, t.strikes + 1);
     if (s.type === HEAL) t.hp = Math.min(MAXHP, t.hp + 2);
     if (s.type === AMMO) t.rail = Math.min(RAIL_MAX, t.rail + 1);
-    fx.spawn(2, cx, cy, 0, 0, 20, 0.5, s.type === STRIKE ? 3 : s.type === AMMO ? 1 : 5);
-    fx.word(cx, cy - 22, TILE_WORD[s.type]!, s.type === STRIKE ? 3 : s.type === AMMO ? 1 : 5, 15);
+    ((FQ[0] = 2), (FQ[1] = cx), (FQ[2] = cy), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 20), (FQ[6] = 0.5), (FQ[7] = s.type === STRIKE ? 3 : s.type === AMMO ? 1 : 5), fxPush(FX_SPAWN));
+    ((FQ[0] = cx), (FQ[1] = cy - 22), (FQ[2] = TILE_WORD[s.type]!), (FQ[3] = s.type === STRIKE ? 3 : s.type === AMMO ? 1 : 5), (FQ[4] = 15), fxPush(FX_WORD));
     e.events.emit("power", t.i);
   }
   function dropCrate() {
@@ -705,7 +806,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     openSpot(spot);
     const x = spot[0]!, y = spot[1]!, r = R(), kind = r < 0.38 ? 0 : r < 0.66 ? 1 : r < 0.9 ? 2 : 3;
     supply.spawn(x, y, kind);
-    fx.word(x, y - 130, W_SUPPLY, 1, 18);
+    ((FQ[0] = x), (FQ[1] = y - 130), (FQ[2] = W_SUPPLY), (FQ[3] = 1), (FQ[4] = 18), fxPush(FX_WORD));
     feedK[feedN % 8] = -2;
     feedV[feedN % 8] = kind;
     feedN++;
@@ -721,12 +822,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (c.kind === 1) t.rail = Math.min(RAIL_MAX, t.rail + 2);
     if (c.kind === 2 || c.kind === 3) t.strikes = Math.min(STRIKE_MAX, t.strikes + 1);
     if (c.kind === 3) t.rail = Math.min(RAIL_MAX, t.rail + 1);
-    fx.spawn(2, c.x, c.y, 0, 0, 26, 0.6, 1);
+    ((FQ[0] = 2), (FQ[1] = c.x), (FQ[2] = c.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 26), (FQ[6] = 0.6), (FQ[7] = 1), fxPush(FX_SPAWN));
     for (let n = 0; n < 8; n++) {
       const a = R() * TAU, sp = 80 + R() * 120;
-      fx.spawn(0, c.x, c.y, Math.cos(a) * sp, Math.sin(a) * sp, 5 + R() * 4, 0.7, 1 + (n % 2) * 4, R() * TAU, (R() - 0.5) * 16);
+      ((FQ[0] = 0), (FQ[1] = c.x), (FQ[2] = c.y), (FQ[3] = Math.cos(a) * sp), (FQ[4] = Math.sin(a) * sp), (FQ[5] = 5 + R() * 4), (FQ[6] = 0.7), (FQ[7] = 1 + (n % 2) * 4), (FQ[8] = R() * TAU), (FQ[9] = (R() - 0.5) * 16), fxPush(FX_SPAWN));
     }
-    fx.word(c.x, c.y - 26, CRATE_WORD[c.kind]!, 1, 18);
+    ((FQ[0] = c.x), (FQ[1] = c.y - 26), (FQ[2] = CRATE_WORD[c.kind]!), (FQ[3] = 1), (FQ[4] = 18), fxPush(FX_WORD));
     e.events.emit("power", t.i);
   }
 
@@ -734,9 +835,13 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const live = (k: number) => k >= 0 && tanks[k]!.alive && tanks[k]!.drop >= 1;
   const nearestEnemy = (t: Tank, range: number) => {
     let best = -1, bd = range;
-    for (const o2 of tanks) {
+    for (let i = 0; i < tanks.length; i++) {
+      const o2 = tanks[i]!;
       if (o2.team === t.team || !o2.alive || o2.drop < 1) continue;
-      const d = dist(o2.x - t.x, o2.y - t.y);
+      F[HX] = o2.x - t.x;
+      F[HY] = o2.y - t.y;
+      hyp();
+      const d = F[HO]!;
       if (d < bd) (bd = d), (best = o2.i);
     }
     return best;
@@ -744,26 +849,49 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   /** The enemy (of `team`) closest to a point (a tap, the mouse, a tank to protect). */
   const nearestTo = (x: number, y: number, range: number, team: number) => {
     let best = -1, bd = range;
-    for (const o2 of tanks) {
+    for (let i = 0; i < tanks.length; i++) {
+      const o2 = tanks[i]!;
       if (o2.team === team || !o2.alive || o2.drop < 1) continue;
-      const d = dist(o2.x - x, o2.y - y);
+      F[HX] = o2.x - x;
+      F[HY] = o2.y - y;
+      hyp();
+      const d = F[HO]!;
       if (d < bd) (bd = d), (best = o2.i);
     }
     return best;
   };
-  const turn = (from: number, to: number, max: number) => {
-    const d = Math.atan2(Math.sin(to - from), Math.cos(to - from));
-    return from + Math.sign(d) * Math.min(Math.abs(d), max);
-  };
-  function drive(t: Tank, ax: number, ay: number, dt: number) {
-    const m = Math.min(1, dist(ax, ay));
+  /** Turn F[TF] toward F[TT] by at most F[TM]: the result in F[TO]. */
+  function turnF() {
+    const from = F[TF]!, to = F[TT]!, max = F[TM]!, d = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+    F[TO] = from + Math.sign(d) * Math.min(Math.abs(d), max);
+  }
+  const turn = (from: number, to: number, max: number) => ((F[TF] = from), (F[TT] = to), (F[TM] = max), turnF(), F[TO]!);
+  /** The hull toward t.a's target angle at most `max`; the turret (ta) the same. */
+  const hullTo = (t: Tank) => (turnF(), (t.a = F[TO]!));
+  const turretTo = (t: Tank) => (turnF(), (t.ta = F[TO]!));
+  /** Drive tank t by the stick (F[DX], F[DY]) for F[DT] seconds. */
+  function drive(t: Tank) {
+    const ax = F[DX]!, ay = F[DY]!, dt = F[DT]!;
+    F[HX] = ax;
+    F[HY] = ay;
+    hyp();
+    const m = Math.min(1, F[HO]!);
     if (m < 0.05) return;
-    t.a = turn(t.a, Math.atan2(ay, ax), 7 * dt);
+    F[TF] = t.a;
+    F[TT] = Math.atan2(ay, ax);
+    F[TM] = 7 * dt;
+    hullTo(t);
     const sp = 150 * m * (scale / 1.4) * dt, nx = t.x + Math.cos(t.a) * sp, ny = t.y + Math.sin(t.a) * sp, rad = 14 * scale;
-    if (!blocked(nx, t.y, rad)) t.x = nx;
-    if (!blocked(t.x, ny, rad)) t.y = ny;
+    F[BX] = nx;
+    F[BY] = t.y;
+    F[BR] = rad;
+    if (!blockedF()) t.x = nx;
+    F[BX] = t.x;
+    F[BY] = ny;
+    F[BR] = rad;
+    if (!blockedF()) t.y = ny;
     t.tread += sp * 0.15;
-    if (t.you) cMoved += sp;
+    if (t.you) G[MOVED]! += sp;
   }
   /** A platoon's lead tank: you for yours, else its lowest-numbered tank on the ground. */
   function leaderOf(t: Tank) {
@@ -777,11 +905,15 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (t.think <= 0) {
       t.think = 0.35 + R() * 0.4;
       const h = lead.lastHit;
-      t.target = live(h) && tanks[h]!.team !== t.team && dist(tanks[h]!.x - lead.x, tanks[h]!.y - lead.y) < 560 ? h : nearestTo(lead.x, lead.y, 420, t.team);
+      t.target = live(h) && tanks[h]!.team !== t.team && within(tanks[h]!, lead, 560) ? h : nearestTo(lead.x, lead.y, 420, t.team);
       if (t.target < 0) t.target = nearestEnemy(t, 360);
       if (t.target >= 0) {
-        const o2 = tanks[t.target]!, d = dist(o2.x - t.x, o2.y - t.y);
-        if (t.strikes > 0 && R() < 0.2) callStrike(t.i, o2.x, o2.y);
+        const o2 = tanks[t.target]!;
+        F[HX] = o2.x - t.x;
+        F[HY] = o2.y - t.y;
+        hyp();
+        const d = F[HO]!;
+        if (t.strikes > 0 && R() < 0.2) ((F[KX] = o2.x), (F[KY] = o2.y), callStrike(t.i));
         else if (t.rail > 0 && d > 380 && R() < 0.3) charge(t, o2.i);
       }
     }
@@ -789,24 +921,32 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const back = lead.a + Math.PI, off = t.slot === 1 ? 0.85 : t.slot === 2 ? -0.85 : 0, r = (t.slot === 3 ? 78 : 58) * scale;
     let gx = lead.x + Math.cos(back + off) * r, gy = lead.y + Math.sin(back + off) * r;
     const o2 = t.target >= 0 ? tanks[t.target]! : null;
-    if (o2 && dist(o2.x - lead.x, o2.y - lead.y) < 300) (gx += (o2.x - gx) * 0.25), (gy += (o2.y - gy) * 0.25); // step up between the leader and the threat
+    if (o2 && within(o2, lead, 300)) (gx += (o2.x - gx) * 0.25), (gy += (o2.y - gy) * 0.25); // step up between the leader and the threat
     if (t.hp <= 2)
       for (const s of tiles)
-        if (s.on && s.roll <= 0 && s.type === HEAL && dist((s.c + 0.5) * T - t.x, (s.r + 0.5) * T - t.y) < 220) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
+        if (s.on && s.roll <= 0 && s.type === HEAL && ((F[HX] = (s.c + 0.5) * T - t.x), (F[HY] = (s.r + 0.5) * T - t.y), hyp(), F[HO]! < 220)) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
     gx = Math.max(30, Math.min(W - 30, gx));
     gy = Math.max(60, Math.min(H - 30, gy));
-    const dx = gx - t.x, dy = gy - t.y, d = dist(dx, dy);
-    if (d > 14) drive(t, dx / d, dy / d, dt * (d > 140 ? 1.05 : 0.8));
+    const dx = gx - t.x, dy = gy - t.y;
+    F[HX] = dx;
+    F[HY] = dy;
+    hyp();
+    const d = F[HO]!;
+    if (d > 14) (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt * (d > 140 ? 1.05 : 0.8)), drive(t);
     gun(t, dt);
   }
   function bot(t: Tank, dt: number) {
     if (practice) {
       // Practice dummies: TARGETs stand still, MOVERs roll about. Nobody shoots.
-      if (t.i <= 3) return void (t.ta = turn(t.ta, t.a + Math.sin(e.time / 0.9 + t.i), 1.5 * dt));
+      if (t.i <= 3) return void ((F[TF] = t.ta), (F[TT] = t.a + Math.sin(e.time / 0.9 + t.i)), (F[TM] = 1.5 * dt), turretTo(t));
       if ((t.think -= dt) <= 0) (t.think = 2 + R() * 2), (t.gx = 60 + R() * (W - 120)), (t.gy = 90 + R() * (H - 160));
-      const dx = t.gx - t.x, dy = t.gy - t.y, d = dist(dx, dy);
-      if (d > 16) drive(t, dx / d, dy / d, dt * 0.55);
-      t.ta = turn(t.ta, t.a, 3 * dt);
+      const dx = t.gx - t.x, dy = t.gy - t.y;
+      F[HX] = dx;
+      F[HY] = dy;
+      hyp();
+      const d = F[HO]!;
+      if (d > 16) (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt * 0.55), drive(t);
+      (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 3 * dt), turretTo(t);
       return;
     }
     if (platoon) {
@@ -819,11 +959,15 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       t.target = nearestEnemy(t, 9999);
       // Hurt bots go for health; everyone likes a supply crate.
       let gx = -1, gy = 0;
-      for (let i = 0; i < supply.count; i++) if (supply.landed(i) && dist(supply.x[i]! - t.x, supply.y[i]! - t.y) < 520 && R() < 0.6) (gx = supply.x[i]!), (gy = supply.y[i]!);
+      for (let i = 0; i < supply.count; i++) if (supply.landed(i) && ((F[HX] = supply.x[i]! - t.x), (F[HY] = supply.y[i]! - t.y), hyp(), F[HO]! < 520) && R() < 0.6) (gx = supply.x[i]!), (gy = supply.y[i]!);
       if (gx < 0)
         for (const s of tiles) {
           if (!s.on || s.roll > 0 || s.type === MINE) continue;
-          const sx = (s.c + 0.5) * T, sy = (s.r + 0.5) * T, d = dist(sx - t.x, sy - t.y);
+          const sx = (s.c + 0.5) * T, sy = (s.r + 0.5) * T;
+          F[HX] = sx - t.x;
+          F[HY] = sy - t.y;
+          hyp();
+          const d = F[HO]!;
           if (d < 380 && (s.type === HEAL ? t.hp <= 3 || R() < 0.3 : R() < 0.45)) (gx = sx), (gy = sy);
         }
       if (gx >= 0) (t.gx = gx), (t.gy = gy);
@@ -833,15 +977,23 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         t.gy = Math.max(60, Math.min(H - 30, o2.y + Math.sin(a) * keep));
       } else (t.gx = 40 + R() * (W - 80)), (t.gy = 70 + R() * (H - 120));
       if (t.target >= 0) {
-        const o2 = tanks[t.target]!, d = dist(o2.x - t.x, o2.y - t.y);
-        if (t.strikes > 0 && R() < 0.35) callStrike(t.i, o2.x, o2.y);
+        const o2 = tanks[t.target]!;
+        F[HX] = o2.x - t.x;
+        F[HY] = o2.y - t.y;
+        hyp();
+        const d = F[HO]!;
+        if (t.strikes > 0 && R() < 0.35) ((F[KX] = o2.x), (F[KY] = o2.y), callStrike(t.i));
         else if (t.rail > 0 && d > 380 && R() < 0.4) charge(t, o2.i);
       }
     }
-    const dx = t.gx - t.x, dy = t.gy - t.y, d = dist(dx, dy);
+    const dx = t.gx - t.x, dy = t.gy - t.y;
+    F[HX] = dx;
+    F[HY] = dy;
+    hyp();
+    const d = F[HO]!;
     if (d > 16) {
       const before = t.x + t.y;
-      drive(t, dx / d, dy / d, dt * 0.85);
+      (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt * 0.85), drive(t);
       if (Math.abs(t.x + t.y - before) < 0.01) t.think = Math.min(t.think, 0.05); // stuck: rethink
     }
     gun(t, dt);
@@ -851,10 +1003,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const o2 = t.target >= 0 ? tanks[t.target]! : null;
     if (o2 && o2.alive && o2.drop >= 1) {
       const aim = Math.atan2(o2.y - t.y, o2.x - t.x);
-      t.ta = turn(t.ta, aim, 4.5 * dt);
+      (F[TF] = t.ta), (F[TT] = aim), (F[TM] = 4.5 * dt), turretTo(t);
       const err = Math.abs(Math.atan2(Math.sin(aim - t.ta), Math.cos(aim - t.ta)));
-      if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && dist(o2.x - t.x, o2.y - t.y) < 460) fire(t);
-    } else t.ta = turn(t.ta, t.a, 3 * dt);
+      if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && within(o2, t, 460)) fire(t);
+    } else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 3 * dt), turretTo(t);
   }
   /** What your turret is on: the lock, else auto-aim's pick, else nothing (-1). */
   function aimTarget() {
@@ -866,13 +1018,13 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function player(dt: number) {
     const t = you;
-    drive(t, input.axis("left", "right", 0), input.axis("up", "down", 1), dt);
+    (F[DX] = input.axis("left", "right", 0)), (F[DY] = input.axis("up", "down", 1)), (F[DT] = dt), drive(t);
     const touch = input.stick.active || coarse.matches, aim = aimTarget();
     if (aim >= 0) {
       const o2 = tanks[aim]!;
-      t.ta = turn(t.ta, Math.atan2(o2.y - t.y, o2.x - t.x), 8 * dt);
-    } else if (!touch || input.pointer.down) t.ta = turn(t.ta, Math.atan2(input.pointer.y - t.y, input.pointer.x - t.x), 10 * dt);
-    else t.ta = turn(t.ta, t.a, 4 * dt);
+      (F[TF] = t.ta), (F[TT] = Math.atan2(o2.y - t.y, o2.x - t.x)), (F[TM] = 8 * dt), turretTo(t);
+    } else if (!touch || input.pointer.down) (F[TF] = t.ta), (F[TT] = Math.atan2(input.pointer.y - t.y, input.pointer.x - t.x)), (F[TM] = 10 * dt), turretTo(t);
+    else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 4 * dt), turretTo(t);
     if ((input.down("fire") || input.pointer.down || fireQ) && !targeting && t.cool <= 0 && t.hot <= 0 && t.charge <= 0) fire(t);
     if (t.cool <= 0) fireQ = false; // a quick tap on FIRE always gets its shot
     if (longQ) {
@@ -883,7 +1035,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (strikeT) (strikeT = false), (targeting = !targeting && t.strikes > 0);
     if (strikeQ) {
       strikeQ = false;
-      if (callStrike(0, strikeX, strikeY)) targeting = false;
+      if (((F[KX] = strikeX), (F[KY] = strikeY), callStrike(0))) targeting = false;
     }
     if (t.strikes <= 0) targeting = false;
   }
@@ -894,14 +1046,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function human(t: Tank, b: number, dt: number) {
     const mx = b & 3, my = (b >>> 2) & 3, aimMode = (b >>> 7) & 3;
     const px = (((b >>> 16) & 255) + 0.5) * (W / 256), py = (((b >>> 24) & 255) + 0.5) * (H / 256);
-    drive(t, mx === 1 ? -1 : mx === 2 ? 1 : 0, my === 1 ? -1 : my === 2 ? 1 : 0, dt);
+    (F[DX] = mx === 1 ? -1 : mx === 2 ? 1 : 0), (F[DY] = my === 1 ? -1 : my === 2 ? 1 : 0), (F[DT] = dt), drive(t);
     const aim = aimMode === 1 ? nearestEnemy(t, 520) : -1;
-    if (aim >= 0) t.ta = turn(t.ta, Math.atan2(tanks[aim]!.y - t.y, tanks[aim]!.x - t.x), 8 * dt);
-    else if (aimMode === 0) t.ta = turn(t.ta, Math.atan2(py - t.y, px - t.x), 10 * dt);
-    else t.ta = turn(t.ta, t.a, 4 * dt);
+    if (aim >= 0) (F[TF] = t.ta), (F[TT] = Math.atan2(tanks[aim]!.y - t.y, tanks[aim]!.x - t.x)), (F[TM] = 8 * dt), turretTo(t);
+    else if (aimMode === 0) (F[TF] = t.ta), (F[TT] = Math.atan2(py - t.y, px - t.x)), (F[TM] = 10 * dt), turretTo(t);
+    else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 4 * dt), turretTo(t);
     if (b & 16 && t.cool <= 0 && t.hot <= 0 && t.charge <= 0) fire(t);
     if (b & 32) charge(t, aim >= 0 ? aim : nearestTo(px, py, 9999, t.team));
-    if (b & 64) callStrike(t.i, px, py);
+    if (b & 64) (F[KX] = px), (F[KY] = py), callStrike(t.i);
   }
   /** This peer's controls as one input word (latched taps are spent here, once). */
   function encode() {
@@ -928,7 +1080,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function worldHash() {
     hs[0] = 0x811c9dc5;
     mix(R.state);
-    mix(clock);
+    mix(G[CLK]!);
     mix(state === "play" ? 1 : state === "count" ? 2 : state === "end" ? 3 : 0);
     for (let i = 0; i < N; i++) {
       const t = tanks[i]!;
@@ -942,6 +1094,30 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   // presence's step hands every player's input for the frame here, then runs world().
   let netIn: Uint32Array = new Uint32Array(Math.max(1, P));
+
+  /** A live tank sits on block b (fizlet/collide circleRect, radius 20, inline): it can't grow back yet. */
+  function tankOn(b: Block) {
+    const x = b.x, y = b.y, w = b.w, h = b.h;
+    for (let i = 0; i < tanks.length; i++) {
+      const t = tanks[i]!;
+      if (!t.alive) continue;
+      const cx = t.x, cy = t.y, dx = cx - (cx < x ? x : cx > x + w ? x + w : cx), dy = cy - (cy < y ? y : cy > y + h ? y + h : cy);
+      if (dx * dx + dy * dy < 20 * 20) return true;
+    }
+    return false;
+  }
+  /** Shell s, going to (F[SX], F[SY]) this step, touches tank t (radius F[SR]): fizlet/collide segCircle(...) >= 0, inline. */
+  function shellHits(s: Shell, t: Tank) {
+    const x0 = s.x, y0 = s.y, cx = t.x, cy = t.y, r = F[SR]!;
+    const dx = F[SX]! - x0, dy = F[SY]! - y0, ox = x0 - cx, oy = y0 - cy;
+    const a = dx * dx + dy * dy, b = 2 * (ox * dx + oy * dy), c = ox * ox + oy * oy - r * r;
+    if (c <= 0) return true;
+    if (a === 0) return false;
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) return false;
+    const u = (-b - Math.sqrt(disc)) / (2 * a);
+    return u >= 0 && u <= 1;
+  }
 
   e.add({
     read() {
@@ -963,6 +1139,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     // Net play: presence runs world() once per lockstep frame instead.
     step: net ? undefined : (_, dt) => world(dt),
     render() {
+      fxPlay(); // what the steps asked for, in order
       // A crate that landed this frame raises a dust puff.
       for (let i = 0; i < e.events.size; i++) {
         const ev = e.events.at(i)!;
@@ -982,39 +1159,39 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // steps them (first, as the engine would) and the engine doesn't.
   if (net) e.remove(supply.system);
   const link = net
-    ? presence(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: net.input ?? encode, step: (_, ins) => ((netIn = ins), world(e.dt)), hash: worldHash })
+    ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: net.input ?? encode, step: (_, ins) => ((netIn = ins), world(e.dt)), hash: worldHash })
     : null;
 
   /** One fixed step of the match. */
   function world(dt: number) {
       if (net) supply.system.step!(e, dt);
-      matchT += dt;
+      G[MATCH]! += dt;
       fx.step(dt);
-      quakeAmt = Math.max(0, quakeAmt - dt * 40);
-      whiteout = Math.max(0, whiteout - dt * 0.9);
+      G[QUAKE] = Math.max(0, G[QUAKE]! - dt * 40);
+      G[WHITE] = Math.max(0, G[WHITE]! - dt * 0.9);
       if (state === "intro" || state === "count") {
         // The start screen: the grid lights up with everything that can land on it.
-        if ((tileIn -= dt) <= 0) (lightTile(true), (tileIn = 0.08 + R() * 0.16));
+        if ((G[TILE_IN]! -= dt) <= 0) (lightTile(true), (G[TILE_IN] = 0.08 + R() * 0.16));
         for (const s of tiles) {
           if (!s.on) continue;
           if (s.roll > 0) s.roll -= dt;
           else if ((s.t -= dt) <= 0) s.on = false;
         }
-        if (state === "count" && (count -= dt) <= 0) {
+        if (state === "count" && (G[CNT]! -= dt) <= 0) {
           for (const s of tiles) s.on = false;
-          tileIn = 1.2;
+          G[TILE_IN] = 1.2;
           begin();
         }
         return;
       }
       if (state !== "play") return;
       if (!embed && !demo && !practice) {
-        clock -= dt;
-        if (clock <= 0) return void end();
+        G[CLK]! -= dt;
+        if (G[CLK]! <= 0) return void end();
       }
       // Tiles blink in; crates parachute in.
-      tileIn -= dt;
-      if (tileIn <= 0) (lightTile(), (tileIn = 1.4 + R() * 2));
+      G[TILE_IN]! -= dt;
+      if (G[TILE_IN]! <= 0) (lightTile(), (G[TILE_IN] = 1.4 + R() * 2));
       for (const s of tiles) {
         if (!s.on) continue;
         if (s.roll > 0) s.roll -= dt;
@@ -1024,8 +1201,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         }
       }
       // The brick moves and expires the crates (and says when one lands: render puffs its dust).
-      if ((crateIn -= dt) <= 0) (dropCrate(), (crateIn = 18 + R() * 8));
-      for (const b of blocks) if (b.hp <= 0 && (b.back -= dt) <= 0 && !tanks.some((t) => t.alive && circleRect(t.x, t.y, 20, b.x, b.y, b.w, b.h))) b.hp = 3;
+      if ((G[CRATE_IN]! -= dt) <= 0) (dropCrate(), (G[CRATE_IN] = 18 + R() * 8));
+      for (const b of blocks) if (b.hp <= 0 && (b.back -= dt) <= 0 && !tankOn(b)) b.hp = 3;
       // Tanks.
       for (const t of tanks) {
         if (!t.alive) {
@@ -1039,8 +1216,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           t.drop = Math.min(1, t.drop + dt / 1.5);
           if (t.drop >= 1) {
             t.shield = Math.max(t.shield, 1.2);
-            fx.spawn(2, t.x, t.y, 0, 0, 22, 0.45, 7);
-            for (let n = 0; n < 6; n++) fx.spawn(5, t.x + (R() - 0.5) * 30, t.y + (R() - 0.5) * 20, (R() - 0.5) * 40, -10, 14, 0.9, 6);
+            ((FQ[0] = 2), (FQ[1] = t.x), (FQ[2] = t.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 22), (FQ[6] = 0.45), (FQ[7] = 7), fxPush(FX_SPAWN));
+            for (let n = 0; n < 6; n++) ((FQ[0] = 5), (FQ[1] = t.x + (R() - 0.5) * 30), (FQ[2] = t.y + (R() - 0.5) * 20), (FQ[3] = (R() - 0.5) * 40), (FQ[4] = -10), (FQ[5] = 14), (FQ[6] = 0.9), (FQ[7] = 6), fxPush(FX_SPAWN));
             e.events.emit("land", t.i);
           }
           continue;
@@ -1062,17 +1239,21 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           if (!live(t.chargeT)) t.charge = 0;
           else {
             const o2 = tanks[t.chargeT]!;
-            t.ta = turn(t.ta, Math.atan2(o2.y - t.y, o2.x - t.x), 14 * dt);
+            (F[TF] = t.ta), (F[TT] = Math.atan2(o2.y - t.y, o2.x - t.x)), (F[TM] = 14 * dt), turretTo(t);
             if ((t.charge -= dt) <= 0) fireRail(t);
           }
         }
         // Hurt tanks smoke.
-        if (t.hp <= 2 && R() < dt * 7) fx.spawn(5, t.x + (R() - 0.5) * 12, t.y - 6, (R() - 0.5) * 20, -30, 10 + R() * 6, 0.9, 6);
+        if (t.hp <= 2 && R() < dt * 7) ((FQ[0] = 5), (FQ[1] = t.x + (R() - 0.5) * 12), (FQ[2] = t.y - 6), (FQ[3] = (R() - 0.5) * 20), (FQ[4] = -30), (FQ[5] = 10 + R() * 6), (FQ[6] = 0.9), (FQ[7] = 6), fxPush(FX_SPAWN));
         t.x = Math.max(18, Math.min(W - 18, t.x));
         t.y = Math.max(54, Math.min(H - 18, t.y));
         // Tiles and crates under the tracks.
-        for (const s of tiles) if (s.on && s.roll <= 0 && inRect(t.x, t.y, s.c * T, s.r * T, T, T)) takeTile(s, t);
-        for (let i = supply.count - 1; i >= 0; i--) if (supply.landed(i) && dist(supply.x[i]! - t.x, supply.y[i]! - t.y) < 26 * scale) takeCrate(i, t);
+        for (const s of tiles) {
+          if (!s.on || s.roll > 0) continue;
+          const x0 = s.c * T, y0 = s.r * T; // fizlet/collide inRect, inline
+          if (t.x >= x0 && t.x <= x0 + T && t.y >= y0 && t.y <= y0 + T) takeTile(s, t);
+        }
+        for (let i = supply.count - 1; i >= 0; i--) if (supply.landed(i) && ((F[HX] = supply.x[i]! - t.x), (F[HY] = supply.y[i]! - t.y), hyp(), F[HO]! < 26 * scale)) takeCrate(i, t);
         // Treads flatten the page (embed).
         if (embed) for (const c of covers) if (inRect(t.x, t.y, c.x, c.y + c.h * 0.2, c.w, c.h * 0.7)) knock(c, 0, 0, 1, true);
       }
@@ -1081,7 +1262,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         for (let j = i + 1; j < N; j++) {
           const p = tanks[i]!, q = tanks[j]!;
           if (!p.alive || !q.alive || p.drop < 1 || q.drop < 1) continue;
-          const dx = q.x - p.x, dy = q.y - p.y, d = dist(dx, dy), min = 26 * scale;
+          const dx = q.x - p.x, dy = q.y - p.y;
+          F[HX] = dx;
+          F[HY] = dy;
+          hyp();
+          const d = F[HO]!, min = 26 * scale;
           if (d > 0 && d < min) {
             // Practice TARGETs are immovable: whoever bumps them gets the whole push.
             const pf = practice && p.i >= 1 && p.i <= 3 ? 0 : 1, qf = practice && q.i >= 1 && q.i <= 3 ? 0 : 1, k = (min - d) / (pf + qf || 1) / d;
@@ -1092,27 +1277,39 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       for (const s of shells) {
         if (!s.on) continue;
         if (s.rail && live(s.tgt)) {
-          const o2 = tanks[s.tgt]!, va = Math.atan2(s.vy, s.vx), na = turn(va, Math.atan2(o2.y - s.y, o2.x - s.x), 5 * dt), sp = dist(s.vx, s.vy);
+          const o2 = tanks[s.tgt]!;
+          F[TF] = Math.atan2(s.vy, s.vx);
+          F[TT] = Math.atan2(o2.y - s.y, o2.x - s.x);
+          F[TM] = 5 * dt;
+          turnF();
+          const na = F[TO]!;
+          F[HX] = s.vx;
+          F[HY] = s.vy;
+          hyp();
+          const sp = F[HO]!;
           s.vx = Math.cos(na) * sp;
           s.vy = Math.sin(na) * sp;
         }
         const nx = s.x + s.vx * dt, ny = s.y + s.vy * dt;
         s.life -= dt;
         let done = s.life <= 0 || nx < -20 || ny < -20 || nx > W + 20 || ny > H + 20;
+        F[SX] = nx;
+        F[SY] = ny;
+        F[SR] = 15 * scale;
         for (const t of tanks) {
           if (done || t.team === tanks[s.owner]!.team || !t.alive || t.drop < 1) continue; // no friendly fire
-          if (segCircle(s.x, s.y, nx, ny, t.x, t.y, 15 * scale) >= 0) {
+          if (shellHits(s, t)) {
             done = true;
-            boom(t.x, t.y, s.rail ? 1.8 : 1, s.rail ? 1 : 4);
+            ((FQ[0] = t.x), (FQ[1] = t.y), (FQ[2] = s.rail ? 1.8 : 1), (FQ[3] = s.rail ? 1 : 4), boomQ());
             damage(t, s.owner, s.rail ? MAXHP : 1, s.rail ? W_SNIPED : W_BOOM);
           }
         }
-        const b = done ? null : blocked(nx, ny, 2);
+        const b = done ? null : ((F[BX] = nx), (F[BY] = ny), (F[BR] = 2), blockedF());
         if (b) {
-          if (s.rail) wreckBlock(b), boom(nx, ny, 1, 1);
+          if (s.rail) wreckBlock(b), ((FQ[0] = nx), (FQ[1] = ny), (FQ[2] = 1), (FQ[3] = 1), boomQ());
           else {
             done = true;
-            boom(nx, ny, 0.8, 2);
+            ((FQ[0] = nx), (FQ[1] = ny), (FQ[2] = 0.8), (FQ[3] = 2), boomQ());
             if (--b.hp <= 0) wreckBlock(b);
           }
         }
@@ -1123,12 +1320,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
               knock(c, s.vx / d, s.vy / d, s.rail ? 2 : 1.2, false);
               if (!s.rail) {
                 done = true;
-                boom(nx, ny, 0.9, 4);
+                ((FQ[0] = nx), (FQ[1] = ny), (FQ[2] = 0.9), (FQ[3] = 4), boomQ());
                 break;
               }
             }
         if (done) {
-          if (s.life <= 0 && !b) fx.spawn(1, s.x, s.y, 0, 0, 6, 0.15, 1);
+          if (s.life <= 0 && !b) ((FQ[0] = 1), (FQ[1] = s.x), (FQ[2] = s.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 6), (FQ[6] = 0.15), (FQ[7] = 1), fxPush(FX_SPAWN));
           s.on = false;
         } else (s.x = nx), (s.y = ny);
       }
@@ -1141,8 +1338,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         else if ((b.fall -= dt) <= 0) (b.on = false), detonate(b);
       }
       for (const m of marks) if (m.on && (m.t -= dt) <= 0) m.on = false;
-      for (const b of booms) if (b.on && (b.t -= dt) <= 0) (b.on = false), boom(b.x, b.y, b.p, b.c);
-      if (nukeT > 0 && (nukeT -= dt) <= 0) nukeGoesOff();
+      for (const b of booms) if (b.on && (b.t -= dt) <= 0) (b.on = false), ((FQ[0] = b.x), (FQ[1] = b.y), (FQ[2] = b.p), (FQ[3] = b.c), boomQ());
+      if (G[NUKE_T]! > 0 && (G[NUKE_T]! -= dt) <= 0) nukeGoesOff();
   }
 
   // ---------- Taps on the field: an airstrike spot, or a new lock target ----------
@@ -1193,16 +1390,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     "In PLATOON, your three wingmen follow you and go after whoever shoots you.",
     "Esc cancels an airstrike. Double-click the grab bar to put the keys back.",
   ];
-  let cCrate = 0, cStep = 0, cShots = 0, cMoved = 0, cRail = 0, cStrike = 0, cTile = 0, cDrag = 0, cT = 0, coachShown = -1;
+  let cCrate = 0, cStep = 0, cShots = 0, cRail = 0, cStrike = 0, cTile = 0, cDrag = 0, coachShown = -1;
   function coachStep(dt: number) {
     // Never run dry while practising.
     if (you.rail < 1) you.rail = 3;
     if (you.strikes < 1 && !targeting) you.strikes = 2;
-    cT += dt;
-    const done = [cMoved > 220, cShots >= 6, autoOn, lockOn, cRail > 0, cStrike > 0, cTile > 0, you.run >= 3, cCrate > 0, cDrag > 0 || cT > 9][cStep];
+    G[COACH_T]! += dt;
+    const done = [G[MOVED]! > 220, cShots >= 6, autoOn, lockOn, cRail > 0, cStrike > 0, cTile > 0, you.run >= 3, cCrate > 0, cDrag > 0 || G[COACH_T]! > 9][cStep];
     if (cStep < COACH.length && done) {
       cStep++;
-      cT = 0;
+      G[COACH_T] = 0;
       e.events.emit("power", 0);
       if (COACH[cStep]?.[0] === "SUPPLY CRATE") dropCrate();
     }
@@ -1210,7 +1407,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (COACH[cStep]?.[0] === "SUPPLY CRATE" && supply.count === 0) dropCrate();
   }
   function coachFrame() {
-    const key = cStep < COACH.length ? cStep : COACH.length + (((cT / 6) | 0) % TRICKS.length);
+    const key = cStep < COACH.length ? cStep : COACH.length + (((G[COACH_T]! / 6) | 0) % TRICKS.length);
     if (key === coachShown) return;
     coachShown = key;
     for (const el of wrap.querySelectorAll(".coach-on")) el.classList.remove("coach-on");
@@ -1228,7 +1425,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
     supply.reset();
     targeting = false;
-    nukeT = whiteout = quakeAmt = 0;
+    G[NUKE_T] = G[WHITE] = G[QUAKE] = 0;
     fx.clear();
     roster();
     intro();
@@ -1238,7 +1435,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
   function intro() {
     state = "intro";
-    tileIn = 0;
+    G[TILE_IN] = 0;
     wrap.classList.add("pre");
     over.hidden = false;
     over.classList.add("intro");
@@ -1264,14 +1461,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function countdown() {
     state = "count";
     over.classList.remove("intro");
-    count = 2.4;
+    G[CNT] = 2.4;
     over.hidden = false;
     over.innerHTML = `<div class="count" data-c>3</div>`;
     e.events.emit("ready", 0);
   }
   function begin() {
     state = "play";
-    if (practice) (cStep = cCrate = cShots = cMoved = cRail = cStrike = cTile = cDrag = cT = 0), (coachShown = -1);
+    if (practice) (cStep = cCrate = cShots = G[MOVED] = cRail = cStrike = cTile = cDrag = G[COACH_T] = 0), (coachShown = -1);
     wrap.classList.remove("pre");
     over.hidden = true;
     over.innerHTML = "";
@@ -1306,12 +1503,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     o.onEnd?.(st);
   }
   function rematch() {
-    clock = o.seconds ?? 180;
+    G[CLK] = o.seconds ?? 180;
     for (const t of tanks) Object.assign(t, { kills: 0, deaths: 0, alive: false, dead: platoon ? 0.2 + t.team * 0.45 + t.slot * 0.12 : 0.2 + t.i * 0.15, strikes: t.you ? 1 : 0, carpet: 0, rail: t.you ? RAIL_START : 1, run: 0 });
     for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
     supply.reset();
-    nukeT = whiteout = 0;
-    crateIn = 12;
+    G[NUKE_T] = G[WHITE] = 0;
+    G[CRATE_IN] = 12;
     lockT = -1;
     fx.clear();
     if (!embed) layBlocks();
@@ -1366,7 +1563,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const t of tanks) if (t.kills > you.kills) rank++;
     teamKills.fill(0);
     for (const t of tanks) if (t.team < 4) teamKills[t.team]! += t.kills;
-    const tt = practice ? "∞" : embed ? `#${rank}` : `${Math.floor(Math.max(0, clock) / 60)}:${String(Math.floor(Math.max(0, clock) % 60)).padStart(2, "0")}`;
+    const tt = practice ? "∞" : embed ? `#${rank}` : `${Math.floor(Math.max(0, G[CLK]!) / 60)}:${String(Math.floor(Math.max(0, G[CLK]!) % 60)).padStart(2, "0")}`;
     let top = 0;
     for (let k2 = 1; k2 < 3; k2++) if (teamKills[k2]! > teamKills[top]!) top = k2;
     const ld = platoon ? (teamKills[top] ? `${PLATOON[top]} ${teamKills[top]}` : "—") : lead.kills ? `${lead.name} ${lead.kills}` : "—";
@@ -1422,7 +1619,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       );
     }
     if (state === "count") {
-      const c = count > 1.6 ? "3" : count > 0.8 ? "2" : count > 0.15 ? "1" : "BLITZ!";
+      const c = G[CNT]! > 1.6 ? "3" : G[CNT]! > 0.8 ? "2" : G[CNT]! > 0.15 ? "1" : "BLITZ!";
       if (c !== last.count) {
         last.count = c;
         const el = over.querySelector<HTMLElement>("[data-c]");
@@ -1575,7 +1772,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (net) ctx.setTransform(1, 0, 0, 1, 0, 0), ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!);
     ctx.clearRect(0, 0, W, H);
-    const sh = quakeAmt, sx = sh ? (shakeR() - 0.5) * sh : 0, sy = sh ? (shakeR() - 0.5) * sh : 0;
+    // The shake draws from the screen's own random, never engine.random: how often the screen is drawn must not change the match.
+    const sh = G[QUAKE]!, sx = sh ? (shakeRandom() - 0.5) * sh : 0, sy = sh ? (shakeRandom() - 0.5) * sh : 0;
     ctx.translate(sx, sy);
     if (!embed) {
       // The arena: a dark grid like the game's map.
@@ -1864,7 +2062,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!);
     // The nuke: a red siren, then everything goes white.
-    if (nukeT > 0) {
+    if (G[NUKE_T]! > 0) {
       const blink = ((now * 4) | 0) % 2;
       ctx.strokeStyle = "#ff2b4e";
       ctx.globalAlpha = blink ? 0.8 : 0.35;
@@ -1876,14 +2074,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       ctx.textBaseline = "middle";
       ctx.lineWidth = 8;
       ctx.strokeStyle = "#07060f";
-      const txt = `NUKE ${Math.ceil(nukeT)}`;
+      const txt = `NUKE ${Math.ceil(G[NUKE_T]!)}`;
       ctx.strokeText(txt, W / 2, H / 2);
       ctx.fillStyle = blink ? "#ff2b4e" : "#ffc21a";
       ctx.fillText(txt, W / 2, H / 2);
       ctx.textBaseline = "alphabetic";
     }
-    if (whiteout > 0) {
-      ctx.globalAlpha = Math.min(1, whiteout * 1.4);
+    if (G[WHITE]! > 0) {
+      ctx.globalAlpha = Math.min(1, G[WHITE]! * 1.4);
       ctx.fillStyle = "#fff4ff";
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;

@@ -12,7 +12,7 @@ export interface BlitzOptions {
   platoons?: boolean;
   /** Seed for the match's randomness. Same seed + same input = the same match. Default: random. */
   seed?: number;
-  /** Lockstep multiplayer: same seed (the room's), only inputs cross the wire. A fixed 1100 × 640
+  /** Lockstep multiplayer (needs dist/blitz-net.mjs): same seed (the room's), only inputs cross the wire. A fixed 1100 × 640
    *  arena scaled to fit; humans in seats 0..players-1, bots after; no pause. */
   net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number };
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
@@ -49,7 +49,3 @@ export interface BlitzInstall {
 }
 /** The drop-in: a PLAY BLITZ key (or a hidden easter egg) that turns the page into the arena. */
 export function install(config?: { easterEgg?: boolean | object; palette?: Record<string, string>; label?: string; platoons?: boolean }): BlitzInstall;
-/** Join a fizlet-rooms room: resolves when it's full with your seat and the room's seed. */
-export function join(url: string, signal?: AbortSignal): Promise<{ transport: Transport; slot: number; players: number; seed: number }>;
-/** In-memory link between `peers` transports (tests and one-page demos); call tick() once per frame. */
-export function memory(o: { peers: number; latency?: number; jitter?: number; seed?: number; cap?: number }): { ends: Transport[]; tick(): void; readonly queued: number; readonly dropped: number };

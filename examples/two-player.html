@@ -30,7 +30,7 @@
   <div id="arena"></div>
 </main>
 <script type="module">
-  import { createBlitz, join } from "../dist/blitz.mjs";
+  import { createBlitz, join } from "../dist/blitz-net.mjs";
   const base = new URLSearchParams(location.search).get("rooms") ?? "ws://localhost:8787";
   const http = base.replace(/^ws/, "http"), say = document.getElementById("say"), gate = document.getElementById("gate");
   const tell = (text, bad = false) => ((say.textContent = text), say.classList.toggle("bad", bad));

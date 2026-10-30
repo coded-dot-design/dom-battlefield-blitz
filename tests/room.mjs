@@ -33,7 +33,7 @@ try {
   await page.goto(`${ORIGIN}/`);
   const room = Math.floor(Math.random() * 4);
   const out = await page.evaluate(async ({ base, invite, frames, room }) => {
-    const { createBlitz, join } = await import("/blitz.mjs");
+    const { createBlitz, join } = await import("/blitz-net.mjs");
     const url = `${base}/room/${room}?players=2&invite=${encodeURIComponent(invite)}`;
     const seats = await Promise.all([join(url), join(url)]);
     const hands = (slot) => {
