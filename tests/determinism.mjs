@@ -84,6 +84,26 @@ try {
     assert.equal(await exact(Number(seed), mode === "platoons"), want, `seed ${name} plays the 0.8.2 match, value for value (Chrome ${major})`);
   }
 
+  // Drawing never draws from engine.random (the shake has its own): a board match where you get hit
+  // (so the screen shakes) plays the same whether each step is drawn once or twice.
+  const board = (renders) =>
+    page.evaluate(async ([renders, frames]) => {
+      const { createBlitz } = await import("/blitz.mjs");
+      for (const id of ["a", "b"]) document.getElementById(id).replaceChildren();
+      const g = createBlitz(document.getElementById("a"), { seed: 5, platoons: false });
+      g.engine.stop();
+      g.start();
+      let shook = 0;
+      for (let f = 0; f < frames; f++) for (let r = 0; r < renders; r++) g.engine.advance(1 / 60 / renders);
+      for (const t of g.world.tanks) shook += t.you ? t.deaths : 0;
+      const out = JSON.stringify(g.world.tanks.map((t) => [t.x, t.y, t.a, t.hp, t.kills, t.deaths])) + g.engine.random.state;
+      g.destroy();
+      return { out, shook };
+    }, [renders, FRAMES]);
+  const once = await board(1), twice = await board(2);
+  assert.ok(once.shook > 0, "you were hit in the board match (the screen shook)");
+  assert.equal(twice.out, once.out, "drawing twice a step plays the same board match");
+
   const a = await play(41, FRAMES), b = await play(41, FRAMES), c = await play(42, FRAMES);
   assert.equal(a.calls, 0, "no Math.random while playing");
   assert.equal(a.digest, b.digest, "same seed, same match");
@@ -108,7 +128,7 @@ try {
   }
   perFrame.sort((x, y) => x - y);
   assert.deepEqual(errors, []);
-  console.log(`Blitz determinism: ${pinned ? `seeds ${Object.keys(pinned).join(", ")} play the 0.8.2 matches value for value (Chrome ${major})` : `no pinned digests for Chrome ${major} (pinned: ${Object.keys(PINNED).join(", ")}), skipped`}; seed 41 twice → identical over ${FRAMES} frames, seed 42 differs, 0 Math.random calls in play. Heap growth: ${Math.round(perFrame[1])} B/frame (median of 3 × 600 frames, demo, no GC between).`);
+  console.log(`Blitz determinism: ${pinned ? `seeds ${Object.keys(pinned).join(", ")} play the 0.8.2 matches value for value (Chrome ${major})` : `no pinned digests for Chrome ${major} (pinned: ${Object.keys(PINNED).join(", ")}), skipped`}; seed 41 twice → identical over ${FRAMES} frames, seed 42 differs, 0 Math.random calls in play; a board match plays the same drawn once or twice a step. Heap growth: ${Math.round(perFrame[1])} B/frame (median of 3 × 600 frames, demo, no GC between).`);
 } finally {
   await browser.close();
 }
