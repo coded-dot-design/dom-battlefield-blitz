@@ -50,7 +50,7 @@ export interface BlitzOptions {
   /** Lockstep multiplayer (fizlet/presence): every peer runs the same match from the same seed and
    *  only inputs cross the wire. A fixed 1100 × 640 arena (scaled to fit), humans in seats
    *  0..players-1, bots after them, no pause. `input` replaces this peer's controls (tests). */
-  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number };
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void };
   /** Called when a board match ends. */
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
@@ -1493,12 +1493,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     overlay(
       won ? "STAGE CLEAR" : surrendered ? "WHITE FLAG" : "INSERT COIN",
       won ? (platoon ? "PLATOON WINS" : "YOU WIN") : surrendered ? "GAME OVER" : `${platoon ? PLATOON[teams[0]!.team] : st[0]!.name} WINS`,
-      net ? "" : `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button><button class="bui-sticker-key bui-second" type="button" data-new>${PLAY}<b>NEW GAME</b></button>`,
+      // Net play: the page decides what REMATCH and NEW ROOM do (net.again / net.leave: a new room join).
+      (net ? (net.again ? `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button>` : "") + (net.leave ? `<button class="bui-sticker-key bui-second" type="button" data-new>${PLAY}<b>NEW ROOM</b></button>` : "") : `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button><button class="bui-sticker-key bui-second" type="button" data-new>${PLAY}<b>NEW GAME</b></button>`),
       `<div class="table">${rows}</div>`,
     );
     if (!net) {
       ov.querySelector("[data-again]")!.addEventListener("click", () => (closeOverlay(), rematch()), { signal: e.signal });
       ov.querySelector("[data-new]")!.addEventListener("click", () => (closeOverlay(), toIntro()), { signal: e.signal });
+    } else {
+      ov.querySelector("[data-again]")?.addEventListener("click", () => net.again!(), { signal: e.signal });
+      ov.querySelector("[data-new]")?.addEventListener("click", () => net.leave!(), { signal: e.signal });
     }
     o.onEnd?.(st);
   }

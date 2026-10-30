@@ -135,7 +135,34 @@ try {
     keys += await check(kp, where);
     await kc.close();
   }
-  console.log(`Site: landing + live demo, hero scrim in both themes, board match, phone app mode, drop-in, ${keys} page keys passed.`);
+  // Two players (/play/two/): the join card fits a phone in both orientations and the desktop,
+  // with no sideways scroll, every lobby key at least 44 px, and a bad code refused before any room.
+  where = "two players";
+  for (const [w, h, touch] of [[390, 844, true], [844, 390, true], [1440, 900, false]]) {
+    const tc = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: touch, isMobile: touch });
+    const tp = await tc.newPage();
+    const terr = [];
+    tp.on("pageerror", (e) => terr.push(e.message));
+    await tp.route("https://rooms.test/**", (r) => r.fulfill({ status: 403, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: '{"ok":false}' }));
+    await tp.goto(`${base}play/two/?rooms=wss://rooms.test&room=3`);
+    assert.equal(await tp.locator(".lobby").getAttribute("data-step"), "join");
+    assert.equal(await tp.locator("output[name=roomShow]").textContent(), "3", "?room= picks the room");
+    const fit = await tp.evaluate(() => {
+      const card = document.querySelector('[data-for="join"]').getBoundingClientRect();
+      const small = [...document.querySelectorAll(".lobby :is(button, input:not([type=hidden]))")].filter((el) => el.offsetParent && (el.getBoundingClientRect().width < 44 || el.getBoundingClientRect().height < 44)).map((el) => el.outerHTML.slice(0, 60));
+      return { sideways: document.documentElement.scrollWidth - innerWidth, inView: card.top >= 0 && card.bottom <= innerHeight, small };
+    });
+    assert.equal(fit.sideways, 0, `${w}x${h}: no sideways scroll`);
+    assert.ok(fit.inView, `${w}x${h}: the join card is on screen`);
+    assert.deepEqual(fit.small, [], `${w}x${h}: lobby keys are 44 px or more`);
+    await tp.fill("input[name=code]", "NOPE-NOPE-1");
+    await tp.click("[data-join]");
+    await tp.waitForFunction(() => /isn't on the list/.test(document.querySelector("[data-say]").textContent));
+    assert.equal(await tp.locator(".lobby").getAttribute("data-step"), "join", "a bad code stays on the join card");
+    assert.deepEqual(terr, []);
+    await tc.close();
+  }
+  console.log(`Site: landing + live demo, hero scrim in both themes, board match, phone app mode, drop-in, ${keys} page keys, two-player lobby at 3 sizes passed.`);
 } catch (e) {
   console.error(`site test failed at ${where}`);
   throw e;

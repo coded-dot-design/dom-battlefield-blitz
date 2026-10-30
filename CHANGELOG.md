@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Two players: a real lobby and a phone layout (`/play/two/`).** The page is one full-screen
+  stage like `/play/` (no header, footer or scroll on phones), with a Board UI card over the arena:
+  - **Join:** invite code, room − / + (`?room=` and `?code=` prefill it), JOIN.
+  - **Waiting for player 2:** SEND LINK (share sheet, or copies a link with the room and code) and
+    CANCEL.
+  - The game's own countdown, then the match.
+  - **Result:** REMATCH (both players, the same room, a fresh seed) or NEW ROOM.
+  - **The other player left:** REJOIN or NEW ROOM. Before, the match just waited forever.
+  - A short landscape phone gets a two-column card. Every lobby key is at least 44 px.
+  - Game: `net.again` / `net.leave` put REMATCH / NEW ROOM keys on the net result (no rules
+    change; determinism and lockstep tests unchanged).
+  - The page frees its room 2 s after the match ends, so a slower peer still gets its last inputs.
+  - `test:site` checks the join card at 390×844, 844×390 and 1440×900 (no sideways scroll, on
+    screen, keys ≥ 44 px, a bad code refused).
 - **Site: the hero scrim follows the theme.** In light mode the gradient behind the hero copy was
   still the dark one (near-black over the light grid). It now fades from the theme's token
   (dark `--bg`, light `--surface`), and the hero copy is on tokens too: headline and eyebrow `--ink`,

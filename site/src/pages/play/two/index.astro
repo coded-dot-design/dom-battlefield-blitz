@@ -1,63 +1,412 @@
 ---
 // Battlefield Blitz for two players over a fizlet-rooms room server (demo). Same match on both
 // screens: only inputs travel. The invite code is the demo gate, not a login.
+// One stage, like /play/: the arena fills it and a Board UI lobby sits on top through
+// join → waiting for player 2 → (the game's countdown, match, result) → rematch or a new room.
 import Base from '../../../layouts/Base.astro';
+import Icon from '../../../components/Icon.astro';
 import { base, ROOMS } from '../../../site';
 const title = 'Battlefield Blitz · two players';
 const description = 'Two players, one Blitz match, over the internet. Enter an invite code and pick a room.';
 ---
-<Base title={title} description={description} page="play">
-  <section class="wrap two" data-rooms={ROOMS}>
-    <h1>Blitz · two players</h1>
-    <p class="hint">Both players enter an invite code and the same room number. The match starts when the second player joins.</p>
-    <form id="gate">
-      <label>Invite code <input name="code" autocomplete="off" required minlength="6" maxlength="64" /></label>
-      <label>Room (0–15) <input name="room" type="number" min="0" max="15" value="0" required /></label>
-      <button>PLAY</button>
-    </form>
-    <p id="say" role="status"></p>
-    <div id="arena"></div>
-    <p class="hint"><a href={base('play/')}>Play solo instead</a></p>
+<Base title={title} description={description} page="play" app>
+  <section class="blitz-stage two" aria-labelledby="two-title" data-rooms={ROOMS}>
+    <h1 id="two-title" class="vh">Battlefield Blitz · two players</h1>
+    <div id="arena" class="blitz-host"></div>
+
+    <div class="lobby" data-step="join">
+      <!-- 1. Join: code and room -->
+      <form class="bui-card step" data-for="join" id="gate" novalidate>
+        <div class="bui-sticker tag"><span>TWO PLAYERS</span><b>JOIN A ROOM</b></div>
+        <label>INVITE CODE
+          <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required minlength="6" maxlength="64" placeholder="BLITZ-XXXX-XXXX" />
+        </label>
+        <div class="room" role="group" aria-label="Room">
+          <span>ROOM</span>
+          <button class="bui-key" type="button" data-room="-1" aria-label="Previous room">−</button>
+          <output name="roomShow" aria-live="polite">0</output>
+          <button class="bui-key" type="button" data-room="1" aria-label="Next room">+</button>
+          <input type="hidden" name="room" value="0" />
+        </div>
+        <button class="bui-key bui-sticker-key go" type="submit" data-join><Icon name="play" size={22} /><b>JOIN</b></button>
+        <p class="say" role="status" data-say></p>
+        <p class="fine">You and your friend: the same code, the same room. The match starts when you're both in.</p>
+      </form>
+
+      <!-- 2. Waiting for player 2 -->
+      <div class="bui-card step" data-for="wait">
+        <div class="bui-sticker tag"><span data-wait-kick>ROOM 0</span><b>WAITING…</b></div>
+        <p class="big" data-wait-say>Waiting for player 2.</p>
+        <p class="fine">Tell your friend to open this page with the same code and room, or send them the link.</p>
+        <div class="keys">
+          <button class="bui-key bui-sticker-key" type="button" data-share><b data-share-say>SEND LINK</b></button>
+          <button class="bui-key bui-sticker-key bui-second" type="button" data-cancel><b>CANCEL</b></button>
+        </div>
+      </div>
+
+      <!-- 3. The other player left, or the room closed -->
+      <div class="bui-card step" data-for="gone">
+        <div class="bui-sticker tag"><span>ROOM CLOSED</span><b data-gone-word>PLAYER LEFT</b></div>
+        <p class="big" data-gone-say>The other player left the match.</p>
+        <div class="keys">
+          <button class="bui-key bui-sticker-key" type="button" data-again><Icon name="play" size={22} /><b>REJOIN</b></button>
+          <button class="bui-key bui-sticker-key bui-second" type="button" data-new><b>NEW ROOM</b></button>
+        </div>
+      </div>
+    </div>
   </section>
+  <div class="wrap blitz-bar">
+    <p><b>BLITZ · TWO PLAYERS</b> · same code, same room · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · phones: drag left to drive</p>
+    <p><a href={base('play/')}>Play solo</a> · <a href={base()}>About Blitz</a></p>
+  </div>
 </Base>
 
 <script>
   import { createBlitz, join } from "../../../../../dist/blitz-net.mjs";
-  const host = document.querySelector<HTMLElement>(".two")!;
-  const ws = new URLSearchParams(location.search).get("rooms") ?? host.dataset.rooms!;
+  type Game = ReturnType<typeof createBlitz>;
+  const stage = document.querySelector<HTMLElement>(".two")!;
+  const lobby = stage.querySelector<HTMLElement>(".lobby")!;
+  const arena = document.getElementById("arena")!;
+  const gate = document.getElementById("gate") as HTMLFormElement;
+  const field = (n: string) => gate.elements.namedItem(n) as HTMLInputElement;
+  const $ = <T extends HTMLElement>(s: string) => stage.querySelector<T>(s)!;
+  const q = new URLSearchParams(location.search);
+  const ws = q.get("rooms") ?? stage.dataset.rooms!;
   const http = ws.replace(/^ws/, "http");
-  const say = document.getElementById("say")!, gate = document.getElementById("gate") as HTMLFormElement;
-  const tell = (text: string, bad = false) => ((say.textContent = text), say.classList.toggle("bad", bad));
-  let game: { destroy(): void } | null = null;
+  const ROOMS = 16;
+  const seconds = Number(q.get("seconds")) || 0;
+
+  // Per-viewer convenience only: the last code, so a rematch or a reload doesn't ask again.
+  const store = { get: () => { try { return sessionStorage.getItem("blitz-code") ?? ""; } catch { return ""; } }, set: (v: string) => { try { sessionStorage.setItem("blitz-code", v); } catch {} } };
+  let room = Math.min(ROOMS - 1, Math.max(0, Number(q.get("room")) | 0));
+  field("code").value = q.get("code") ?? store.get();
+  const showRoom = () => ((field("room").value = String(room)), ((gate.elements.namedItem("roomShow") as HTMLOutputElement).value = String(room)));
+  showRoom();
+  stage.querySelectorAll<HTMLButtonElement>("[data-room]").forEach((b) => b.addEventListener("click", () => ((room = (room + Number(b.dataset.room) + ROOMS) % ROOMS), showRoom())));
+
+  const step = (s: "join" | "wait" | "gone" | "play") => {
+    lobby.dataset.step = s;
+    lobby.hidden = s === "play";
+    stage.querySelector<HTMLElement>(`[data-for="${s}"] :is(input:not([type=hidden]), button)`)?.focus({ preventScroll: true });
+  };
+  const say = (text: string) => ($("[data-say]").textContent = text);
+
+  let game: Game | null = null, abort: AbortController | null = null, watch = 0, code = "";
+  let link: { close(): void } | null = null, ended = false, freeAt = 0;
+  const stop = () => {
+    clearInterval(watch);
+    clearTimeout(freeAt);
+    abort?.abort();
+    link?.close();
+    link = null;
+    game?.destroy();
+    game = null;
+  };
+
+  async function enter() {
+    stop();
+    $("[data-wait-kick]").textContent = `ROOM ${room}`;
+    $("[data-wait-say]").textContent = "Waiting for player 2.";
+    $("[data-share-say]").textContent = "SEND LINK";
+    step("wait");
+    abort = new AbortController();
+    const signal = abort.signal;
+    // A rematch can arrive a beat before the last match's sockets are gone: try again for a few seconds.
+    for (let tries = 0; ; tries++) {
+      try {
+        const seat = await join(`${ws}/room/${room}?players=2&invite=${encodeURIComponent(code)}`, signal);
+        return start(seat);
+      } catch {
+        if (signal.aborted) return;
+        if (tries >= 4) return gone("ROOM BUSY", "That room is full or closed. Try another room.");
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+  }
+
+  function start({ transport, slot, players, seed }: Awaited<ReturnType<typeof join>>) {
+    step("play");
+    const leave = () => (stop(), step("join"));
+    link = transport;
+    ended = false;
+    game = createBlitz(arena, {
+      seed,
+      // Match length is part of the match: both players need the same one (the share link carries it).
+      ...(seconds ? { seconds } : {}),
+      net: { transport, slot, players, again: enter, leave },
+      // Match over: free the room, so REMATCH can open it fresh for both players. Wait a moment
+      // first: the other player may be a few frames behind and still needs our last inputs.
+      onEnd: () => {
+        ended = true;
+        freeAt = window.setTimeout(() => (link?.close(), (link = null)), 2000);
+      },
+    });
+    (window as unknown as { blitz: Game }).blitz = game;
+    // The other player gone mid-match: the lockstep would wait for them forever, so say so.
+    watch = window.setInterval(() => {
+      if (!ended && game?.net?.lost) gone("PLAYER LEFT", "The other player left the match.");
+    }, 500);
+  }
+
+  function gone(word: string, text: string) {
+    stop();
+    $("[data-gone-word]").textContent = word;
+    $("[data-gone-say]").textContent = text;
+    step("gone");
+  }
+
   gate.addEventListener("submit", async (ev) => {
     ev.preventDefault();
-    const code = (gate.elements.namedItem("code") as HTMLInputElement).value.trim();
-    const room = Number((gate.elements.namedItem("room") as HTMLInputElement).value);
-    const ok = await fetch(`${http}/invite?code=${encodeURIComponent(code)}`).then((r) => r.ok, () => false);
-    if (!ok) return tell("That invite code isn't on the list.", true);
-    gate.hidden = true;
-    tell(`Room ${room}: waiting for player 2…`);
+    code = field("code").value.trim().toUpperCase();
+    if (code.length < 6) return say("Enter the invite code you were sent.");
+    say("Checking the code…");
+    const ok = await fetch(`${http}/invite?code=${encodeURIComponent(code)}`).then((r) => r.ok, () => null);
+    if (ok === null) return say("Can't reach the game server. Check your connection and try again.");
+    if (!ok) return say("That invite code isn't on the list.");
+    say("");
+    store.set(code);
+    enter();
+  });
+  $("[data-cancel]").addEventListener("click", () => (stop(), step("join")));
+  $("[data-again]").addEventListener("click", () => enter());
+  $("[data-new]").addEventListener("click", () => step("join"));
+  $("[data-share]").addEventListener("click", async () => {
+    const link = `${location.origin}${location.pathname}?room=${room}&code=${encodeURIComponent(code)}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}`;
+    const label = $("[data-share-say]");
     try {
-      const { transport, slot, players, seed } = await join(`${ws}/room/${room}?players=2&invite=${encodeURIComponent(code)}`);
-      tell(`You're player ${slot + 1} of ${players}. Same match on both screens: only inputs travel.`);
-      game?.destroy();
-      game = createBlitz(document.getElementById("arena")!, { seed, net: { transport, slot, players }, onEnd: () => tell("Match over.") });
-      (window as unknown as { blitz: unknown }).blitz = game;
+      if (navigator.share) await navigator.share({ title: "Battlefield Blitz · two players", text: `Join me in Blitz, room ${room}.`, url: link });
+      else (await navigator.clipboard.writeText(link), (label.textContent = "LINK COPIED"));
     } catch {
-      gate.hidden = false;
-      tell("The room closed (full, idle, or the server is down). Try another room.", true);
+      label.textContent = "COPY FAILED";
     }
   });
+  step("join");
 </script>
 
 <style>
-  .two { padding-top: 24px; padding-bottom: 24px; }
-  .hint { color: var(--muted); font: 13px var(--mono); }
-  form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
-  label { display: grid; gap: 4px; font: 13px var(--mono); color: var(--muted); }
-  input { font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
-  button { font: 700 14px var(--mono); background: var(--k-attack); color: #07060f; border: 0; border-radius: 6px; padding: 9px 18px; cursor: pointer; }
-  #say { min-height: 1.5em; font: 14px var(--mono); }
-  #say.bad { color: var(--k-attack); }
-  #arena { position: relative; width: 100%; aspect-ratio: 1100 / 640; max-height: 80vh; }
+  .vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .blitz-stage {
+    position: relative;
+    height: calc(100svh - 78px);
+    min-height: 420px;
+    border-bottom: 2px solid var(--line);
+    background: #090818;
+    overflow: hidden;
+  }
+  .blitz-host {
+    position: absolute;
+    inset: 0;
+  }
+  /* The lobby: the kit's overlay dim, one card centred, scrolls inside itself on short screens. */
+  .lobby {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    overflow-y: auto;
+    background: color-mix(in srgb, #2a2d38 82%, transparent);
+  }
+  .lobby[hidden] {
+    display: none;
+  }
+  .lobby .step {
+    display: none;
+  }
+  .lobby[data-step="join"] [data-for="join"],
+  .lobby[data-step="wait"] [data-for="wait"],
+  .lobby[data-step="gone"] [data-for="gone"] {
+    display: grid;
+  }
+  .lobby .step {
+    --u: 1px;
+    width: min(100%, 420px);
+    gap: 14px;
+    justify-items: stretch;
+    padding: 34px 20px 20px;
+    margin-top: 18px;
+  }
+  /* The kit sticker as the card's title tag (static, not the overlay's absolute centre). */
+  .lobby .step .tag {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none;
+    justify-self: center;
+    margin: -64px 0 4px;
+  }
+  .lobby .step .tag b {
+    font-size: 28px;
+  }
+  .step label,
+  .room span {
+    display: grid;
+    gap: 6px;
+    font: 800 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .step input:not([type="hidden"]) {
+    min-height: 48px;
+    padding: 0 14px;
+    font: 800 18px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--surface);
+    border: 2.5px solid var(--line);
+    border-radius: 8px;
+  }
+  .step input::placeholder {
+    color: color-mix(in srgb, var(--muted) 55%, transparent);
+  }
+  .step input:focus-visible {
+    outline: 3px solid var(--k-sys, #19f0ff);
+    outline-offset: 2px;
+  }
+  .room {
+    display: grid;
+    grid-template-columns: 1fr 48px 64px 48px;
+    align-items: center;
+    gap: 8px;
+  }
+  .lobby .room .bui-key {
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0;
+    font: 900 22px/1 var(--mono);
+  }
+  .room output {
+    font: 900 28px/1 var(--mono);
+    text-align: center;
+    color: var(--ink);
+  }
+  /* The kit's sticker key, laid out as a wide row key (icon + word) for the card. */
+  .lobby .step .bui-sticker-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 56px;
+    padding: 8px 14px;
+  }
+  .lobby .step .bui-sticker-key svg {
+    width: 22px;
+    height: 22px;
+  }
+  .lobby .step .bui-sticker-key b {
+    font-size: 15px;
+    letter-spacing: 0.16em;
+  }
+  .step .keys {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .say {
+    min-height: 1.3em;
+    margin: 0;
+    font: 700 14px/1.3 var(--mono);
+    color: var(--k-attack);
+  }
+  .say:empty {
+    display: none;
+  }
+  .big {
+    margin: 0;
+    font: 800 16px/1.4 var(--mono);
+    text-align: center;
+  }
+  .fine {
+    margin: 0;
+    font: 13px/1.45 var(--mono);
+    color: var(--muted);
+    text-align: center;
+  }
+  .blitz-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px 24px;
+    padding-top: 18px;
+    padding-bottom: 6px;
+    font: 12px var(--mono);
+    color: var(--muted);
+  }
+  .blitz-bar p {
+    margin: 0;
+  }
+  .blitz-bar b {
+    color: var(--k-attack);
+  }
+  .blitz-bar a {
+    display: inline-block;
+    padding: 12px 0;
+    color: var(--k-sys-ink);
+  }
+  /* Phones: the game is the whole screen, like /play/. No header, footer, scroll or zoom. */
+  @media (pointer: coarse), (max-width: 760px) {
+    :global(html:has(body[data-app])),
+    :global(body[data-app]) {
+      height: 100%;
+      overflow: hidden;
+      overscroll-behavior: none;
+      touch-action: none;
+      -webkit-text-size-adjust: 100%;
+    }
+    :global(body[data-app] :is(.site-head, .site-foot, .skip)),
+    .blitz-bar {
+      display: none;
+    }
+    .blitz-stage {
+      position: fixed;
+      inset: 0;
+      height: auto;
+      min-height: 0;
+      border: 0;
+    }
+    .lobby {
+      touch-action: pan-y;
+    }
+  }
+  /* Short landscape phones: a two-column card, so it fits without scrolling. */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .lobby .step {
+      width: min(100%, 640px);
+      grid-template-columns: 1fr 1fr;
+      align-items: end;
+      padding-top: 26px;
+      gap: 10px 16px;
+    }
+    .lobby .step .tag {
+      grid-column: 1 / -1;
+      margin-top: -50px;
+    }
+    .lobby .step .tag b {
+      font-size: 22px;
+    }
+    .step .say,
+    .step .fine,
+    .step .big,
+    .step .keys {
+      grid-column: 1 / -1;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lobby .step .tag {
+      animation: none;
+    }
+  }
 </style>
