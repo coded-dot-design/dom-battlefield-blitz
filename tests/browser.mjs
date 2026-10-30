@@ -204,7 +204,7 @@ try {
 
   where = "practice: tune";
   const shadow = (sel) => `document.getElementById("board").shadowRoot.querySelector(${JSON.stringify(sel)})`;
-  const DEFAULTS = { speed: 1, tank: 150, turn: 1, fire: 1, shell: 600, respawn: 2.2, bots: 7, air: 1 };
+  const DEFAULTS = { speed: 1, tank: 150, turn: 1, fire: 1, botfire: 1, spread: 1, range: 460, hurt: 1, shell: 600, respawn: 2.2, bots: 7, air: 1 };
   assert.deepEqual(await page.evaluate(() => pr.tune.values), DEFAULTS, "the levers start at the game's numbers");
   await page.evaluate(`${shadow("[data-tune]")}.click()`);
   assert.equal(await page.evaluate(`${shadow("[data-tune-panel]")}.hidden`), false, "TUNE opens the card");
@@ -267,6 +267,67 @@ try {
   assert.equal(await page.evaluate(() => localStorage.getItem("blitz:tune")), null, "and forgets the saved ones");
   await page.evaluate(() => (pr.destroy(), localStorage.clear()));
 
+  // Tuning (dev): ?tune=1 puts the TUNE key top left in SOLO; it plays live mid-match. A shared link
+  // (?t=…) loads its levers (saved too), says so on the start screen, and RESET there puts them back.
+  where = "tuning (dev)";
+  const make = (search) => page.evaluate(async (search) => {
+    window.pr?.destroy();
+    history.replaceState(null, "", `/${search}`);
+    const { createBlitz } = await import("/blitz.mjs");
+    window.pr = createBlitz(document.getElementById("board"), { mode: "board" });
+  }, search);
+  await make("");
+  assert.equal(await page.evaluate(`${shadow("[data-tune-dev]")}.hidden`), true, "no TUNE key for players by default");
+  await make("?tune=1");
+  assert.equal(await page.evaluate(() => pr.tune.dev), true, "?tune=1 turns tuning on");
+  assert.equal(await page.evaluate(() => localStorage.getItem("blitz:dev")), "1", "remembered");
+  await pick("solo");
+  await page.evaluate(() => pr.start());
+  await page.waitForFunction(() => pr.state === "play", null, { timeout: 6000 });
+  await page.evaluate(`${shadow("[data-tune-dev]")}.click()`);
+  assert.equal(await page.evaluate(`${shadow("[data-tune-panel]")}.hidden`), false, "the TUNE key opens the card in SOLO");
+  await page.waitForTimeout(200);
+  assert.equal(await page.evaluate(`${shadow("[data-tune-panel]")}.hidden`), false, "and it stays open mid-match");
+  for (const [name, v] of [["botfire", "0.5"], ["hurt", "0.5"], ["range", "300"]])
+    await page.evaluate(`(() => { const i = ${shadow(`input[name=${name}]`)}; i.value = "${v}"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  // Live: a cannon hit on you now takes half a pip.
+  const hurt = await page.evaluate(() => {
+    pr.engine.stop();
+    const w = pr.world, me = w.tanks[0], bot = w.tanks[1];
+    me.alive = true; me.drop = 1; me.shield = 0; me.hp = 5;
+    const s = w.shells.find((q) => !q.on);
+    Object.assign(s, { on: true, rail: false, tgt: -1, owner: bot.i, x: me.x - 30, y: me.y, vx: 600, vy: 0, life: 1 });
+    for (let f = 0; f < 6 && me.hp === 5; f++) pr.engine.advance(1 / 60);
+    pr.engine.start();
+    return me.hp;
+  });
+  assert.equal(hurt, 4.5, "DAMAGE TO YOU 0.5×: one hit takes half a pip, live");
+  const link = await page.evaluate(() => pr.tune.link);
+  assert.match(link, /\?t=botfire0\.5_range300_hurt0\.5$/, "the share link carries only the changed levers: " + link);
+  await page.evaluate(`${shadow("[data-tune-share]")}.click()`);
+  await page.waitForFunction(`${shadow("[data-tune-share]")}.textContent === "LINK COPIED"`);
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), link, "SHARE LINK copies it");
+  // Another device opens the link.
+  await page.evaluate(() => localStorage.clear());
+  await make(new URL(link).search);
+  assert.deepEqual(await page.evaluate(() => pr.tune.values), { ...DEFAULTS, botfire: 0.5, range: 300, hurt: 0.5 }, "the link loads its levers");
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("blitz:tune")).hurt), 0.5, "and saves them");
+  assert.equal(await page.evaluate(() => location.search), "", "the address drops ?t= (a reload keeps edits)");
+  assert.equal(await page.evaluate(() => pr.tune.dev), true, "a link turns tuning on");
+  assert.match(await page.evaluate(`${shadow("[data-linked]")}.textContent`), /TUNED SETUP LOADED · 3 LEVERS/);
+  await page.evaluate(`${shadow("[data-tuned-reset]")}.click()`);
+  assert.deepEqual(await page.evaluate(() => pr.tune.values), DEFAULTS, "the banner's RESET puts the defaults back");
+  assert.equal(await page.evaluate(`${shadow("[data-linked]")}`), null, "and the banner goes");
+  // The pause menu's switch turns it off.
+  await page.evaluate(() => pr.start());
+  await page.waitForFunction(() => pr.state === "play", null, { timeout: 6000 });
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => pr.state === "paused");
+  await page.evaluate(`${shadow("[data-dev]")}.click()`);
+  assert.equal(await page.evaluate(() => pr.tune.dev), false, "TUNING (DEV) · OFF from the pause menu");
+  assert.equal(await page.evaluate(`${shadow("[data-tune-dev]")}.hidden`), true, "the key goes");
+  await page.evaluate(() => (pr.destroy(), localStorage.clear(), history.replaceState(null, "", "/")));
+
   where = "drop-in";
   const snap = () => page.evaluate(() => [...document.body.querySelectorAll("*")].filter((n) => !n.closest("[data-fizlet-host],[data-blitz-ignore]")).map((n) => n.tagName + [...n.attributes].map((a) => a.name + "=" + a.value).sort().join("|") + "#" + [...n.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join("")).join("\n"));
   const before = await snap();
@@ -286,7 +347,7 @@ try {
   assert.equal(await snap(), before, "the page is exactly as it was");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar, locate pulse; TUNE: sliders, keys, saved, copy, persist, SOLO BOTS, shell speed and reach, RESET), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar, locate pulse; TUNE: sliders, keys, saved, copy, persist, SOLO BOTS, shell speed and reach, RESET; dev key in SOLO, live damage, share link, link load + banner RESET, pause-menu switch), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

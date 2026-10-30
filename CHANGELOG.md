@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.12.0
+
+- **Tune it while you play: Tuning (dev) in every local mode, firing levers, shareable setups** (owner:
+  "gameplay levers adjustable in the game … behind a dev toggle … in the URL so I can share a setup").
+  No default changed: an untouched game plays bit for bit as before (`test:replay` plays the 0.8.2 matches
+  value for value; lockstep 0 desyncs).
+  - **Tuning (dev).** Off for players. `?tune=1` (or PAUSE → TUNING (DEV) · ON) puts a TUNE key top left
+    in SOLO, PLATOON and PRACTICE, on the start screen and mid-match; `?tune=0` or the same switch turns it
+    off. Remembered on this device (`blitz:dev`). Every lever plays live, mid-match, except SOLO BOTS (next
+    match, labelled). Practice's coach TUNE key stays as it was.
+  - **Four firing levers** (the "too fast to compete" ones, read in `fire()`, `gun()` and `damage()`):
+    BOT RELOAD 1.00× (bots' cannon rate on top of FIRE RATE, so you vs them), BOT SPREAD 1.00× (bots'
+    scatter, 0.12 rad), BOT RANGE 460 px (how close a bot gets before it fires), DAMAGE TO YOU 1.00×
+    (per cannon hit on your tank, 5 armour). Twelve levers in all, one config layer (`TU`). Cannon shells
+    have no splash, so there is no splash lever; airstrike blasts are unchanged.
+  - **Share a setup.** SHARE LINK copies this page's address with the changed levers, `?t=botfire0.5_hurt0.5`
+    (untouched: `?tune=1`). Opening it replaces the levers, saves them (`blitz:tune`), turns tuning on and
+    drops `?t=` from the address (a reload keeps edits); the start screen says "TUNED SETUP LOADED · n
+    LEVERS" with a RESET key. Module: `tune.dev`, `tune.link`, `tune.linked`.
+  - **Online stays on the defaults.** Lockstep needs identical numbers on every peer; a `?t=` on the
+    two-player page is ignored. Carrying P1's setup in the match setup needs ~12 levers × 5-6 bits through
+    the countdown (the team pick uses 3 spare bits), so it is left for its own change.
+  - Sizes (gzip): `blitz.js` 43,752 → 44,971 (+1,219), `blitz.mjs` 43,864 → 45,067 (+1,203), `blitz-net.mjs`
+    45,331 → 46,538 (+1,207). Budgets raised by the measured cost: 44,032 → 45,252 (js, mjs), 46,080 → 47,290 (net).
+
 ## 0.11.0
 
 - **Dial in the pace: TUNE levers, team sizes for two players, and find your tank** (owner: "so fun but so fast
