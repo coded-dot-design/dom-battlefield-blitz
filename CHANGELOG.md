@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Reduced motion: no screen shake.** Under `prefers-reduced-motion: reduce` the arena no longer shakes for blasts, hits and the nuke (up to 18 px before; the stickers and launch effects already calmed down). Drawing only: the shake has its own render-side random, so the match is the same (`test:replay` value for value, `test:lockstep` 0 desyncs). `test:browser` steps one seeded match both ways: it shakes without the setting, never with it, same hash. Sizes (gzip): `blitz.js` 40,689 → 40,711, `blitz.mjs` 40,773 → 40,797, `blitz-net.mjs` 42,267 → 42,279.
 - **Fizlet 0.20.0** in `vendor/fizlet/` (tag `v0.20.0`, `bf42a8c`; `node scripts/sync.mjs`, no hand edits; `shared/` unchanged at sherman-bytes 0.5.2). Same matches: `test:replay` plays the 0.8.2 matches value for value; `test:lockstep` 0 desyncs.
   - The `join(url, signal, protocols)` shim is gone: `src/join.ts` is deleted and `src/net.ts` exports the vendored `join` from `fizlet/presence` (fizlet#113). `tests/multiplayer.mjs` passes on both invite forms (subprotocol and `?invite=`).
   - Pinch lock: the site's own `site/src/scripts/touch.ts` is gone; `Base.astro` imports `lockTouch` from `vendor/fizlet/touch`. The page's touch CSS is the Board UI kit's now, so `site.css` drops its copy; the hero is `data-touch-lock="y"` (the kit's `pan-y`; a bare `[data-touch-lock]` is `none` in the kit), so the page still scrolls through it.

@@ -290,6 +290,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   G[TILE_IN] = 1.2; // the next power tile
   G[CRATE_IN] = 12; // the next supply crate
   const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)");
+  // Reduced motion: the screen never shakes (the blasts, flags and stickers already calm down).
+  const calm = matchMedia("(prefers-reduced-motion: reduce)");
+  let shook = 0; // the last frame's shake (px), for the tests
 
   // ---------- World ----------
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
@@ -1777,7 +1780,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!);
     ctx.clearRect(0, 0, W, H);
     // The shake draws from the screen's own random, never engine.random: how often the screen is drawn must not change the match.
-    const sh = G[QUAKE]!, sx = sh ? (shakeRandom() - 0.5) * sh : 0, sy = sh ? (shakeRandom() - 0.5) * sh : 0;
+    const sh = calm.matches ? 0 : G[QUAKE]!, sx = sh ? (shakeRandom() - 0.5) * sh : 0, sy = sh ? (shakeRandom() - 0.5) * sh : 0;
+    shook = Math.abs(sx) + Math.abs(sy);
     ctx.translate(sx, sy);
     if (!embed) {
       // The arena: a dark grid like the game's map.
@@ -2235,6 +2239,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     /** Practice coach: the step you're on (0-based; 8 = done). */
     get coach() {
       return cStep;
+    },
+    /** Debug / tests: the screen shake drawn last frame (px; always 0 under reduced motion). */
+    get shake() {
+      return shook;
     },
     /** Debug / tests: your controls. */
     controls: {
