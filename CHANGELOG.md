@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **No `shared/` copy (G4).** The tank art moves to `src/sherman-sprites.ts`, contents unchanged (taken from Sherman Bytes 0.5.2, `66000fb`). `shared/ORIGIN.json` goes, `scripts/sync.mjs` refreshes `vendor/fizlet/` only, and `tsconfig.json` drops `shared/**`. Why not a brick: the tanks are game art, and redrawing them on `fizlet/sprite` would change their pixels (same call as dom-battlefield#19). The rebuilt `dist/` is byte-identical, so play and art don't change.
 - **Fizlet 0.20.0** in `vendor/fizlet/` (tag `v0.20.0`, `bf42a8c`; `node scripts/sync.mjs`, no hand edits; `shared/` unchanged at sherman-bytes 0.5.2). Same matches: `test:replay` plays the 0.8.2 matches value for value; `test:lockstep` 0 desyncs.
   - The `join(url, signal, protocols)` shim is gone: `src/join.ts` is deleted and `src/net.ts` exports the vendored `join` from `fizlet/presence` (fizlet#113). `tests/multiplayer.mjs` passes on both invite forms (subprotocol and `?invite=`).
   - Pinch lock: the site's own `site/src/scripts/touch.ts` is gone; `Base.astro` imports `lockTouch` from `vendor/fizlet/touch`. The page's touch CSS is the Board UI kit's now, so `site.css` drops its copy; the hero is `data-touch-lock="y"` (the kit's `pan-y`; a bare `[data-touch-lock]` is `none` in the kit), so the page still scrolls through it.
