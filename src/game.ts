@@ -27,7 +27,7 @@ import { controls } from "../vendor/fizlet/input";
 import { effects } from "../vendor/fizlet/fx";
 import { sound } from "../vendor/fizlet/sound";
 import { inRect } from "../vendor/fizlet/collide";
-import { tankSprites } from "../shared/sherman-sprites";
+import { tankSprites } from "./sherman-sprites";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 import { drops } from "../vendor/fizlet/rules";
 

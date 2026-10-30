@@ -20,8 +20,8 @@ Battlefield styling and the Board UI kit. `npm run site:build` builds it into `a
 `npm run test:site` checks it. Custom domain: set the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com`
 and `SITE_BASE=/`, then the custom domain in Settings → Pages; the Pages build writes `CNAME` from
 `SITE_URL`. This repo is also the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
-(the engine) and draws tanks with [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes)
-sprites. No runtime dependencies; everything first-party is snapshotted with provenance.
+(the engine, snapshotted in `vendor/fizlet/` with provenance) and draws tanks with the art in
+`src/sherman-sprites.ts`, taken from [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes) 0.5.2. No runtime dependencies.
 
 ## The game
 
@@ -138,7 +138,7 @@ npm run test:browser   # board match + every key, demo, drop-in (Chromium)
 npm run test:replay    # same seed, same match; no Math.random in play
 npm run test:lockstep  # two net peers over the memory link stay identical (and under jitter)
 ROOMS_URL=ws://127.0.0.1:8787 ROOMS_INVITE=<code> node tests/room.mjs   # through a running room server
-node scripts/sync.mjs  # refresh vendor/fizlet and shared/ from sibling checkouts
+node scripts/sync.mjs  # refresh vendor/fizlet from a sibling ../fizlet checkout
 ```
 
 Release: bump `version`, rebuild, add a CHANGELOG entry, push `main`; CI checks `dist/` matches
