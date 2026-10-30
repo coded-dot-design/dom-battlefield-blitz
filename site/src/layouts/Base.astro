@@ -46,9 +46,9 @@ const nav = [
     <a class="skip" href="#main">Skip to content</a>
     <header class="site-head">
       <div class="wrap">
-        <a class="brand" href={base()} aria-label="Battlefield Blitz home">
+        <a class="brand" href={base()} aria-label={`DOM BLITZ / V${VERSION} BATTLEFIELD: home`}>
           <span class="brand-mark"><Skull size={40} /></span>
-          <span class="brand-text"><small>DOM<i>BLITZ / V{VERSION}</i></small><b>BATTLEFIELD</b></span>
+          <span class="brand-text"><small>DOM <i>BLITZ / V{VERSION}</i></small> <b>BATTLEFIELD</b></span>
         </a>
         <nav class="site-nav" aria-label="Site">
           {nav.map(([id, label, href]) => <a href={href} aria-current={id === page ? 'page' : undefined}>{label}</a>)}

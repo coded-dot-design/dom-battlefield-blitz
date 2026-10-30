@@ -63,8 +63,8 @@ patches 1 armour.
 next strike drops seven bombs), 8 → NUKE (siren, then every other tank on the field is wrecked).
 
 **Controls.** Desktop: WASD / arrows drive, the mouse aims, click or Space fires, E (or
-right-click) long shot, F airstrike then click the spot, Q auto-aim, T aim lock, Esc pauses
-(board) or closes (drop-in). Phones: drag on the left half to drive, tap the field to shoot there,
+right-click) long shot, F airstrike then click the spot (or Enter: on your target), Q auto-aim,
+T aim lock, Esc pauses (board) or closes (drop-in). Phones: drag on the left half to drive, tap the field to shoot there,
 and the round arcade keys bottom right: AUTO and LOCK ride on FIRE (like the Battlefield cockpit),
 LONG and STRIKE sit in a row above, and the grab bar on top moves the whole pad (remembered;
 double-click puts it back). Auto-aim starts on. The screen shakes only for blasts near your tank
@@ -72,6 +72,24 @@ and hits you take (harder the bigger the hit), and phones buzz when you're hit.
 The board follows the page's light or dark theme (`<html data-theme>`) and has a full screen key
 (top left) next to the white flag: pause asks BATTLE PAUSED / GIVE UP? with KEEP FIGHTING or
 SURRENDER, the same overlay as DOM Battlefield. Every key is a Board UI kit key (Fizlet's `ui` brick), the same as DOM Battlefield's.
+
+### Keys
+
+Blitz plays with the keyboard alone: no mouse needed.
+
+| Key | Does |
+|---|---|
+| `W` `A` `S` `D` / arrows | drive |
+| mouse, or `Q` auto-aim · `T` aim lock | aim (auto-aim and lock turn the turret for you) |
+| `Space` (or click; hold) | fire the cannon (it overheats) |
+| `E` (or `R`, right-click) | long shot at your target |
+| `F` (or `X`), then `Enter` or a click | airstrike: `Enter` drops it on your target (the lock, else the nearest tank); `Esc` cancels |
+| `Esc` / `P` | pause (BATTLE PAUSED / GIVE UP?); `Esc` again resumes. In the drop-in, `Esc` closes |
+| `Tab` / `Shift+Tab`, `Enter` / `Space` | move between the on-screen keys (modes, PRESS START, KEEP FIGHTING, SURRENDER, REMATCH, NEW GAME, full screen) and press them |
+
+Focus goes to the arena when a match starts and back to it when the pause closes; a pause or a
+result puts focus on its first key. Screen readers hear your kills, rank, armour and the result
+through one polite live region (at most one update a second; the kill feed stays quiet).
 
 ## Drop-in options
 
@@ -123,7 +141,8 @@ createBlitz(document.querySelector("#arena"), { seed, net: { transport, slot, pl
 ```sh
 npm ci
 npm run check          # typecheck + build dist/ (committed)
-npm run size           # budget: 40 KB gzip (today ~34 KB, engine, art and the Board UI kit included)
+npm run size           # budget: 40 KB gzip + 0.8 KB for accessible play (engine, art and the Board UI kit included)
+npm test               # zero-allocation step, announcements, keyboard-only play
 npm run test:browser   # board match + every key, demo, drop-in (Chromium)
 npm run test:replay    # same seed, same match; no Math.random in play
 npm run test:lockstep  # two net peers over the memory link stay identical (and under jitter)

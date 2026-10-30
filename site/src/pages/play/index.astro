@@ -13,7 +13,19 @@ const description = 'Battlefield Blitz: free-for-all tank chaos. Parachute in, g
     <div id="blitz" class="blitz-host"></div>
   </section>
   <div class="wrap blitz-bar">
-    <p><b>BLITZ</b> · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike · <kbd>Q</kbd> auto · <kbd>T</kbd> lock · <kbd>Esc</kbd> pause · phones: drag left to drive</p>
+    <div class="blitz-keys">
+      <h2 id="blitz-keys"><b>BLITZ</b> KEYS</h2>
+      <ul aria-labelledby="blitz-keys">
+        <li><kbd>WASD</kbd> / <kbd>arrows</kbd> drive</li>
+        <li><kbd>mouse</kbd> aim, or <kbd>Q</kbd> auto-aim · <kbd>T</kbd> aim lock</li>
+        <li><kbd>Space</kbd> / <kbd>click</kbd> fire</li>
+        <li><kbd>E</kbd> long shot</li>
+        <li><kbd>F</kbd> airstrike, then <kbd>Enter</kbd> (your target) or click the spot</li>
+        <li><kbd>Esc</kbd> pause · cancel a strike · resume</li>
+        <li><kbd>Tab</kbd> / <kbd>Enter</kbd> the on-screen keys</li>
+        <li>Phones: drag left to drive</li>
+      </ul>
+    </div>
     <p><a href={base()}>About Blitz</a> · <a href={base('#drop')}>Put it on your site</a> · <a href={BATTLEFIELD}>The original: DOM Battlefield</a></p>
   </div>
 </Base>
@@ -58,6 +70,22 @@ const description = 'Battlefield Blitz: free-for-all tank chaos. Parachute in, g
   }
   .blitz-bar p {
     margin: 0;
+  }
+  .blitz-keys h2 {
+    margin: 0 0 6px;
+    font: inherit;
+    color: var(--ink);
+  }
+  .blitz-keys ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--ink);
   }
   .blitz-bar b {
     color: var(--k-attack);

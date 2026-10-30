@@ -30,6 +30,7 @@ import { inRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 import { drops } from "../vendor/fizlet/rules";
+import { announcer } from "./announce";
 
 /** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
 declare const __KIT_CSS__: string;
@@ -127,7 +128,7 @@ const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="tru
 const CSS = `:host{all:initial;display:block}*{box-sizing:border-box}
 .bz{position:absolute;inset:0;overflow:hidden;font:600 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
 .bz.embed{position:fixed;z-index:2147483000}
-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}canvas:focus-visible{outline:3px solid var(--k-sys-ink);outline-offset:-3px}.ov .bui-sticker span{animation-name:blink}
 .aiming canvas{cursor:none}
 .hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim);pointer-events:auto;cursor:grab;touch-action:none;white-space:nowrap}.hud.on{cursor:grabbing}
 .hud b{font-size:17px;font-weight:900}.hud small{display:block;font-size:8px;letter-spacing:.16em;color:var(--muted)}
@@ -207,20 +208,20 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const wrap = document.createElement("div");
   wrap.className = `bui bz ${mode}${demo ? " demo" : ""}${o.net ? " net" : ""}`;
   wrap.dataset.theme = "dark";
-  wrap.innerHTML = `<canvas></canvas>
+  wrap.innerHTML = `<canvas tabindex="0" role="application" aria-label="Arena: WASD or arrows drive, Space fires, Q auto-aim, T lock, E long shot, F airstrike then Enter, Esc pause"></canvas>
 <div class="hud"><div class="k"><small>KILLS</small><b data-k>0</b></div><div class="t"><small>${embed ? "RANK" : "TIME"}</small><b data-t>3:00</b></div><div class="hp"><small>ARMOR</small><i><u data-hp></u></i></div><div class="st"><small>STREAK</small><b data-st>0</b></div><div class="tm"><small>TEAM</small><b data-tm>0</b></div><div class="lead"><small>LEADER</small><b data-lead>—</b></div></div>
 <ol class="feed"><li></li><li></li><li></li><li></li></ol>
 <div class="banner" data-banner><b></b><span></span></div>
-<div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
+<div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO<span class="fine-only"> · ENTER: ON YOUR TARGET</span></div>
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
-<button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause or surrender (Esc)" title="Esc · Pause">${svg("flag")}<span>Surrender</span></button>
+<button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Surrender? Pause (Esc)" title="Esc · Pause">${svg("flag")}<span>Surrender</span></button>
 <div class="pad" data-pad>
 <button class="bui-grip grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"></button>
-<button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
-<button class="rk bui-arcade bui-aim lock" type="button" data-k="lock" aria-pressed="false" aria-label="Aim lock: stick to one target, tap a tank to switch (T)" title="T · Aim lock">${svg("lock")}<small>LOCK</small><kbd>T</kbd></button>
-<button class="rk bui-arcade bui-attack strike" type="button" data-k="strike" aria-pressed="false" aria-label="Airstrike: then tap where the bombs go (F)" title="F · Airstrike">${svg("strike")}<small>STRIKE</small><span class="n" data-n="strike">1</span><kbd>F</kbd></button>
-<button class="rk bui-arcade long" type="button" data-k="long" aria-label="Long shot: locks on and hits from across the field (E)" title="E · Long shot">${svg("long")}<small>LONG</small><span class="n" data-n="long">3</span><kbd>E</kbd></button>
-<button class="rk bui-arcade bui-fire fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
+<button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" title="Auto-aim at the nearest tank">${svg("auto")}<small>AUTO</small> <kbd>Q</kbd></button>
+<button class="rk bui-arcade bui-aim lock" type="button" data-k="lock" aria-pressed="false" title="Aim lock: stick to one target, tap a tank to switch">${svg("lock")}<small>LOCK</small> <kbd>T</kbd></button>
+<button class="rk bui-arcade bui-attack strike" type="button" data-k="strike" aria-pressed="false" title="Airstrike: then tap where the bombs go, or Enter for your target">${svg("strike")}<small>STRIKE</small> <span class="n" data-n="strike">1</span> <kbd>F</kbd></button>
+<button class="rk bui-arcade long" type="button" data-k="long" title="Long shot: locks on and hits from across the field">${svg("long")}<small>LONG</small> <span class="n" data-n="long">3</span> <kbd>E</kbd></button>
+<button class="rk bui-arcade bui-fire fire" type="button" data-k="fire" aria-label="SPACE: fire the cannon" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : net ? "" : " · ESC PAUSE"}</div>
 <div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div>
@@ -239,6 +240,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     sn: $<HTMLElement>("[data-n=strike]"), ln: $<HTMLElement>("[data-n=long]"),
   };
   const feed = [...wrap.querySelectorAll<HTMLLIElement>(".feed li")];
+  // Screen readers: one polite region, change-only writes from the HUD (never the step), 1 a second.
+  const ann = demo ? null : announcer();
+  let news = ""; // the match's news (go, the result), set by the match flow, said by the HUD
+  /** Keyboard focus to the arena (its keys work anywhere; Space/Enter there press no button). */
+  const home = () => canvas.focus({ preventScroll: true });
 
   if (net && o.seed === undefined) throw new Error("Blitz net play needs the room's seed");
   if (net && !lockstep) throw new Error("Blitz net play: import createBlitz from blitz-net.mjs");
@@ -1456,6 +1462,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         e.events.emit("lock", 0);
       }, { signal: e.signal });
     const go = over.querySelector<HTMLButtonElement>("[data-go]")!;
+    if (root.activeElement) go.focus({ preventScroll: true }); // back from a match: focus on PRESS START
     go.addEventListener("click", () => launch(go, countdown, { reduced: matchMedia("(prefers-reduced-motion: reduce)").matches }), { signal: e.signal });
   }
   function countdown() {
@@ -1464,6 +1471,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     G[CNT] = 2.4;
     over.hidden = false;
     over.innerHTML = `<div class="count" data-c>3</div>`;
+    if (!root.activeElement && document.activeElement === document.body) home(); // the start key went away
     e.events.emit("ready", 0);
   }
   function begin() {
@@ -1472,6 +1480,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     wrap.classList.remove("pre");
     over.hidden = true;
     over.innerHTML = "";
+    news = "Go";
   }
   function standings() {
     return tanks.map((t) => ({ name: t.name, kills: t.kills, deaths: t.deaths, you: net ? t === you : t.you, team: t.team })).sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
@@ -1504,6 +1513,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       ov.querySelector("[data-again]")?.addEventListener("click", () => net.again!(), { signal: e.signal });
       ov.querySelector("[data-new]")?.addEventListener("click", () => net.leave!(), { signal: e.signal });
     }
+    news = `${won ? (platoon ? "Your platoon wins" : "You win") : surrendered ? "You surrendered" : `${platoon ? PLATOON[teams[0]!.team] + " platoon" : st[0]!.name} wins`}. ${you.kills} kills, place ${st.findIndex((s) => s.you) + 1} of ${st.length}`;
     o.onEnd?.(st);
   }
   function rematch() {
@@ -1528,7 +1538,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     slam(ov.querySelector(".bui-sticker"));
     requestAnimationFrame(() => ov.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true }));
   }
-  const closeOverlay = () => ((ov.hidden = true), (ov.innerHTML = ""));
+  const closeOverlay = () => {
+    const had = ov.contains(root.activeElement);
+    ov.hidden = true;
+    ov.innerHTML = "";
+    if (had) home();
+  };
   /** Pause = the surrender question, exactly like DOM Battlefield: KEEP FIGHTING or SURRENDER. */
   function togglePause() {
     if (net) return; // a lockstep match never pauses for one player
@@ -1552,8 +1567,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 
   // ---------- HUD (change-only writes, render phase) ----------
   const teamKills = new Int32Array(4);
-  const last = { tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
+  const last = { tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, rank: 0, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
   function hudFrame() {
+    if (news) (ann?.say("status", news), ann?.flush(), (news = ""));
     const coaching = practice && state === "play";
     if (coaching) coachFrame();
     if ($<HTMLElement>("[data-coach]").hidden === coaching) {
@@ -1573,7 +1589,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const ld = platoon ? (teamKills[top] ? `${PLATOON[top]} ${teamKills[top]}` : "—") : lead.kills ? `${lead.name} ${lead.kills}` : "—";
     const tm = String(teamKills[0]);
     if (tm !== last.tm) hud.tm.textContent = last.tm = tm;
-    if (k !== last.k) hud.k.textContent = last.k = k;
+    if (k !== last.k) {
+      hud.k.textContent = last.k = k;
+      if (state === "play") ann?.say("score", `${k} kill${you.kills === 1 ? "" : "s"}`);
+    }
+    if (rank !== last.rank) {
+      last.rank = rank;
+      if (state === "play") ann?.say("rank", `rank ${rank} of ${tanks.length}`);
+    }
     if (tt !== last.t) hud.t.textContent = last.t = tt;
     if (ld !== last.lead) hud.lead.textContent = last.lead = ld;
     const st = String(you.run);
@@ -1583,6 +1606,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       last.hp = hp;
       hud.hp.style.width = `${(hp / MAXHP) * 100}%`;
       hud.hp.parentElement!.parentElement!.classList.toggle("low", hp <= 2);
+      if (state === "play") ann?.say("armor", you.alive ? `armor ${Math.ceil(hp)} of ${MAXHP}` : "wrecked");
     }
     const sn = String(you.strikes), ln = String(you.rail);
     if (sn !== last.sn) hud.sn.textContent = last.sn = sn;
@@ -2113,6 +2137,19 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     fireQ = true;
   }, { signal: e.signal });
   for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) keys.fire.addEventListener(t, fireUp, { signal: e.signal });
+  keys.fire.addEventListener("click", (ev) => ev.detail === 0 && (fireQ = true), { signal: e.signal }); // keyboard: one shot
+  // Keyboard airstrike: F, then Enter drops the bombs on your target (the lock, else the nearest
+  // enemy), else just ahead of your gun. The same spot a tap would give: no new input, no step change.
+  addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter" || !targeting || ev.repeat) return;
+    ev.preventDefault();
+    let k = lockOn && live(lockT) ? lockT : -1, bd = 1e12;
+    if (k < 0) for (const t of tanks) if (t.team !== you.team && t.alive && t.drop >= 1 && (t.x - you.x) ** 2 + (t.y - you.y) ** 2 < bd) (bd = (t.x - you.x) ** 2 + (t.y - you.y) ** 2), (k = t.i);
+    const x = k < 0 ? you.x + Math.cos(you.ta) * 160 : tanks[k]!.x, y = k < 0 ? you.y + Math.sin(you.ta) * 160 : tanks[k]!.y;
+    strikeX = x * view[0]! + view[1]!;
+    strikeY = y * view[0]! + view[2]!;
+    strikeQ = true;
+  }, { signal: e.signal });
   // Drag to move, remembered on this device; double-click puts it back. The keys move by their grab
   // bar; the scoreboard by any part of it (in-page scoreboards always drag: Board UI).
   const movable = (el: HTMLElement, handle: HTMLElement, id: string, clamp: (at: Float64Array, w: DOMRect) => void, css: (x: number, y: number) => string, moved?: () => void) => {
@@ -2260,6 +2297,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       sfx.on = v;
     },
     destroy() {
+      ann?.destroy();
       for (const a of anims) a.cancel();
       anims.clear();
       e.destroy();
