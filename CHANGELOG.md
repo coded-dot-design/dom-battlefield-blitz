@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0
+
+- **Two players in lockstep** (`net` option, demo). Every peer runs the same match from the room's
+  seed and only inputs travel, through `fizlet/presence`. A fixed 1100 × 640 arena scaled to fit (so
+  any two screens play one match), humans in seats 0..players-1 and bots after, one 32-bit input word
+  per player per frame (drive, fire, long shot, airstrike at the pointer, aim mode, pointer), and a
+  match hash compared every 30 frames.
+- **`dist/blitz-net.mjs`**, a new module: everything in `blitz.mjs` plus net play (fizlet/presence,
+  `join`, `memory`), with its own budget of 43,008 B gzip. The drop-in and `blitz.mjs` stay solo, so
+  they don't carry the lockstep code. `examples/two-player.html` is the demo page (invite code → room → play).
+- `npm run test:lockstep`: two peers on 1100 × 640 and 700 × 460 screens, scripted inputs, 3,600
+  frames identical every 600 frames; with 6 ± 5 ticks of jitter too, giving the same match as with no
+  latency; 0 desyncs, 0 `Math.random` in play. `tests/room.mjs` (needs a room server, skipped in CI):
+  measured locally through `wrangler dev`, 1,800 frames identical every 300 frames.
+- Crates (`fizlet/rules` drops) step inside the match step in net play, so a peer waiting for input
+  doesn't move them.
+- Size: `dist/blitz.js` 39,143 → 40,251 B gzip, `dist/blitz.mjs` 39,245 → 40,355 (net hooks:
+  input word, match hash, fixed arena); `dist/blitz-net.mjs` 41,785 (budget 43,008). Budget 40,960 B.
+- Solo play is unchanged: `test:replay` still plays the pinned 0.8.2 matches value for value.
+
 ## 0.8.4
 
 Still on Fizlet 0.15.0. **The step allocates nothing.** `npm test` checks it: 20,000 busy demo steps (free-for-all and platoons) make 0 minor GCs, measured on Chromium 153 (the bar is ≤ 1). 0.8.3 made 10 and 14. Gameplay is unchanged: the pinned digests (seeds 41, 42, 7 platoons) and five more seeds are the same as 0.8.2's, value for value. The one exception is below.

@@ -2,7 +2,8 @@
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 let failed = false;
-for (const [file, budget] of [["dist/blitz.js", 40960], ["dist/blitz.mjs", 40960]]) {
+// blitz-net.mjs is the module plus net play (fizlet/presence, join, memory): its own budget, 2 KB over.
+for (const [file, budget] of [["dist/blitz.js", 40960], ["dist/blitz.mjs", 40960], ["dist/blitz-net.mjs", 43008]]) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= budget;
   failed ||= !ok;
   console.log(`${ok ? "ok  " : "OVER"} ${file.padEnd(16)} ${gz} / ${budget} bytes gzip`);

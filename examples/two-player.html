@@ -1,0 +1,57 @@
+<!doctype html>
+<!-- Battlefield Blitz, two players over a fizlet-rooms room server (demo).
+     Serve the repo root (e.g. `npx serve .`) and open /examples/two-player.html on two machines
+     or two tabs. ?rooms=wss://your-rooms.example sets the server (default: ws://localhost:8787,
+     `npm run dev` in fizlet's rooms/). The invite code is the demo gate, not a login. -->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blitz · two players</title>
+<style>
+  :root { color-scheme: dark; --bg: #07060f; --ink: #f6f3ff; --muted: #9a93c9; --go: #39ffb0; --bad: #ff5c8f; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 ui-monospace, monospace; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  form { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+  label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+  input { font: inherit; color: var(--ink); background: #14122a; border: 1px solid #2b2752; border-radius: 6px; padding: 8px 10px; }
+  button { font: inherit; font-weight: 700; background: var(--go); color: var(--bg); border: 0; border-radius: 6px; padding: 9px 18px; cursor: pointer; }
+  #say { min-height: 1.5em; margin: 12px 0; }
+  #say.bad { color: var(--bad); }
+  #arena { position: relative; width: 100%; aspect-ratio: 1100 / 640; max-height: 80vh; }
+</style>
+<main>
+  <h1>Blitz · two players</h1>
+  <form id="gate">
+    <label>Invite code <input name="code" autocomplete="off" required minlength="6" maxlength="64"></label>
+    <label>Room (0–15) <input name="room" type="number" min="0" max="15" value="0" required></label>
+    <button>PLAY</button>
+  </form>
+  <p id="say" role="status"></p>
+  <div id="arena"></div>
+</main>
+<script type="module">
+  import { createBlitz, join } from "../dist/blitz-net.mjs";
+  const base = new URLSearchParams(location.search).get("rooms") ?? "ws://localhost:8787";
+  const http = base.replace(/^ws/, "http"), say = document.getElementById("say"), gate = document.getElementById("gate");
+  const tell = (text, bad = false) => ((say.textContent = text), say.classList.toggle("bad", bad));
+  let game = null;
+  gate.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const code = gate.code.value.trim(), room = Number(gate.room.value);
+    // The demo gate: the room server checks the code against its list (hashes in Cloudflare KV).
+    const ok = await fetch(`${http}/invite?code=${encodeURIComponent(code)}`).then((r) => r.ok, () => false);
+    if (!ok) return tell("That invite code isn't on the list.", true);
+    gate.hidden = true;
+    tell(`Room ${room}: waiting for player 2…`);
+    try {
+      const { transport, slot, players, seed } = await join(`${base}/room/${room}?players=2&invite=${encodeURIComponent(code)}`);
+      tell(`You're player ${slot + 1} of ${players}. Same match on both screens: only inputs travel.`);
+      game?.destroy();
+      game = createBlitz(document.getElementById("arena"), { seed, net: { transport, slot, players }, onEnd: () => tell("Match over.") });
+    } catch {
+      gate.hidden = false;
+      tell("The room closed (full, idle, or the server is down). Try another room.", true);
+    }
+  });
+</script>
+</html>
