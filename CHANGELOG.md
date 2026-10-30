@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Site: robots.txt, sitemap.xml and llms.txt** (`scripts/discovery.mjs`, run by `scripts/pages.mjs`), read from the
+  built pages: a page is listed when it is not noindex and its canonical is its own URL (home, `/play/`, `/play/multi/`).
 - **Multiplayer: the invite code's focus ring is whole.** The room card's scrolling body clipped the input's
   focus ring (3 px + 2 px offset); a 6 px inline gutter, taken back by a negative margin, keeps it whole.
 - **Movement on `@fzlt/core/steer`, the practice coach's steps on `@fzlt/core/coach`** (the Fizlet factory's roadmap, G13).
