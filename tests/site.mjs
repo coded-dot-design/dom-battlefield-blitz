@@ -7,6 +7,7 @@ import { join, extname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { checkKeys, checkTaps } from "./keys.mjs";
 import { checkHeroScrim } from "./hero-scrim.mjs";
+import { GROUPS, PAGES, hidden } from "../site/src/sitemap.mjs";
 
 const root = resolve("artifacts/pages");
 const PREFIX = "/dom-battlefield-blitz";
@@ -194,7 +195,42 @@ try {
     assert.deepEqual(terr, []);
     await tc.close();
   }
-  console.log(`Site: landing + live demo, hero scrim in both themes, board match, phone app mode, drop-in, ${keys} page keys, two-player lobby at 3 sizes passed.`);
+  where = "footer site map";
+  {
+    // The footer's site map (site/src/sitemap.mjs): on every page, one column per group, every page in
+    // PAGES linked exactly once, no hidden or noindex page, the current page marked, every section
+    // link landing on its heading. Phones: one column, no sideways scroll.
+    const noindex = (path) => /<meta\s+name="robots"\s+content="[^"]*noindex/.test(readFileSync(join(root, path, "index.html"), "utf8"));
+    const fp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    for (const at of PAGES.map((p) => p.path)) {
+      await fp.goto(base + at);
+      const map = fp.locator('footer nav[aria-label="Site map"]');
+      assert.equal(await map.locator("ul").count(), GROUPS.length, `/${at}: a list per group`);
+      assert.deepEqual(await map.locator("h2").allTextContents(), GROUPS.map((g, i) => `${String(i + 1).padStart(2, "0")}${g.title}`), `/${at}: group headings`);
+      const links = await map.locator("a").evaluateAll((as) => as.map((a) => ({ href: a.href, current: a.getAttribute("aria-current") })));
+      const local = links.map((l) => ({ ...l, url: new URL(l.href) })).filter((l) => l.url.origin === origin);
+      for (const p of PAGES) {
+        const n = local.filter((l) => l.url.pathname === new URL(base + p.path).pathname && !l.url.hash).length;
+        assert.equal(n, 1, `/${at}: footer links /${p.path} once (got ${n})`);
+      }
+      for (const l of local) {
+        const path = l.url.pathname.slice(`${PREFIX}/`.length);
+        assert.ok(!hidden(path) && !noindex(path), `/${at}: footer never links hidden or noindex /${path}`);
+        if (l.url.hash) assert.match(readFileSync(join(root, path, "index.html"), "utf8"), new RegExp(`id="${l.url.hash.slice(1)}"`), `${l.href} has its heading`);
+      }
+      const current = local.filter((l) => l.current === "page").map((l) => l.url.pathname);
+      assert.deepEqual(current, [new URL(base + at).pathname], `/${at}: aria-current on this page only`);
+    }
+    await fp.setViewportSize({ width: 390, height: 844 });
+    await fp.goto(base);
+    const phone = await fp.evaluate(() => {
+      const cols = [...document.querySelectorAll(".foot-col")].map((c) => Math.round(c.getBoundingClientRect().left));
+      return { oneColumn: new Set(cols).size === 1, fits: document.documentElement.scrollWidth <= innerWidth };
+    });
+    assert.deepEqual(phone, { oneColumn: true, fits: true }, "phone: one column of groups, no sideways scroll");
+    await fp.close();
+  }
+  console.log(`Site: landing + live demo, hero scrim in both themes, board match, phone app mode, drop-in, ${keys} page keys, two-player lobby at 3 sizes, footer site map passed.`);
 } catch (e) {
   console.error(`site test failed at ${where}`);
   throw e;

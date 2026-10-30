@@ -5,6 +5,7 @@ import '../../../vendor/fizlet/ui/board-ui.css';
 import '../styles/site.css';
 import Icon from '../components/Icon.astro';
 import Skull from '../components/Skull.astro';
+import SiteFooter from '../components/SiteFooter.astro';
 import { VERSION, REPO, HUB, BATTLEFIELD, base } from '../site';
 import { ldJson } from '../schema';
 // app: a game page. On phones it loads like the Battlefield app: no header or footer, no scroll, no zoom.
@@ -67,37 +68,7 @@ const nav = [
     <main id="main">
       <slot />
     </main>
-    <footer class="site-foot">
-      <div class="wrap">
-        <div class="foot-brand">
-          <a class="brand" href={base()}>
-            <span class="brand-mark"><Skull size={40} /></span>
-            <span class="brand-text"><small>DOM</small><b>BATTLEFIELD</b></span>
-          </a>
-          <p>Every tank for itself, in a browser tab. The arcade version of DOM Battlefield, a DOM VIRUS cartridge by coded.design.</p>
-        </div>
-        <div>
-          <h2>GAME</h2>
-          <ul>
-            <li><a href={base('play/')}>Play now</a></li>
-            <li><a href={base('#drop')}>Put it on your site</a></li>
-            <li><a href={BATTLEFIELD}>The original: DOM Battlefield</a></li>
-            <li><a href={`${REPO}/blob/main/CHANGELOG.md`}>Release notes</a></li>
-          </ul>
-        </div>
-        <div>
-          <h2>DOM VIRUS</h2>
-          <ul>
-            <li><a href={HUB}>The arcade ↗</a></li>
-            <li><a href={BATTLEFIELD}>DOM Battlefield ↗</a></li>
-            <li><a href={REPO}>Source on GitHub ↗</a></li>
-          </ul>
-        </div>
-      </div>
-      <div class="foot-base">
-        <div class="wrap"><span>© 2026 coded.design · MIT</span><span>Created by Chris Cooley</span></div>
-      </div>
-    </footer>
+    <SiteFooter />
     {app && <script is:inline>
       // App pages on phones: no pinch or double-tap zoom (iOS ignores user-scalable=no).
       for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, function (e) { if (matchMedia("(pointer: coarse)").matches) e.preventDefault(); }, { passive: false });

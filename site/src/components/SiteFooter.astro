@@ -1,0 +1,49 @@
+---
+// The footer on every page: the brand, the site map and the credit line. The site's own pages come
+// from site/src/sitemap.mjs (one source; the build fails on a page that is in neither PAGES nor
+// HIDDEN), so a new page shows up here by itself. Other sites (the hub, the family, the repo) follow.
+import Skull from './Skull.astro';
+import { REPO, HUB, BATTLEFIELD, BATTLEFIELD_PLAY, FAMILY, FIZLET, base } from '../site';
+import { GROUPS, PAGES } from '../sitemap.mjs';
+
+const here = Astro.url.pathname;
+const links = Object.fromEntries(GROUPS.map((g) => [g.id, []]));
+for (const p of PAGES) links[p.group].push({ label: p.label, href: base(p.path), current: base(p.path) === here });
+for (const p of PAGES)
+  for (const s of p.sections ?? []) links[s.group ?? p.group].push({ label: s.label, href: `${base(p.path)}#${s.id}` });
+const out = (label, href) => ({ label, href, out: true });
+links.play.push(out('Play the original', BATTLEFIELD_PLAY));
+links.board.push(out('Style guide', `${BATTLEFIELD}style-guide/`), out('Board UI spec', `${FIZLET}/blob/main/src/ui/BOARD-UI.md`));
+links.family.push(out('DOM VIRUS arcade', HUB), ...FAMILY.map(([label, href]) => out(label, href)));
+links.about.push(
+  out('Release notes', `${REPO}/blob/main/CHANGELOG.md`),
+  out('Source on GitHub', REPO),
+  out('Built on Fizlet', FIZLET),
+  out('Contributing', `${REPO}/blob/main/CONTRIBUTING.md`),
+  out('MIT licence', `${REPO}/blob/main/LICENSE`),
+);
+---
+<footer class="site-foot">
+  <div class="wrap foot-top">
+    <a class="brand" href={base()}>
+      <span class="brand-mark"><Skull size={40} /></span>
+      <span class="brand-text"><small>DOM</small><b>BATTLEFIELD</b></span>
+    </a>
+    <p>Every tank for itself, in a browser tab. The arcade version of DOM Battlefield, a DOM VIRUS cartridge by coded.design.</p>
+  </div>
+  <nav class="wrap foot-map" aria-label="Site map">
+    {GROUPS.map((g, i) => (
+      <div class="foot-col">
+        <h2 id={`map-${g.id}`}><span class="index">{String(i + 1).padStart(2, '0')}</span>{g.title}</h2>
+        <ul aria-labelledby={`map-${g.id}`}>
+          {links[g.id].map((l) => (
+            <li><a href={l.href} aria-current={l.current ? 'page' : undefined}>{l.label}{l.out && <span class="out" aria-hidden="true">↗</span>}</a></li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </nav>
+  <div class="foot-base">
+    <div class="wrap"><span>© 2026 coded.design · MIT</span><span>Created by Chris Cooley</span></div>
+  </div>
+</footer>
