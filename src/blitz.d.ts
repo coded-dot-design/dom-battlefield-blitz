@@ -24,9 +24,11 @@ export interface BlitzOptions {
   tune?: Partial<Record<TuneKey, number>>;
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
-/** The levers: speed (×, 1), tank (px/s, 150), turn (turret ×, 1), fire (×, 1), shell (px/s, 600),
- *  respawn (s, 2.2), bots (SOLO rivals, 7), air (bot airstrike calls ×, 1). Defaults = the game as it was. */
-export type TuneKey = "speed" | "tank" | "turn" | "fire" | "shell" | "respawn" | "bots" | "air";
+/** The levers: speed (×, 1), tank (px/s, 150), turn (turret ×, 1), fire (×, 1), botfire (bots' fire rate ×, 1),
+ *  spread (bots' aim scatter ×, 1), range (bots' firing range px, 460), hurt (cannon damage to you ×, 1),
+ *  shell (px/s, 600), respawn (s, 2.2), bots (SOLO rivals, 7), air (bot airstrike calls ×, 1).
+ *  Defaults = the game as it was. A board page also reads ?t=fire0.6_hurt0.5 (a shared setup) and ?tune=1|0. */
+export type TuneKey = "speed" | "tank" | "turn" | "fire" | "botfire" | "spread" | "range" | "hurt" | "shell" | "respawn" | "bots" | "air";
 /** fizlet/presence transport: moves 12-byte messages. */
 export interface Transport {
   send(data: Uint8Array): void;
@@ -39,8 +41,10 @@ export interface Blitz {
   readonly state: "intro" | "count" | "play" | "end" | "paused";
   /** Net play, two players: tanks a side as agreed (0 = free-for-all). */
   readonly squad: number;
-  /** The intensity levers: live values, set one (saved on this device in board play), reset, open the card. */
-  readonly tune: { readonly values: Record<TuneKey, number>; readonly changed: number; set(key: TuneKey, v: number): void; reset(): void; open(on?: boolean): void };
+  /** The intensity levers: live values, set one (saved on this device in board play), reset, open the card;
+   *  dev = the Tuning (dev) TUNE key in every local mode; link = this page with the setup (?t=…);
+   *  linked = the levers came from a shared link. */
+  readonly tune: { readonly values: Record<TuneKey, number>; readonly changed: number; set(key: TuneKey, v: number): void; reset(): void; open(on?: boolean): void; dev: boolean; readonly link: string; readonly linked: boolean };
   /** Leave the intro screen and start the countdown. */
   start(): void;
   sound: boolean;

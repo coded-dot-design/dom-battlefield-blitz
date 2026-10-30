@@ -34,11 +34,15 @@ itself. **PLATOON:** you and three wingmen in your colour against two other plat
 after whoever is shooting at you, and parachute back in next to you; the other platoons stick
 with their lead tank. The platoon with the most kills wins.
 
-**TUNE** (in Practice, a key on the coach card): sliders for the pace, to dial the chaos in. GAME
-SPEED (1.00×), TANK SPEED (150 px/s), TURRET TURN (1.00×), FIRE RATE (1.00×), SHELL SPEED (600 px/s,
-same reach), RESPAWN (2.2 s), SOLO BOTS (7) and BOT AIRSTRIKES (1.0×); the defaults are the game's
-numbers. Practice plays them live, SOLO and PLATOON at the next match, on this device only. RESET puts
-them back; COPY SETTINGS copies them as JSON. Online matches always play the defaults.
+**TUNE** (in Practice, a key on the coach card; in every local mode with Tuning (dev)): sliders to dial
+the chaos in. GAME SPEED (1.00×), TANK SPEED (150 px/s), TURRET TURN (1.00×), FIRE RATE (1.00×), BOT RELOAD
+(1.00×, bots only), BOT SPREAD (1.00×), BOT RANGE (460 px), DAMAGE TO YOU (1.00×), SHELL SPEED (600 px/s, same
+reach), RESPAWN (2.2 s), SOLO BOTS (7) and BOT AIRSTRIKES (1.0×); the defaults are the game's numbers. They play
+live, mid-match (SOLO BOTS from the next match), on this device only. RESET puts them back; COPY SETTINGS copies
+them as JSON; SHARE LINK copies the page's address with the setup (`/play/?t=botfire0.5_hurt0.5`), and opening it
+loads the same levers. **Tuning (dev)** is off for players: `/play/?tune=1` (or PAUSE → TUNING (DEV)) puts the
+TUNE key top left; `?tune=0` takes it away. Online matches always play the defaults (lockstep needs the same
+numbers on every peer).
 
 **Two players** (`/play/two/`, online rooms in lockstep): the TEAMS pick is FFA (both players + 4 bots,
 the default), 1V1, or 2V2 to 4V4, where each player leads AI wingmen in their colour. P1's pick is the match's.
