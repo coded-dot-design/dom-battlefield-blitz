@@ -31,9 +31,13 @@ test("a busy match steps without allocating (minor GC ≤ 1 in 20 000 steps)", a
         return g.world.tanks.filter((t) => t.alive).length;
       }, [seed, platoons]);
       assert.ok(busy >= 4, `the match is busy (${busy} tanks alive)`);
-      const gcs = await minorGCs(page, (n) => window.g.world.steps(n), STEPS);
-      assert.ok(gcs <= 1, `${platoons ? "platoons" : "free for all"}: ${gcs} minor GCs in ${STEPS} steps`);
+      const gcs = await minorGCs(page, (n) => window.g.world.steps(n), STEPS), what = `${platoons ? "platoons" : "free for all"}: ${gcs} minor GCs in ${STEPS} steps (Chrome ${browser.version()})`;
+      if (process.env.GITHUB_ACTIONS) console.log(`::${gcs <= 1 ? "notice" : "error"} title=zero-gc::${what}`); // CI logs show the count
+      assert.ok(gcs <= 1, what);
     }
+  } catch (err) {
+    if (process.env.GITHUB_ACTIONS) console.log(`::error title=zero-gc::${String(err?.message ?? err).split("\n")[0]}`);
+    throw err;
   } finally {
     await browser.close();
   }
