@@ -22,7 +22,7 @@ test("a busy match steps without allocating (minor GC ≤ 1 in 20 000 steps)", a
     });
     await page.goto(`${ORIGIN}/`);
     // The third run is tuned (every lever off its default): the levers are read, never allocated.
-    const TUNED = { speed: 0.7, tank: 120, turn: 0.6, fire: 0.6, shell: 400, respawn: 4, bots: 9, air: 2 };
+    const TUNED = { speed: 0.7, tank: 120, turn: 0.6, fire: 0.6, botfire: 0.5, spread: 2.5, range: 300, hurt: 0.5, shell: 400, respawn: 4, bots: 9, air: 2 };
     for (const [seed, platoons, tune] of [[7, false], [8, true], [9, false, TUNED]]) {
       const busy = await page.evaluate(async ([seed, platoons, tune]) => {
         const { createBlitz } = await import("/blitz.mjs");

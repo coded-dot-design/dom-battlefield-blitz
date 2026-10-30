@@ -17,7 +17,9 @@ let failed = false;
 // 46,784 / 46,912 / 48,768 → 47,808 / 47,936 / 49,792 (measured + 18-47 B).
 // Accessible play (E14): keyboard airstrike, focus moves, the arena's name, one polite live region: measured on main
 // 47,761 / 47,918 / 49,757 → 48,615 / 48,759 / 50,570 (+854 / +841 / +813); budgets raised by exactly those deltas.
-for (const [file, budget] of [["dist/blitz.js", 47808 + 854], ["dist/blitz.mjs", 47936 + 841], ["dist/blitz-net.mjs", 49792 + 813]]) {
+// Tuning (dev) in every local mode, 4 firing levers, share links: measured on main 48,615 / 48,759 / 50,570
+// → 49,850 / 49,972 / 51,806 (+1,235 / +1,213 / +1,236); budgets raised by exactly those deltas.
+for (const [file, budget] of [["dist/blitz.js", 47808 + 854 + 1235], ["dist/blitz.mjs", 47936 + 841 + 1213], ["dist/blitz-net.mjs", 49792 + 813 + 1236]]) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= budget;
   failed ||= !ok;
   console.log(`${ok ? "ok  " : "OVER"} ${file.padEnd(16)} ${gz} / ${budget} bytes gzip`);
