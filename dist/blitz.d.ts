@@ -12,7 +12,16 @@ export interface BlitzOptions {
   platoons?: boolean;
   /** Seed for the match's randomness. Same seed + same input = the same match. Default: random. */
   seed?: number;
+  /** Lockstep multiplayer (needs dist/blitz-net.mjs): same seed (the room's), only inputs cross the wire. A fixed 1100 × 640
+   *  arena scaled to fit; humans in seats 0..players-1, bots after; no pause. */
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number };
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
+}
+/** fizlet/presence transport: moves 12-byte messages. */
+export interface Transport {
+  send(data: Uint8Array): void;
+  listen(fn: ((data: Uint8Array) => void) | null): void;
+  close(): void;
 }
 export interface Blitz {
   /** Platoon mode on? */
@@ -22,6 +31,10 @@ export interface Blitz {
   start(): void;
   sound: boolean;
   destroy(): void;
+  /** Net play: lockstep frame, stalls, first desynced frame (-1); null when solo. */
+  readonly net: { readonly frame: number; readonly stalls: number; readonly desync: number; readonly lost: number } | null;
+  /** A hash of the match state. */
+  hash(): number;
   readonly engine: { stats(): unknown; stop(): void; start(): void; advance(sec: number): void; readonly running: boolean };
   readonly world: { tanks: unknown[]; tiles: unknown[]; shells: unknown[]; blocks: unknown[]; planes: unknown[]; bombs: unknown[]; crates: unknown[]; marks: unknown[]; steps(n: number): void };
   /** Your controls (debug / tests). */
