@@ -50,12 +50,46 @@ export interface BlitzOptions {
   /** Lockstep multiplayer (fizlet/presence): every peer runs the same match from the same seed and
    *  only inputs cross the wire. A fixed 1100 × 640 arena (scaled to fit), humans in seats
    *  0..players-1, bots after them, no pause. `input` replaces this peer's controls (tests). */
-  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void };
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void; squad?: number };
+  /** Intensity levers (see TUNE). A board match on this device reads the ones saved by Practice →
+   *  TUNE; these override them in any mode. Net play: every peer must pass the same values. */
+  tune?: Partial<Record<TuneKey, number>>;
   /** Called when a board match ends. */
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
 
 const TAU = Math.PI * 2;
+/**
+ * The intensity levers (Practice → TUNE): one config layer the match reads at its seams. Each default
+ * is the number the game used before the levers, so an untouched game plays bit for bit as before.
+ *   speed   the match clock: every timer, every move (a fixed step of dt × speed)
+ *   tank    drive speed, px/s at the 1.4 scale
+ *   turn    turret (aim) turn rate, × (players' and bots')
+ *   fire    cannon fire rate, × (the cooldown ÷ this; everyone)
+ *   shell   cannon shell speed, px/s (same reach: a slower shell lives longer)
+ *   respawn seconds wrecked before the parachute
+ *   bots    rival bots in a SOLO match (next match)
+ *   air     how often bots call in the airstrikes they hold, ×
+ */
+const TUNE = [
+  ["speed", "GAME SPEED", "the whole match, slow-mo to fast", 1, 0.5, 1.5, 0.05, "×"],
+  ["tank", "TANK SPEED", "how fast every tank drives", 150, 80, 220, 5, " px/s"],
+  ["turn", "TURRET TURN", "how fast turrets swing onto a target", 1, 0.4, 1.5, 0.05, "×"],
+  ["fire", "FIRE RATE", "cannon shots per second, everyone", 1, 0.4, 1.5, 0.05, "×"],
+  ["shell", "SHELL SPEED", "slower shells are easier to dodge", 600, 300, 900, 25, " px/s"],
+  ["respawn", "RESPAWN", "time out after you are wrecked", 2.2, 1, 6, 0.1, " s"],
+  ["bots", "SOLO BOTS", "rivals in a SOLO match (next match)", 7, 1, 10, 1, ""],
+  ["air", "BOT AIRSTRIKES", "how often bots call strikes in", 1, 0, 2, 0.1, "×"],
+] as const;
+export type TuneKey = (typeof TUNE)[number][0];
+const U_SPEED = 0, U_TANK = 1, U_TURN = 2, U_FIRE = 3, U_SHELL = 4, U_RESPAWN = 5, U_BOTS = 6, U_AIR = 7;
+const tuneDefaults = () => Object.fromEntries(TUNE.map((r) => [r[0], r[3]])) as Record<TuneKey, number>;
+/** A lever's value on its slider's grid, clamped to its range. */
+const tuneFit = (k: number, v: number) => {
+  const [, , , , min, max, step] = TUNE[k]!;
+  // To 6 decimals, so a value that lands on a default is the default exactly (2.2, not 2.2000000000000002).
+  return Number.isFinite(+v) ? Math.round(Math.min(max, Math.max(min, Math.round((+v - min) / step) * step + min)) * 1e6) / 1e6 : TUNE[k]![3];
+};
 /**
  * Length of (x, y), bit for bit what Math.hypot returns for finite x, y, without its allocation
  * (V8's Math.hypot allocates on every call, even optimized). It scales by the larger side as V8 does,
@@ -113,6 +147,7 @@ const ICON = {
   flag: '<path d="M5 18V3M5 4h10l-3 3.5 3 3.5H5"/>',
   full: '<path d="M2 7V2h5M18 7V2h-5M2 13v5h5M18 13v5h-5"/>',
   exit: '<path d="M7 2v5H2M13 2v5h5M7 18v-5H2M13 18v-5h5"/>',
+  tune: '<path d="M3 5h14M3 10h14M3 15h14"/><circle cx="7" cy="5" r="2" fill="currentColor"/><circle cx="13" cy="10" r="2" fill="currentColor"/><circle cx="9" cy="15" r="2" fill="currentColor"/>',
 };
 // The Battlefield cartridge skull on its grid tile, with a pink Blitz bolt.
 const GRID = '<path d="M0 16h64M0 32h64M0 48h64M16 0v64M32 0v64M48 0v64" stroke="#19f0ff" stroke-opacity=".35"/><rect x="1" y="1" width="62" height="62" fill="none" stroke="#19f0ff" stroke-width="2"/>';
@@ -178,7 +213,28 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .coach{position:absolute;left:50%;top:max(76px,calc(env(safe-area-inset-top) + 66px));translate:-50% 0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:2px 12px;width:min(520px,calc(100% - 24px));padding:10px 12px 10px 14px;color:#f6f3ff;background:#10233f;border:2.5px solid #f6f3ff;border-radius:12px;box-shadow:0 5px 0 #f6f3ff}
 .bui[data-theme=light] .coach{color:var(--rim);background:#f6f3ff;border-color:var(--rim);box-shadow:0 5px 0 var(--rim)}
 .coach[hidden]{display:none}.coach span{grid-row:span 2;font:900 11px/1 ui-monospace,monospace;color:var(--k-sys-ink)}.coach b{font:900 14px/1.1 ui-monospace,monospace;letter-spacing:.08em;color:var(--hurt)}.bui[data-theme=light] .coach b{color:#b07400}.coach small{grid-column:2;font-size:11px;line-height:1.35;opacity:.85}
-.bui .coach button{grid-row:1/span 2;grid-column:3;min-height:0;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em}
+.coach .cx{grid-row:1/span 2;grid-column:3;display:grid;gap:6px}.bui .coach button{min-height:0;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em}
+.bui .coach [data-tune]{display:inline-flex;align-items:center;justify-content:center;gap:5px}.coach [data-tune] svg{width:13px;height:13px;stroke:currentColor;stroke-width:2;fill:none}
+.tuning .coach{display:none}
+.bui .tune{position:absolute;z-index:4;left:max(12px,env(safe-area-inset-left));top:max(60px,calc(env(safe-area-inset-top) + 50px));display:grid;gap:8px;width:min(400px,calc(100% - 24px));max-height:calc(100% - 76px);padding-bottom:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+.tune[hidden]{display:none}
+.tune header{display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:10px}.tune header b{font:900 15px/1.1 ui-monospace,monospace;letter-spacing:.12em}.tune header small{grid-row:2;font-size:9px;letter-spacing:.14em;color:var(--muted)}
+.bui .tune button{min-height:44px;padding:0 12px;font:900 11px/1 ui-monospace,monospace;letter-spacing:.1em}.bui .tune header button{grid-row:1/span 2;grid-column:2;min-height:40px}
+.tr{display:grid;gap:2px;padding:6px 0 4px;border-top:1px solid var(--line)}
+.tr span{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:11px;letter-spacing:.1em}
+.tr output{font:900 13px/1 ui-monospace,monospace;font-variant-numeric:tabular-nums}.tr.on output{color:var(--hurt)}.bui[data-theme=light] .tr.on output{color:#b07400}
+.tr small{font-size:10px;color:var(--muted)}
+.tune input{-webkit-appearance:none;appearance:none;display:block;width:100%;height:26px;margin:0;background:none;cursor:pointer;touch-action:pan-y}
+.tune input::-webkit-slider-runnable-track{height:10px;border:2px solid var(--line);border-radius:5px;background:linear-gradient(90deg,var(--k-sys) calc(var(--p,0) * 100%),var(--raised) 0)}
+.tune input::-moz-range-track{height:6px;border:2px solid var(--line);border-radius:5px;background:linear-gradient(90deg,var(--k-sys) calc(var(--p,0) * 100%),var(--raised) 0)}
+.tune input::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-8px;background:var(--k-sys);border:2.5px solid var(--rim);border-radius:6px;box-shadow:calc(2 * var(--shadow-x,0) * var(--u)) calc(2 * var(--shadow-y,1) * var(--u)) 0 var(--shadow-color,var(--rim))}
+.tune input::-moz-range-thumb{width:17px;height:17px;background:var(--k-sys);border:2.5px solid var(--rim);border-radius:6px;box-shadow:calc(2 * var(--shadow-x,0) * var(--u)) calc(2 * var(--shadow-y,1) * var(--u)) 0 var(--shadow-color,var(--rim))}
+.tune input:focus-visible{outline:3px solid var(--k-sys-ink);outline-offset:1px;border-radius:6px}
+.tune .note{margin:0;font-size:10px;line-height:1.4;color:var(--muted)}
+.tune code{display:block;padding:6px 8px;font:10px/1.45 ui-monospace,monospace;word-break:break-all;color:var(--ink);background:var(--raised);border:1px solid var(--line);border-radius:6px;user-select:text;-webkit-user-select:text}
+.tune .tk{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:0 -14px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--line)}
+.tuned{margin:-14px 0 0;padding:4px 10px;font-size:10px;letter-spacing:.12em;color:var(--rim);background:var(--hurt);border:2px solid var(--rim);border-radius:6px}
+.vs{margin:-18px 0 0;font:900 18px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--k-sys-ink)}
 .bui .fs{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
 .bui .pz{position:absolute;z-index:3;left:max(60px,calc(env(safe-area-inset-left) + 48px));top:max(10px,env(safe-area-inset-top));height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
@@ -223,7 +279,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <button class="rk bui-arcade bui-fire fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : net ? "" : " · ESC PAUSE"}</div>
-<div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div>
+<div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><div class="cx"><button class="bui-key" type="button" data-tune aria-expanded="false" aria-controls="bz-tune" title="Intensity levers: game speed, tank speed, fire rate…">${svg("tune")}TUNE</button><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div></div>
+<section class="tune bui-card" id="bz-tune" data-tune-panel hidden aria-labelledby="bz-tune-t"><header><b id="bz-tune-t">TUNE</b><small>PACE &amp; CHAOS · THIS DEVICE</small><button class="bui-key" type="button" data-tune-x>DONE</button></header><div data-tune-rows></div><p class="note">Plays in SOLO, PLATOON and PRACTICE on this device. Online matches keep the defaults.</p><code data-tune-json></code><div class="tk"><button class="bui-key" type="button" data-tune-reset>RESET</button><button class="bui-key" type="button" data-tune-copy>COPY SETTINGS</button></div></section>
 <div class="over" data-over hidden></div>
 <div class="bui-overlay ov" data-ov hidden role="dialog"></div>`;
   root.append(style, wrap);
@@ -290,6 +347,24 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   G[TILE_IN] = 1.2; // the next power tile
   G[CRATE_IN] = 12; // the next supply crate
   const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)");
+  // The levers (TUNE): one config layer the step reads at its seams. Board play on this device reads
+  // what Practice → TUNE saved; the drop-in, the attract match and net play keep the defaults (net
+  // play: the same numbers on every peer, or a desync). o.tune goes on top, in any mode.
+  const TU = new Float64Array(TUNE.map((r) => r[3]));
+  const tunable = !net && !embed && !demo;
+  const tuneLoad = (v: unknown) => {
+    if (v && typeof v === "object") for (let k = 0; k < TUNE.length; k++) { const x = (v as Record<string, unknown>)[TUNE[k]![0]]; if (x != null) TU[k] = tuneFit(k, Number(x)); }
+  };
+  if (tunable)
+    try {
+      tuneLoad(JSON.parse(localStorage.getItem("blitz:tune") ?? "null"));
+    } catch {}
+  tuneLoad(o.tune);
+  // Net play, two players: tanks a side (1 = 1v1 … 4 = 4v4: you + AI wingmen; 0 = free-for-all).
+  // P1's pick rides in bits 9-11 of P1's input word through the countdown, so every peer builds the
+  // same roster on the same lockstep frame; nobody's seat changes.
+  const squadOf = (v: number) => (P === 2 && v >= 1 && v <= 4 ? v | 0 : 0);
+  let squad = 0;
 
   // ---------- World ----------
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
@@ -312,13 +387,20 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   let platoon = !net && (o.platoons ?? saved === "platoon"), practice = !net && !embed && !demo && o.platoons === undefined && saved === "practice";
   let N = 0, tanks: Tank[] = [], you: Tank = null!;
   const per = embed ? 3 : 4;
+  /** How many sides a platoon match has: three locally, one per player in net play. */
+  const sides = net ? P : 3;
+  const sideName = (team: number) => (net ? (team === you.team ? "YOUR" : `P${team + 1}`) : PLATOON[team]!);
   function roster() {
-    N = net ? P + (o.bots ?? 4) : practice ? 7 : platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : 7));
+    if (net) platoon = squad > 1;
+    N = net ? (squad ? P * squad : P + (o.bots ?? 4)) : practice ? 7 : platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : TU[U_BOTS]!));
     tanks = Array.from({ length: N }, (_, i) => {
-      const team = platoon ? (i / per) | 0 : i, slot = platoon ? i % per : 0, hu = net ? i < P : i === 0;
+      const hu = net ? i < P : i === 0, w = i - P;
+      // Net squads: the humans (seats 0..P-1) lead sides 0..P-1; their AI wingmen come after.
+      const team = net && squad ? (hu ? i : (w / (squad - 1)) | 0) : platoon ? (i / per) | 0 : i;
+      const slot = net && squad ? (hu ? 0 : 1 + (w % (squad - 1))) : platoon ? i % per : 0;
       return {
         i, team, slot, you: net ? hu : i === 0 && !demo,
-        name: net ? (i === net.slot ? "YOU" : hu ? `P${i + 1}` : NAMES[i % NAMES.length]!) : practice ? (i === 0 ? "YOU" : i <= 3 ? `TARGET${i}` : `MOVER${i - 3}`) : platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
+        name: net ? (i === net.slot ? "YOU" : hu ? `P${i + 1}` : squad ? (team === net.slot ? WING[slot - 1]! : `P${team + 1}·${WING[slot - 1]}`) : NAMES[i % NAMES.length]!) : practice ? (i === 0 ? "YOU" : i <= 3 ? `TARGET${i}` : `MOVER${i - 3}`) : platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
         color: platoon ? TEAM_COLORS[team]! : COLORS[i % COLORS.length]!,
         x: 0, y: 0, a: 0, ta: 0, hp: MAXHP, alive: false, dead: platoon ? 0.2 + team * 0.45 + slot * 0.12 : 0.2 + i * 0.18, drop: 0, shield: 0, rapid: 0, triple: 0,
         strikes: hu ? 1 : 0, carpet: 0, rail: hu ? RAIL_START : 1, charge: 0, chargeT: -1, heat: 0, hot: 0,
@@ -326,8 +408,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       };
     });
     you = tanks[net ? net.slot : 0]!;
-    wrap.classList.toggle("platoon", platoon);
-    wrap.classList.toggle("practice", practice);
   }
   roster();
   const shells: Shell[] = Array.from({ length: 140 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, owner: 0, on: false, rail: false, tgt: -1 }));
@@ -483,7 +563,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       // Platoons drop together: next to the platoon's lead tank, else at the platoon's corner.
       let anchor: Tank | null = null;
       for (const o2 of tanks) if (o2 !== t && o2.team === t.team && o2.alive && (!anchor || o2.slot < anchor.slot)) anchor = o2;
-      const a = Math.PI * 0.75 + (t.team * TAU) / 3;
+      const a = Math.PI * 0.75 + (t.team * TAU) / sides;
       F[PX] = anchor ? anchor.x : W / 2 + Math.cos(a) * W * 0.32;
       F[PY] = anchor ? anchor.y : H / 2 + Math.sin(a) * H * 0.3;
     }
@@ -539,16 +619,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       s.tgt = -1;
       s.x = t.x + Math.cos(a) * len;
       s.y = t.y + Math.sin(a) * len;
-      s.vx = Math.cos(a) * 600;
-      s.vy = Math.sin(a) * 600;
-      s.life = 1;
+      s.vx = Math.cos(a) * TU[U_SHELL]!;
+      s.vy = Math.sin(a) * TU[U_SHELL]!;
+      s.life = 600 / TU[U_SHELL]!; // the same reach at any speed
       s.owner = t.i;
     }
     t.recoil = 6;
     t.flash = 0.08;
     if (t.you) cShots++;
     // The cannon is quick; hold it down too long and it overheats (rapid fire never does).
-    t.cool = t.you ? (t.rapid > 0 ? 0.1 : 0.19) : t.rapid > 0 ? 0.22 : 0.5 + R() * 0.35;
+    t.cool = (t.you ? (t.rapid > 0 ? 0.1 : 0.19) : t.rapid > 0 ? 0.22 : 0.5 + R() * 0.35) / TU[U_FIRE]!;
     if (t.you && t.rapid <= 0 && (t.heat += 0.16) >= 1) {
       t.hot = 1.4;
       ((FQ[0] = t.x), (FQ[1] = t.y - 34), (FQ[2] = W_HOT), (FQ[3] = 2), (FQ[4] = 16), fxPush(FX_WORD));
@@ -591,7 +671,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function kill(t: Tank, by: number, word = W_BOOM) {
     if (!t.alive) return;
     t.alive = false;
-    t.dead = 2.2;
+    t.dead = TU[U_RESPAWN]!;
     t.deaths++;
     t.run = 0;
     t.charge = 0;
@@ -881,7 +961,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     F[TT] = Math.atan2(ay, ax);
     F[TM] = 7 * dt;
     hullTo(t);
-    const sp = 150 * m * (scale / 1.4) * dt, nx = t.x + Math.cos(t.a) * sp, ny = t.y + Math.sin(t.a) * sp, rad = 14 * scale;
+    const sp = TU[U_TANK]! * m * (scale / 1.4) * dt, nx = t.x + Math.cos(t.a) * sp, ny = t.y + Math.sin(t.a) * sp, rad = 14 * scale;
     F[BX] = nx;
     F[BY] = t.y;
     F[BR] = rad;
@@ -913,7 +993,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         F[HY] = o2.y - t.y;
         hyp();
         const d = F[HO]!;
-        if (t.strikes > 0 && R() < 0.2) ((F[KX] = o2.x), (F[KY] = o2.y), callStrike(t.i));
+        if (t.strikes > 0 && R() < 0.2 * TU[U_AIR]!) ((F[KX] = o2.x), (F[KY] = o2.y), callStrike(t.i));
         else if (t.rail > 0 && d > 380 && R() < 0.3) charge(t, o2.i);
       }
     }
@@ -982,7 +1062,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         F[HY] = o2.y - t.y;
         hyp();
         const d = F[HO]!;
-        if (t.strikes > 0 && R() < 0.35) ((F[KX] = o2.x), (F[KY] = o2.y), callStrike(t.i));
+        if (t.strikes > 0 && R() < 0.35 * TU[U_AIR]!) ((F[KX] = o2.x), (F[KY] = o2.y), callStrike(t.i));
         else if (t.rail > 0 && d > 380 && R() < 0.4) charge(t, o2.i);
       }
     }
@@ -1003,10 +1083,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const o2 = t.target >= 0 ? tanks[t.target]! : null;
     if (o2 && o2.alive && o2.drop >= 1) {
       const aim = Math.atan2(o2.y - t.y, o2.x - t.x);
-      (F[TF] = t.ta), (F[TT] = aim), (F[TM] = 4.5 * dt), turretTo(t);
+      (F[TF] = t.ta), (F[TT] = aim), (F[TM] = 4.5 * TU[U_TURN]! * dt), turretTo(t);
       const err = Math.abs(Math.atan2(Math.sin(aim - t.ta), Math.cos(aim - t.ta)));
       if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && within(o2, t, 460)) fire(t);
-    } else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 3 * dt), turretTo(t);
+    } else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 3 * TU[U_TURN]! * dt), turretTo(t);
   }
   /** What your turret is on: the lock, else auto-aim's pick, else nothing (-1). */
   function aimTarget() {
@@ -1022,9 +1102,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const touch = input.stick.active || coarse.matches, aim = aimTarget();
     if (aim >= 0) {
       const o2 = tanks[aim]!;
-      (F[TF] = t.ta), (F[TT] = Math.atan2(o2.y - t.y, o2.x - t.x)), (F[TM] = 8 * dt), turretTo(t);
-    } else if (!touch || input.pointer.down) (F[TF] = t.ta), (F[TT] = Math.atan2(input.pointer.y - t.y, input.pointer.x - t.x)), (F[TM] = 10 * dt), turretTo(t);
-    else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 4 * dt), turretTo(t);
+      (F[TF] = t.ta), (F[TT] = Math.atan2(o2.y - t.y, o2.x - t.x)), (F[TM] = 8 * TU[U_TURN]! * dt), turretTo(t);
+    } else if (!touch || input.pointer.down) (F[TF] = t.ta), (F[TT] = Math.atan2(input.pointer.y - t.y, input.pointer.x - t.x)), (F[TM] = 10 * TU[U_TURN]! * dt), turretTo(t);
+    else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 4 * TU[U_TURN]! * dt), turretTo(t);
     if ((input.down("fire") || input.pointer.down || fireQ) && !targeting && t.cool <= 0 && t.hot <= 0 && t.charge <= 0) fire(t);
     if (t.cool <= 0) fireQ = false; // a quick tap on FIRE always gets its shot
     if (longQ) {
@@ -1048,9 +1128,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const px = (((b >>> 16) & 255) + 0.5) * (W / 256), py = (((b >>> 24) & 255) + 0.5) * (H / 256);
     (F[DX] = mx === 1 ? -1 : mx === 2 ? 1 : 0), (F[DY] = my === 1 ? -1 : my === 2 ? 1 : 0), (F[DT] = dt), drive(t);
     const aim = aimMode === 1 ? nearestEnemy(t, 520) : -1;
-    if (aim >= 0) (F[TF] = t.ta), (F[TT] = Math.atan2(tanks[aim]!.y - t.y, tanks[aim]!.x - t.x)), (F[TM] = 8 * dt), turretTo(t);
-    else if (aimMode === 0) (F[TF] = t.ta), (F[TT] = Math.atan2(py - t.y, px - t.x)), (F[TM] = 10 * dt), turretTo(t);
-    else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 4 * dt), turretTo(t);
+    if (aim >= 0) (F[TF] = t.ta), (F[TT] = Math.atan2(tanks[aim]!.y - t.y, tanks[aim]!.x - t.x)), (F[TM] = 8 * TU[U_TURN]! * dt), turretTo(t);
+    else if (aimMode === 0) (F[TF] = t.ta), (F[TT] = Math.atan2(py - t.y, px - t.x)), (F[TM] = 10 * TU[U_TURN]! * dt), turretTo(t);
+    else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 4 * TU[U_TURN]! * dt), turretTo(t);
     if (b & 16 && t.cool <= 0 && t.hot <= 0 && t.charge <= 0) fire(t);
     if (b & 32) charge(t, aim >= 0 ? aim : nearestTo(px, py, 9999, t.team));
     if (b & 64) (F[KX] = px), (F[KY] = py), callStrike(t.i);
@@ -1137,7 +1217,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (input.hit("lock")) (lockOn = !lockOn), (lockT = -1);
     },
     // Net play: presence runs world() once per lockstep frame instead.
-    step: net ? undefined : (_, dt) => world(dt),
+    step: net ? undefined : (_, dt) => world(dt * TU[U_SPEED]!),
     render() {
       fxPlay(); // what the steps asked for, in order
       // A crate that landed this frame raises a dust puff.
@@ -1158,8 +1238,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // Crates are a fizlet/rules system: in net play they move on lockstep frames too, so world()
   // steps them (first, as the engine would) and the engine doesn't.
   if (net) e.remove(supply.system);
+  // This peer's word, with its team-size pick in bits 9-11 (only P1's counts).
+  const squadBits = squadOf(net?.squad ?? 0) << 9, ownInput = net?.input ?? encode;
+  const netInput = () => (ownInput() | squadBits) >>> 0;
   const link = net
-    ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: net.input ?? encode, step: (_, ins) => ((netIn = ins), world(e.dt)), hash: worldHash })
+    ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: netInput, step: (_, ins) => ((netIn = ins), world(e.dt * TU[U_SPEED]!)), hash: worldHash })
     : null;
 
   /** One fixed step of the match. */
@@ -1170,6 +1253,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       G[QUAKE] = Math.max(0, G[QUAKE]! - dt * 40);
       G[WHITE] = Math.max(0, G[WHITE]! - dt * 0.9);
       if (state === "intro" || state === "count") {
+        // Net, two players: P1's team size (the same input word on every peer, the same frame).
+        if (net && P === 2 && squadOf((netIn[0]! >>> 9) & 7) !== squad) (squad = squadOf((netIn[0]! >>> 9) & 7)), roster();
         // The start screen: the grid lights up with everything that can land on it.
         if ((G[TILE_IN]! -= dt) <= 0) (lightTile(true), (G[TILE_IN] = 0.08 + R() * 0.16));
         for (const s of tiles) {
@@ -1431,6 +1516,70 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     intro();
   }
 
+  // ---------- TUNE: the intensity levers (a card from Practice's coach) ----------
+  // Each slider writes one number of TU (the config the step reads), saved on this device. Practice
+  // plays it live; SOLO and PLATOON read it at the next match. COPY SETTINGS puts the JSON on the
+  // clipboard, to send back the numbers that feel right.
+  const tunePanel = $<HTMLElement>("[data-tune-panel]"), tuneKey = $<HTMLButtonElement>("[data-tune]"), tuneJson = $<HTMLElement>("[data-tune-json]");
+  const copyKey = $<HTMLButtonElement>("[data-tune-copy]");
+  const tuneValues = () => Object.fromEntries(TUNE.map((r, k) => [r[0], TU[k]!])) as Record<TuneKey, number>;
+  const tuneChanged = () => TUNE.reduce((n, r, k) => n + (TU[k] !== r[3] ? 1 : 0), 0);
+  const tuneShow = (k: number, v: number) => `${v.toFixed(TUNE[k]![6] < 0.1 ? 2 : TUNE[k]![6] < 1 ? 1 : 0)}${TUNE[k]![7]}`;
+  $<HTMLElement>("[data-tune-rows]").innerHTML = TUNE.map(
+    ([id, label, hint, def, min, max, step], k) =>
+      `<label class="tr"><span><b>${label}</b><output></output></span><input type="range" name="${id}" min="${min}" max="${max}" step="${step}" data-u="${k}"><small>${hint} · default ${tuneShow(k, def)}</small></label>`,
+  ).join("");
+  const tuneInputs = [...tunePanel.querySelectorAll<HTMLInputElement>("input")];
+  function tunePaint() {
+    tuneInputs.forEach((inp, k) => {
+      const [, , , def, min, max] = TUNE[k]!, v = TU[k]!, row = inp.parentElement!;
+      inp.value = String(v);
+      inp.style.setProperty("--p", String((v - min) / (max - min)));
+      inp.setAttribute("aria-valuetext", tuneShow(k, v));
+      row.classList.toggle("on", v !== def);
+      row.querySelector("output")!.textContent = tuneShow(k, v);
+    });
+    tuneJson.textContent = JSON.stringify(tuneValues());
+  }
+  const tuneSave = () => {
+    try {
+      if (tuneChanged()) localStorage.setItem("blitz:tune", JSON.stringify(tuneValues()));
+      else localStorage.removeItem("blitz:tune");
+    } catch {}
+  };
+  function tuneOpen(on: boolean) {
+    if (on) tunePaint();
+    tunePanel.hidden = !on;
+    wrap.classList.toggle("tuning", on);
+    tuneKey.setAttribute("aria-expanded", String(on));
+    if (on) tuneInputs[0]!.focus({ preventScroll: true });
+  }
+  tunePanel.addEventListener("input", (ev) => {
+    const inp = ev.target as HTMLInputElement, k = Number(inp.dataset.u);
+    TU[k] = tuneFit(k, Number(inp.value));
+    tuneSave();
+    tunePaint();
+  }, { signal: e.signal });
+  // A slider takes its own arrow keys (they don't drive); Escape closes the card.
+  tunePanel.addEventListener("keydown", (ev) => {
+    if (ev.code === "Escape") return void (ev.stopPropagation(), tuneOpen(false), tuneKey.focus({ preventScroll: true }));
+    if ((ev.target as Element).matches("input") && /^(Arrow|Home|End|Page)/.test(ev.code)) ev.stopPropagation();
+  }, { signal: e.signal });
+  tuneKey.addEventListener("click", () => tuneOpen(!!tunePanel.hidden), { signal: e.signal });
+  $<HTMLButtonElement>("[data-tune-x]").addEventListener("click", () => (tuneOpen(false), tuneKey.focus({ preventScroll: true })), { signal: e.signal });
+  $<HTMLButtonElement>("[data-tune-reset]").addEventListener("click", () => (TU.set(TUNE.map((r) => r[3])), tuneSave(), tunePaint()), { signal: e.signal });
+  copyKey.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(tuneValues()));
+      copyKey.textContent = "COPIED";
+    } catch {
+      // No clipboard (an insecure page, a denied permission): select the line so it copies by hand.
+      getSelection()?.selectAllChildren(tuneJson);
+      copyKey.textContent = "SELECTED · COPY IT";
+    }
+    setTimeout(() => (copyKey.textContent = "COPY SETTINGS"), 1800);
+  }, { signal: e.signal });
+
   // ---------- Match flow ----------
   const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
   function intro() {
@@ -1441,6 +1590,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     over.classList.add("intro");
     over.innerHTML = `<div class="sticker">${BADGE}<span data-kick>${kicker()}</span><b>BLITZ<em>!</em></b></div>
 <div class="modes bui-seg" role="group" aria-label="Mode"><button class="mode" type="button" data-mode="solo" aria-pressed="${!platoon && !practice}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" data-mode="platoon" aria-pressed="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button><button class="mode" type="button" data-mode="practice" aria-pressed="${practice}"><b>PRACTICE</b><small>learn the keys, with tips</small></button></div>
+${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${tuneChanged() > 1 ? "S" : ""} CHANGED · PRACTICE → TUNE</p>` : ""}
 <div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
 <button class="bui-sticker-key bui-call" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
     for (const b of over.querySelectorAll<HTMLButtonElement>("[data-mode]"))
@@ -1463,7 +1613,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     over.classList.remove("intro");
     G[CNT] = 2.4;
     over.hidden = false;
-    over.innerHTML = `<div class="count" data-c>3</div>`;
+    over.innerHTML = `<div class="count" data-c>3</div>${net && P === 2 ? `<p class="vs" data-vs></p>` : ""}`;
     e.events.emit("ready", 0);
   }
   function begin() {
@@ -1481,18 +1631,18 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     targeting = false;
     const st = standings();
     // Platoons: the platoon with the most kills wins; the table is the platoons, then you.
-    const teams = [0, 1, 2].map((team) => ({ team, kills: 0, deaths: 0 }));
+    const teams = Array.from({ length: sides }, (_, team) => ({ team, kills: 0, deaths: 0 }));
     if (platoon) for (const t of tanks) (teams[t.team]!.kills += t.kills), (teams[t.team]!.deaths += t.deaths);
     teams.sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
-    const won = !surrendered && (platoon ? teams[0]!.team === 0 : st[0]!.you);
+    const won = !surrendered && (platoon ? teams[0]!.team === you.team : st[0]!.you);
     e.events.emit(won ? "win" : "end", 0);
     const rows = platoon
-      ? teams.map((s, i) => `<div class="${s.team === 0 ? "you" : ""}"><span>${i + 1}. ${PLATOON[s.team]} PLATOON</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("") + `<div class="you"><span>YOU</span><span>${you.kills} K · ${you.deaths} D</span></div>`
+      ? teams.map((s, i) => `<div class="${s.team === you.team ? "you" : ""}"><span>${i + 1}. ${sideName(s.team)} PLATOON</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("") + `<div class="you"><span>YOU</span><span>${you.kills} K · ${you.deaths} D</span></div>`
       : st.slice(0, 5).map((s, i) => `<div class="${s.you ? "you" : ""}"><span>${i + 1}. ${s.name}</span><span>${s.kills} K · ${s.deaths} D</span></div>`).join("");
     // Kit result overlays: STAGE CLEAR when you win, INSERT COIN when you don't, WHITE FLAG when you gave up.
     overlay(
       won ? "STAGE CLEAR" : surrendered ? "WHITE FLAG" : "INSERT COIN",
-      won ? (platoon ? "PLATOON WINS" : "YOU WIN") : surrendered ? "GAME OVER" : `${platoon ? PLATOON[teams[0]!.team] : st[0]!.name} WINS`,
+      won ? (platoon ? "PLATOON WINS" : "YOU WIN") : surrendered ? "GAME OVER" : `${platoon ? sideName(teams[0]!.team) : st[0]!.name} WINS`,
       // Net play: the page decides what REMATCH and NEW ROOM do (net.again / net.leave: a new room join).
       (net ? (net.again ? `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button>` : "") + (net.leave ? `<button class="bui-sticker-key bui-second" type="button" data-new>${PLAY}<b>NEW ROOM</b></button>` : "") : `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>REMATCH</b></button><button class="bui-sticker-key bui-second" type="button" data-new>${PLAY}<b>NEW GAME</b></button>`),
       `<div class="table">${rows}</div>`,
@@ -1552,9 +1702,12 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 
   // ---------- HUD (change-only writes, render phase) ----------
   const teamKills = new Int32Array(4);
-  const last = { tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
+  const last = { pl: false, pr: false, tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
   function hudFrame() {
+    if (last.pl !== platoon) wrap.classList.toggle("platoon", (last.pl = platoon));
+    if (last.pr !== practice) wrap.classList.toggle("practice", (last.pr = practice));
     const coaching = practice && state === "play";
+    if (!coaching && !tunePanel.hidden) tuneOpen(false);
     if (coaching) coachFrame();
     if ($<HTMLElement>("[data-coach]").hidden === coaching) {
       $<HTMLElement>("[data-coach]").hidden = !coaching;
@@ -1569,9 +1722,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const t of tanks) if (t.team < 4) teamKills[t.team]! += t.kills;
     const tt = practice ? "∞" : embed ? `#${rank}` : `${Math.floor(Math.max(0, G[CLK]!) / 60)}:${String(Math.floor(Math.max(0, G[CLK]!) % 60)).padStart(2, "0")}`;
     let top = 0;
-    for (let k2 = 1; k2 < 3; k2++) if (teamKills[k2]! > teamKills[top]!) top = k2;
-    const ld = platoon ? (teamKills[top] ? `${PLATOON[top]} ${teamKills[top]}` : "—") : lead.kills ? `${lead.name} ${lead.kills}` : "—";
-    const tm = String(teamKills[0]);
+    for (let k2 = 1; k2 < sides && k2 < 4; k2++) if (teamKills[k2]! > teamKills[top]!) top = k2;
+    const ld = platoon ? (teamKills[top] ? `${sideName(top)} ${teamKills[top]}` : "—") : lead.kills ? `${lead.name} ${lead.kills}` : "—";
+    const tm = String(teamKills[you.team] ?? 0);
     if (tm !== last.tm) hud.tm.textContent = last.tm = tm;
     if (k !== last.k) hud.k.textContent = last.k = k;
     if (tt !== last.t) hud.t.textContent = last.t = tt;
@@ -1623,6 +1776,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       );
     }
     if (state === "count") {
+      const vs = squad ? `${squad} V ${squad}` : "FREE FOR ALL", vsEl = over.querySelector<HTMLElement>("[data-vs]");
+      if (vsEl && vsEl.textContent !== vs) vsEl.textContent = vs;
       const c = G[CNT]! > 1.6 ? "3" : G[CNT]! > 0.8 ? "2" : G[CNT]! > 0.15 ? "1" : "BLITZ!";
       if (c !== last.count) {
         last.count = c;
@@ -1633,6 +1788,47 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
 
   // ---------- Drawing ----------
+  /** Find yourself: seconds the locate pulse runs after you land, and when it last started (render clock). */
+  const LOCATE = 1.4, still = matchMedia("(prefers-reduced-motion: reduce)");
+  let youUp = false, locateAt = -9;
+  /** Find yourself: each time you land (the start, every respawn) rings ripple out from your tank and
+   *  a big YOU chevron drops onto it. Drawn only, on the screen's clock (never the match's). */
+  function locatePulse() {
+    const now = performance.now() / 1000, up = you.alive && you.drop >= 1; // port-check: ok render: the pulse is drawn only
+    if (up && !youUp) locateAt = now;
+    youUp = up;
+    const lk = now - locateAt;
+    if (!up || lk >= LOCATE) return;
+    const r0 = 27 * scale, s = scale / 1.4, calm = still.matches;
+    // Three rings a beat apart (one fading ring with reduced motion).
+    for (let k = 0; k < (calm ? 1 : 3); k++) {
+      const ph = calm ? 0.3 : lk / LOCATE - k * 0.2;
+      if (ph <= 0 || ph >= 1) continue;
+      ctx.globalAlpha = calm ? 1 - lk / LOCATE : 1 - ph;
+      ctx.beginPath();
+      ctx.arc(you.x, you.y, r0 + ph * 120 * s, 0, TAU);
+      ctx.strokeStyle = lightTheme ? "#f6f3ff" : "#07060f";
+      ctx.lineWidth = 6;
+      ctx.stroke();
+      ctx.strokeStyle = you.color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    // The chevron: drops in over the tag and bobs, then fades.
+    const drop = calm ? 0 : 10 * Math.abs(Math.sin(lk * 8)) * (1 - lk / LOCATE), y = you.y - r0 - 30 - drop;
+    ctx.globalAlpha = Math.min(1, (LOCATE - lk) * 3);
+    ctx.beginPath();
+    ctx.moveTo(you.x - 11, y - 10);
+    ctx.lineTo(you.x + 11, y - 10);
+    ctx.lineTo(you.x, y + 3);
+    ctx.closePath();
+    ctx.fillStyle = you.color;
+    ctx.strokeStyle = lightTheme ? "#f6f3ff" : "#07060f";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
   /** A top-down jet pointing along +x. */
   function jet(x: number, y: number, a: number, s: number) {
     ctx.save();
@@ -1973,6 +2169,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           ctx.fillRect(t.x - 17 + k * 7, ty + 4, 5, 3);
         }
     }
+    if (!demo) locatePulse();
     // Your aim: the lock (cyan brackets) or auto's pick (thin).
     if (!demo && you.alive && you.drop >= 1 && you.charge <= 0) {
       const k = lockOn ? lockT : autoOn ? nearestEnemy(you, 520) : -1;
@@ -2229,6 +2426,30 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     get platoons() {
       return platoon;
     },
+    /** Net play, two players: tanks a side as agreed (P1's pick), 0 = free-for-all. */
+    get squad() {
+      return squad;
+    },
+    /** The intensity levers (Practice → TUNE): the live values, set one (saved like the slider), reset. */
+    tune: {
+      get values() {
+        return tuneValues();
+      },
+      get changed() {
+        return tuneChanged();
+      },
+      set(key: TuneKey, v: number) {
+        const k = TUNE.findIndex((r) => r[0] === key);
+        if (k >= 0) (TU[k] = tuneFit(k, v)), tunable && tuneSave(), tunePaint();
+      },
+      reset() {
+        TU.set(TUNE.map((r) => r[3]));
+        if (tunable) tuneSave();
+        tunePaint();
+      },
+      /** The TUNE card's key: open or close it (practice). */
+      open: (on = true) => tuneOpen(on),
+    },
     get practice() {
       return practice;
     },
@@ -2249,6 +2470,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       },
       get targeting() {
         return targeting;
+      },
+      /** When the find-yourself pulse last started (performance.now() seconds; -9 never). */
+      get locate() {
+        return locateAt;
       },
       /** Drop a supply crate now. */
       crate: () => dropCrate(),

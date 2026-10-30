@@ -1,6 +1,42 @@
 # Changelog
 
-## Unreleased
+## 0.11.0
+
+- **Dial in the pace: TUNE levers, team sizes for two players, and find your tank** (owner: "so fun but so fast
+  you lose your guy … add some sort of slider … 2 player should have platoon option and 1v1"). No default changed:
+  an untouched game plays bit for bit as before (`test:replay` plays the 0.8.2 matches value for value).
+  - **TUNE** (Practice: a TUNE key on the coach card opens a Board UI card). Eight levers, one config layer
+    (`TU`) the step reads at its seams. Defaults are the numbers the game used: GAME SPEED 1.00× (the fixed
+    step's dt × speed: every timer and move), TANK SPEED 150 px/s, TURRET TURN 1.00× (players' and bots'
+    aim), FIRE RATE 1.00× (cannon cooldown ÷ rate, everyone), SHELL SPEED 600 px/s (same reach: a slower
+    shell lives longer), RESPAWN 2.2 s, SOLO BOTS 7 (next match), BOT AIRSTRIKES 1.0× (how often bots
+    call in the strikes they hold). Each shows its value and its default; changed ones turn amber.
+    RESET puts them all back; COPY SETTINGS puts the JSON on the clipboard (or selects it to copy by
+    hand), and the card shows the same line. Saved on this device (`blitz:tune`, try/catch): Practice
+    plays them live, SOLO and PLATOON read them at the next match, and the start screen says
+    "TUNED · n LEVERS CHANGED". Not in net play (the drop-in and the attract match keep the defaults too):
+    lockstep needs the same numbers on every peer, so online matches play the defaults. `createBlitz({ tune })`
+    sets them in any mode (net play: every peer must pass the same). A slider's arrow keys don't drive;
+    Escape closes the card. New shadows use the unitless shadow tokens (`--shadow-x`, `--shadow-y`, `--shadow-color`).
+  - **Two players: teams.** The room card's TEAMS pick: FFA (default, as before: 2 players + 4 bots),
+    1V1, 2V2, 3V3, 4V4 (each player + AI wingmen in their colour, who follow and cover them like PLATOON
+    wingmen). P1's pick is the match's: it rides in bits 9-11 of P1's input word through the countdown, so
+    every peer builds the same roster on the same lockstep frame (no seat or room-server change). The
+    countdown says `2 V 2`, the card header `LIVE · 2V2`, the share link carries `&teams=`. Two-player
+    rooms only (3 and 4 players stay free-for-all). `net.squad` in the module.
+  - **Find your tank.** Each time you land (the start and every respawn) three rings ripple out from your
+    tank and a YOU chevron drops onto it for 1.4 s (one fading ring with reduced motion). Drawn in the
+    engine's render phase on the screen's clock, never the match's.
+  - Sizes (gzip): `blitz.js` 40,689 → 43,752 (+3,063), `blitz.mjs` 40,773 → 43,864 (+3,091),
+    `blitz-net.mjs` 42,267 → 45,331 (+3,064): the TUNE card (its CSS, the eight levers and the panel code)
+    is most of it. Budgets +3 KB: 40,960 → 44,032 (drop-in and module), 43,008 → 46,080 (net).
+  - Tests: `test:browser` opens TUNE, moves sliders by keys and by input, checks the readout, the saved
+    JSON, COPY SETTINGS on the clipboard, persistence into a new game, SOLO BOTS (4 tanks), a tuned shell
+    (450 px/s, same reach), RESET (defaults back, saved settings cleared), and the locate pulse.
+    `test:lockstep`: 1v1 to 4v4 with P2 asking for another size: both peers play P1's, 2k tanks, k a
+    side, 0 desyncs; free-for-all unchanged. `npm test` (zero-GC) adds a tuned match (every lever off its
+    default): ≤ 1 minor GC in 20,000 steps. `test:site`: the TEAMS pick (two players only), P1's pick on
+    every screen, the tank count, the link.
 
 - **Fizlet 0.20.0** in `vendor/fizlet/` (tag `v0.20.0`, `bf42a8c`; `node scripts/sync.mjs`, no hand edits; `shared/` unchanged at sherman-bytes 0.5.2). Same matches: `test:replay` plays the 0.8.2 matches value for value; `test:lockstep` 0 desyncs.
   - The `join(url, signal, protocols)` shim is gone: `src/join.ts` is deleted and `src/net.ts` exports the vendored `join` from `fizlet/presence` (fizlet#113). `tests/multiplayer.mjs` passes on both invite forms (subprotocol and `?invite=`).

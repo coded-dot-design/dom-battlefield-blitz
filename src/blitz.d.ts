@@ -15,9 +15,18 @@ export interface BlitzOptions {
   /** Lockstep multiplayer (needs dist/blitz-net.mjs): same seed (the room's), only inputs cross the wire. A fixed 1100 × 640
    *  arena scaled to fit; humans in seats 0..players-1, bots after; no pause. `again` / `leave` put
    *  REMATCH / NEW ROOM keys on the result (the page joins the next room). */
-  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void };
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void;
+    /** Two players: tanks a side, 1 (1v1) to 4 (4v4: each player + 3 AI wingmen); 0 or none = free-for-all
+     *  with `bots` bots. P1's pick is the match's (it rides in P1's input word through the countdown). */
+    squad?: number };
+  /** Intensity levers. A board match reads the ones Practice → TUNE saved on this device; these
+   *  override them in any mode (net play: every peer must pass the same values). */
+  tune?: Partial<Record<TuneKey, number>>;
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
+/** The levers: speed (×, 1), tank (px/s, 150), turn (turret ×, 1), fire (×, 1), shell (px/s, 600),
+ *  respawn (s, 2.2), bots (SOLO rivals, 7), air (bot airstrike calls ×, 1). Defaults = the game as it was. */
+export type TuneKey = "speed" | "tank" | "turn" | "fire" | "shell" | "respawn" | "bots" | "air";
 /** fizlet/presence transport: moves 12-byte messages. */
 export interface Transport {
   send(data: Uint8Array): void;
@@ -28,6 +37,10 @@ export interface Blitz {
   /** Platoon mode on? */
   readonly platoons: boolean;
   readonly state: "intro" | "count" | "play" | "end" | "paused";
+  /** Net play, two players: tanks a side as agreed (0 = free-for-all). */
+  readonly squad: number;
+  /** The intensity levers: live values, set one (saved on this device in board play), reset, open the card. */
+  readonly tune: { readonly values: Record<TuneKey, number>; readonly changed: number; set(key: TuneKey, v: number): void; reset(): void; open(on?: boolean): void };
   /** Leave the intro screen and start the countdown. */
   start(): void;
   sound: boolean;
@@ -39,7 +52,7 @@ export interface Blitz {
   readonly engine: { stats(): unknown; stop(): void; start(): void; advance(sec: number): void; readonly running: boolean };
   readonly world: { tanks: unknown[]; tiles: unknown[]; shells: unknown[]; blocks: unknown[]; planes: unknown[]; bombs: unknown[]; crates: unknown[]; marks: unknown[]; steps(n: number): void };
   /** Your controls (debug / tests). */
-  readonly controls: { readonly auto: boolean; readonly lock: boolean; readonly lockTarget: number; readonly targeting: boolean; crate(): void };
+  readonly controls: { readonly auto: boolean; readonly lock: boolean; readonly lockTarget: number; readonly targeting: boolean; readonly locate: number; crate(): void };
 }
 export function createBlitz(host: HTMLElement, options?: BlitzOptions): Blitz;
 export interface BlitzInstall {
