@@ -70,7 +70,7 @@ const rules = [
         <ul class="tiles">
           {tiles.map(([icon, c, ink, name, what]) => <li><i style={`--c:${c};${ink ? `--t:${ink}` : ''}`}>{icon}</i><span><b>{name}</b> {what}</span></li>)}
         </ul>
-        <p class="keys-line"><kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> / <kbd>space</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike, then click the spot · <kbd>Q</kbd> auto-aim · <kbd>T</kbd> aim lock · <kbd>Esc</kbd> pause. Phones: drag on the left to drive; AUTO and LOCK ride on FIRE, LONG and STRIKE sit above, and the grab bar moves the keys.</p>
+        <p class="keys-line"><kbd>WASD</kbd> / <kbd>arrows</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> / <kbd>space</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike, then click the spot or <kbd>Enter</kbd> for your target · <kbd>Q</kbd> auto-aim · <kbd>T</kbd> aim lock · <kbd>Esc</kbd> pause. Keyboard only works too: <kbd>Tab</kbd> to a key, <kbd>Enter</kbd> to press it. Phones: drag on the left to drive; AUTO and LOCK ride on FIRE, LONG and STRIKE sit above, and the grab bar moves the keys.</p>
       </div>
       <a class="panel lit shot" href={base('play/')} aria-label="Play Battlefield Blitz">
         <img src={base('shots/blitz.webp')} alt="Battlefield Blitz: eight tanks in a free-for-all, an airstrike exploding, a parachute dropping a tank in, the kill feed on the right." width="1440" height="820" loading="lazy" decoding="async" />
@@ -84,9 +84,9 @@ const rules = [
         <p class="eyebrow"><b>DROP-IN</b> · ANY WEBSITE</p>
         <h2>Put Blitz on your page.</h2>
         <p>One line. A <b>PLAY BLITZ</b> key appears; press it and your page becomes the arena: shells knock your headings around, treads flatten them. Escape gives the page back exactly as it was.</p>
-        <pre><code>{snippet}</code></pre>
+        <pre tabindex="0"><code>{snippet}</code></pre>
         <p>Or hide it as an easter egg: the Konami code on desktop, a hold-then-tap on any <code>data-blitz-trigger</code> element on phones.</p>
-        <pre><code>{eggSnippet}</code></pre>
+        <pre tabindex="0"><code>{eggSnippet}</code></pre>
         <button class="bui-key bui-arcade bui-attack" type="button" data-drop><Icon name="bolt" size={16} />Drop Blitz on this page</button>
       </div>
       <div class="bz-family">

@@ -2,6 +2,47 @@
 
 ## Unreleased
 
+- **Accessible play (roadmap E14).** Blitz plays with the keyboard alone, passes axe-core with no
+  serious or critical issues, and tells screen readers how the match is going. No gameplay change:
+  `test:replay` plays the 0.8.2 matches value for value, `test:lockstep` 0 desyncs, the input word
+  is unchanged.
+  - **Keyboard airstrike:** `F`, then `Enter` drops the bombs on your target (the lock, else the
+    nearest enemy, else just ahead of your gun). It sets the same spot a tap does (the strike queue
+    the pointer already fills), so the step and the net input word are untouched. `Esc` still cancels.
+  - **Focus:** the arena canvas is focusable (`role="application"`, its name lists the keys, a
+    visible focus ring); focus moves to it when the start key goes and when the pause closes, to the
+    first key when the pause or result opens, and to PRESS START after NEW GAME. Space/Enter in the
+    arena press no button. The FIRE key fires once from the keyboard (Enter / Space on it). Tab
+    always leads out of the game (no trap).
+  - **Screen readers:** one polite live region per document (`[data-fz-announce]`, role `status`,
+    `aria-atomic`, visually hidden), through `src/announce.ts`, a local copy of the
+    `fizlet/announce` contract (`announcer({ gap, doc })` → `say(key, text)` / `flush()` /
+    `destroy()`); the next vendor sync swaps the import, `vendor/` is untouched. The HUD says, change
+    only and never from the step: your kills (`score`), your rank (`rank`), your armour or
+    "wrecked" (`armor`), "Go" and the result with your kills and place (`status`, flushed at once).
+    At most one write a second; the kill feed and streak banner are not announced. No region in demo
+    mode; the drop-in removes its region when it closes.
+  - **axe-core 4.14 (serious / critical before → after), dark and light:** landing 3 / 0 → 0 / 0;
+    `/play/` intro 1 → 0, mid-game 6 → 0, pause 6–7 → 0, result 6–7 → 0; `/play/two/` lobby 1 → 0;
+    `examples/two-player.html` idle 0 → 0, mid-game 5 → 0; drop-in host 0 → 0, open 5 → 0. Fixes:
+    pad key names now contain their visible text (`AUTO Q`, `LONG 3 E`, `SPACE: fire the cannon`,
+    `Surrender? Pause (Esc)`; the long descriptions moved to `title`), the result kicker blinks to
+    60 % instead of 45 % (contrast 3.2 → 5:1), the landing's code blocks are focusable (scrollable
+    regions), the header logo's name contains its text. Left (moderate): `/play/`'s
+    `user-scalable=no` (phones' app mode, by design) and the drop-in arena outside landmarks.
+  - **Keys documented:** a KEYS list on `/play/` under the arena, the landing and `/play/two/` key
+    lines, and a Keys table in the README.
+  - Tests (`npm test`): `tests/announce.test.mjs` (coalescing, rate limit, region attributes,
+    shared region, destroy; a match says go, kills, rank, armour and the result, one region, at most
+    one write a second) and `tests/keyboard.test.mjs` (start, drive, auto/lock, fire, long shot,
+    F+Enter airstrike, Esc cancel, pause/resume, surrender, NEW GAME, focus rings, no trap). The
+    zero-gc step check stays green.
+  - Sizes (gzip): `blitz.js` 40,689 → 41,520, `blitz.mjs` 40,773 → 41,607, `blitz-net.mjs`
+    42,267 → 43,125. Measured: the announcer ≈ 300 B; the rest (keyboard airstrike, focus moves,
+    the arena's name, key names, announcement texts) ≈ 530 B. Budgets raised by exactly those
+    deltas for accessible play: 40,960 → 41,791 (`blitz.js`), 40,960 → 41,794 (`blitz.mjs`),
+    43,008 → 43,866 (`blitz-net.mjs`).
+
 - **Fizlet 0.20.0** in `vendor/fizlet/` (tag `v0.20.0`, `bf42a8c`; `node scripts/sync.mjs`, no hand edits; `shared/` unchanged at sherman-bytes 0.5.2). Same matches: `test:replay` plays the 0.8.2 matches value for value; `test:lockstep` 0 desyncs.
   - The `join(url, signal, protocols)` shim is gone: `src/join.ts` is deleted and `src/net.ts` exports the vendored `join` from `fizlet/presence` (fizlet#113). `tests/multiplayer.mjs` passes on both invite forms (subprotocol and `?invite=`).
   - Pinch lock: the site's own `site/src/scripts/touch.ts` is gone; `Base.astro` imports `lockTouch` from `vendor/fizlet/touch`. The page's touch CSS is the Board UI kit's now, so `site.css` drops its copy; the hero is `data-touch-lock="y"` (the kit's `pan-y`; a bare `[data-touch-lock]` is `none` in the kit), so the page still scrolls through it.
