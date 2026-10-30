@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- **Phones: taps and swipes never zoom or pan the page** (owner: "for mobile all of our pages right
+  now need to lock down double tap and pinch to zoom"). The page is `touch-action: manipulation`
+  (no double-tap zoom) with `text-size-adjust: 100%`; the hero battle is `[data-touch-lock]`:
+  `touch-action: pan-y` and `overscroll-behavior: none`, so the page still scrolls through it but a
+  swipe never pans it sideways, and `lockTouch` (Fizlet's `fizlet/touch` rule, in
+  `site/src/scripts/touch.ts` until the next vendor sync) cancels a pinch on it, iOS gesture events
+  included. The landing keeps pinch-zoom on the copy (WCAG 1.4.4); `/play/` already turns zoom off.
+  `test:site` pinches, swipes and double-taps the hero at 390 × 844 (touch): scale stays 1, the page
+  390 wide.
+
 ## 0.10.0
 
 - **The scoreboard drags.** Board UI rule: in-page scoreboards always drag.

@@ -126,6 +126,38 @@ try {
   await dp.close();
   // Page keys (Fizlet BOARD-UI.md "Page keys"): every in-page key presses (face drops by its base)
   // and clicks on its face, top edge and base; Enter shows the press; phones: a tap on the base clicks.
+  where = "touch";
+  {
+    // Phones (390 x 844, touch): a double-tap, a pinch or a sideways swipe on the hero battle never
+    // zooms or pans the page; the page is touch-action: manipulation (no double-tap zoom) and stays
+    // 390 wide. Raw touch points: Chromium's synthesized touch pinch never zooms headless.
+    const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+    const tp = await phone.newPage();
+    await tp.goto(base);
+    await tp.waitForTimeout(500);
+    const cdp = await phone.newCDPSession(tp);
+    const pts = (type, list) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: list.map(([x, y], id) => ({ x, y, id })) });
+    const state = () => tp.evaluate(() => ({ scale: visualViewport.scale, x: scrollX, w: document.documentElement.scrollWidth }));
+    const hero = await tp.locator("[data-touch-lock]").first().boundingBox();
+    const x = 195, y = Math.round(hero.y + hero.height * 0.55);
+    await pts("touchStart", [[x - 15, y], [x + 15, y]]);
+    for (let i = 1; i <= 10; i++) await pts("touchMove", [[x - 15 - i * 12, y], [x + 15 + i * 12, y]]);
+    await pts("touchEnd", []);
+    await tp.waitForTimeout(300);
+    assert.deepEqual(await state(), { scale: 1, x: 0, w: 390 }, "a pinch on the hero does not zoom the page");
+    await pts("touchStart", [[300, y]]);
+    for (let i = 1; i <= 10; i++) await pts("touchMove", [[300 - i * 25, y]]);
+    await pts("touchEnd", []);
+    await tp.waitForTimeout(300);
+    assert.deepEqual(await state(), { scale: 1, x: 0, w: 390 }, "a sideways swipe on the hero does not pan the page");
+    await cdp.send("Input.synthesizeTapGesture", { x, y, tapCount: 2, gestureSourceType: "touch" });
+    await tp.waitForTimeout(300);
+    assert.equal((await state()).scale, 1, "a double-tap on the hero does not zoom");
+    const ta = await tp.evaluate(() => [getComputedStyle(document.documentElement).touchAction, getComputedStyle(document.querySelector("[data-touch-lock]")).touchAction]);
+    assert.deepEqual(ta, ["manipulation", "pan-y"], "page touch-action manipulation, hero pan-y");
+    await phone.close();
+  }
+
   where = "page keys";
   let keys = 0;
   for (const [opts, check] of [[{ viewport: { width: 1440, height: 900 } }, checkKeys], [{ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, checkTaps]]) {
