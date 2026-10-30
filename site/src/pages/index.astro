@@ -136,7 +136,18 @@ const rules = [
     display: grid;
     align-items: center;
     border-bottom: 2px solid var(--line);
-    background: #090818;
+    background: var(--bg);
+    /* Theme tokens for the copy over the battle: the scrim fades from the page colour (dark --bg,
+       light --surface), and the pink line and BLITZ VERSION darken toward --ink in light mode so
+       they keep WCAG AA on the light scrim (tests/hero-scrim.mjs checks both themes). */
+    --scrim: var(--bg);
+    --hero-pink: var(--k-attack);
+    --hero-tag: var(--k-sys-ink);
+  }
+  :global(html.bui[data-theme="light"]) .bz-hero {
+    --scrim: var(--surface);
+    --hero-pink: color-mix(in srgb, var(--k-attack) 75%, var(--ink));
+    --hero-tag: color-mix(in srgb, var(--k-sys-ink) 75%, var(--ink));
   }
   .bz-demo {
     position: absolute;
@@ -150,7 +161,7 @@ const rules = [
     inset: 0;
     z-index: 0;
     pointer-events: none;
-    background: linear-gradient(90deg, #090818ee 0%, #090818aa 45%, transparent 75%);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--scrim) 93%, transparent) 0%, color-mix(in srgb, var(--scrim) 67%, transparent) 45%, transparent 75%);
   }
   .bz-hero-inner {
     position: relative;
@@ -165,10 +176,13 @@ const rules = [
   }
   .bz-hero .eyebrow,
   .bz-hero h1 {
-    color: #f6f3ff;
+    color: var(--ink);
   }
   .bz-hero .eyebrow {
     display: block;
+  }
+  .bz-hero .eyebrow b {
+    color: var(--hero-tag);
   }
   .bz-hero .eyebrow .dot {
     display: inline-block;
@@ -179,14 +193,14 @@ const rules = [
     font-size: clamp(48px, 8vw, 112px);
     line-height: 0.95;
     letter-spacing: -0.05em;
-    text-shadow: 0 4px 30px #090818;
+    text-shadow: 0 4px 30px var(--scrim);
   }
   .bz-hero h1 em {
     font-style: normal;
-    color: #ff2e88;
+    color: var(--hero-pink);
   }
   .bz-hero .lead {
-    color: #cfc7f0;
+    color: var(--muted);
     max-width: 540px;
   }
   .bz-ctas {
@@ -207,11 +221,11 @@ const rules = [
     gap: 8px;
     font: 700 12px var(--mono);
     letter-spacing: 0.06em;
-    color: #cfc7f0;
+    color: var(--muted);
     text-decoration: none;
   }
   .bz-og:hover {
-    color: #fff;
+    color: var(--ink);
   }
   .section {
     padding: clamp(70px, 10vw, 120px) 0 0;
@@ -380,7 +394,7 @@ const rules = [
       grid-template-columns: minmax(0, 1fr);
     }
     .bz-hero::after {
-      background: linear-gradient(180deg, #090818dd 0%, #090818aa 60%, #09081866 100%);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--scrim) 87%, transparent) 0%, color-mix(in srgb, var(--scrim) 67%, transparent) 60%, color-mix(in srgb, var(--scrim) 40%, transparent) 100%);
     }
   }
 </style>
