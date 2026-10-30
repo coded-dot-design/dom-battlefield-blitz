@@ -11,6 +11,18 @@ import { checkHeroScrim } from "./hero-scrim.mjs";
 const root = resolve("artifacts/pages");
 const PREFIX = "/dom-battlefield-blitz";
 if (!existsSync(join(root, "index.html"))) throw Error("Build the site first: npm run site:build");
+// Discovery files (scripts/discovery.mjs): robots.txt names the sitemap; the sitemap and llms.txt list the
+// indexable pages (home, /play/, /play/two/) and nothing that is noindex or canonical elsewhere.
+{
+  const home = readFileSync(join(root, "index.html"), "utf8").match(/<link rel="canonical" href="([^"]+)"/)[1];
+  assert.match(readFileSync(join(root, "robots.txt"), "utf8"), new RegExp(`^Sitemap: ${home}sitemap\\.xml$`, "m"));
+  const locs = [...readFileSync(join(root, "sitemap.xml"), "utf8").matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  assert.deepEqual(locs, [home, `${home}play/`, `${home}play/two/`]);
+  const llms = readFileSync(join(root, "llms.txt"), "utf8");
+  assert.match(llms, /^# Battlefield Blitz\n/);
+  assert.match(llms, /By Chris Cooley\./);
+  for (const url of locs) assert.ok(llms.includes(`](${url})`), `llms.txt links ${url}`);
+}
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".json": "application/json" };
 // A plain page to drop Blitz onto (the drop-in must give it back exactly).
 const HOST_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Host</title></head><body><h1>A page</h1><p>Some <b>text</b> to knock around.</p><ul><li>one</li><li>two</li></ul></body></html>`;

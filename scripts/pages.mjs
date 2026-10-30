@@ -3,12 +3,18 @@
 //   /           landing page   (site/src/pages/index.astro)
 //   /play/      the game       (site/src/pages/play/index.astro, dist/blitz.mjs)
 //   /blitz.js   the drop-in    (dist/blitz.js, the committed build)
+//   /robots.txt, /sitemap.xml, /llms.txt   from the built pages (scripts/discovery.mjs)
 import { cpSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
+import { writeDiscovery } from "./discovery.mjs";
 
 const out = resolve("artifacts/pages");
 if (!existsSync(join(out, "index.html"))) throw Error("Run astro build first (npm run site:build).");
 cpSync("dist/blitz.js", join(out, "blitz.js"));
+
+// Search engines and LLM readers: robots.txt, sitemap.xml, llms.txt (indexable pages only).
+const home = new URL((process.env.SITE_BASE || "/dom-battlefield-blitz").replace(/\/?$/, "/"), process.env.SITE_URL || "https://coded-dot-design.github.io").href;
+console.log(`Discovery: ${writeDiscovery(out, home, "Battlefield Blitz").length} pages in sitemap.xml and llms.txt`);
 
 // Every local href/src in the built pages must resolve to a file.
 const BASE = `${(process.env.SITE_BASE || "/dom-battlefield-blitz").replace(/\/$/, "")}/`;
