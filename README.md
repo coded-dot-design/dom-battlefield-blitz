@@ -20,8 +20,8 @@ Battlefield styling and the Board UI kit. `npm run site:build` builds it into `a
 `npm run test:site` checks it. Custom domain: set the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com`
 and `SITE_BASE=/`, then the custom domain in Settings → Pages; the Pages build writes `CNAME` from
 `SITE_URL`. This repo is also the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
-(the engine) and draws tanks with [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes)
-sprites. No runtime dependencies; everything first-party is snapshotted with provenance.
+(the engine, snapshotted in `vendor/fizlet/` with provenance) and draws tanks with the art in
+`src/sherman-sprites.ts`, taken from [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes) 0.5.2. No runtime dependencies.
 
 ## The game
 
@@ -34,6 +34,15 @@ itself. **PLATOON:** you and three wingmen in your colour against two other plat
 after whoever is shooting at you, and parachute back in next to you; the other platoons stick
 with their lead tank. The platoon with the most kills wins.
 
+**TUNE** (in Practice, a key on the coach card): sliders for the pace, to dial the chaos in. GAME
+SPEED (1.00×), TANK SPEED (150 px/s), TURRET TURN (1.00×), FIRE RATE (1.00×), SHELL SPEED (600 px/s,
+same reach), RESPAWN (2.2 s), SOLO BOTS (7) and BOT AIRSTRIKES (1.0×); the defaults are the game's
+numbers. Practice plays them live, SOLO and PLATOON at the next match, on this device only. RESET puts
+them back; COPY SETTINGS copies them as JSON. Online matches always play the defaults.
+
+**Two players** (`/play/two/`, online rooms in lockstep): the TEAMS pick is FFA (both players + 4 bots,
+the default), 1V1, or 2V2 to 4V4, where each player leads AI wingmen in their colour. P1's pick is the match's.
+
 
 **Two guns.** The cannon fires fast but overheats if you hold it (watch the ring on FIRE). The
 LONG gun locks on (laser sight), then a guided round crosses the whole field, punches through
@@ -43,7 +52,8 @@ cover and wrecks in one hit. You start with 3 long shots; find and earn more.
 shoulder, the bombs fall and go off with the Battlefield hero's triple blasts and black scorch.
 
 **Aim help.** AUTO swings the turret onto the nearest tank. LOCK sticks to one target (tap a tank
-to switch). Your tank wears a marching dashed ring so you always find yourself.
+to switch). Your tank wears a marching dashed ring so you always find yourself, and every time you land
+(the start and each respawn) rings ripple out from it under a YOU chevron.
 
 | Tile | What it does |
 |---|---|
@@ -128,7 +138,7 @@ npm run test:browser   # board match + every key, demo, drop-in (Chromium)
 npm run test:replay    # same seed, same match; no Math.random in play
 npm run test:lockstep  # two net peers over the memory link stay identical (and under jitter)
 ROOMS_URL=ws://127.0.0.1:8787 ROOMS_INVITE=<code> node tests/room.mjs   # through a running room server
-node scripts/sync.mjs  # refresh vendor/fizlet and shared/ from sibling checkouts
+node scripts/sync.mjs  # refresh vendor/fizlet from a sibling ../fizlet checkout
 ```
 
 Release: bump `version`, rebuild, add a CHANGELOG entry, push `main`; CI checks `dist/` matches

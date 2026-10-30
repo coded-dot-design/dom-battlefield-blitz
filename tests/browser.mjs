@@ -199,8 +199,72 @@ try {
   await page.mouse.up();
   assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-pad]").style.translate), /-200px -80px/);
   assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("blitz:pad"))), [-200, -80]);
-  await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-cx]").click());
+  // Find yourself: your landing started the locate pulse (drawn on the render clock).
+  assert.ok(await page.evaluate(() => pr.controls.locate > 0), "the locate pulse ran when you landed");
+
+  where = "practice: tune";
+  const shadow = (sel) => `document.getElementById("board").shadowRoot.querySelector(${JSON.stringify(sel)})`;
+  const DEFAULTS = { speed: 1, tank: 150, turn: 1, fire: 1, shell: 600, respawn: 2.2, bots: 7, air: 1 };
+  assert.deepEqual(await page.evaluate(() => pr.tune.values), DEFAULTS, "the levers start at the game's numbers");
+  await page.evaluate(`${shadow("[data-tune]")}.click()`);
+  assert.equal(await page.evaluate(`${shadow("[data-tune-panel]")}.hidden`), false, "TUNE opens the card");
+  assert.equal(await page.evaluate(`getComputedStyle(${shadow("[data-coach]")}).display`), "none", "the coach steps aside");
+  // Keys on a slider: GAME SPEED one notch down (0.05), TANK SPEED two notches up (+10 px/s); the arrows don't drive.
+  const x0 = await page.evaluate(() => pr.world.tanks[0].x);
+  await page.evaluate(`${shadow("input[name=speed]")}.focus()`);
+  await page.keyboard.press("ArrowLeft");
+  await page.evaluate(`${shadow("input[name=tank]")}.focus()`);
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction(() => pr.tune.values.tank === 160);
+  assert.equal(await page.evaluate(() => pr.tune.values.speed), 0.95, "GAME SPEED moved");
+  assert.ok(Math.abs((await page.evaluate(() => pr.world.tanks[0].x)) - x0) < 1, "a slider's arrows don't drive the tank");
+  assert.equal(await page.evaluate(`${shadow("input[name=tank]")}.parentElement.querySelector("output").textContent`), "160 px/s", "the value shows");
+  // Drag-equivalent: set a value through the slider (an input event), and through the API.
+  await page.evaluate(`(() => { const i = ${shadow("input[name=shell]")}; i.value = "450"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  await page.evaluate(() => pr.tune.set("bots", 3));
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("blitz:tune")));
+  assert.deepEqual(saved, { ...DEFAULTS, speed: 0.95, tank: 160, shell: 450, bots: 3 }, "saved on this device");
+  assert.equal(await page.evaluate(`${shadow("[data-tune-json]")}.textContent`), JSON.stringify(saved), "the copy line is the settings");
+  // COPY SETTINGS: the clipboard gets the JSON (granted in the test), the key says so.
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"], { origin: ORIGIN });
+  await page.evaluate(`${shadow("[data-tune-copy]")}.click()`);
+  await page.waitForFunction(`${shadow("[data-tune-copy]")}.textContent === "COPIED"`);
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), JSON.stringify(saved), "COPY SETTINGS puts the JSON on the clipboard");
+  // Persist: a new game on this device reads them; the start screen says it's tuned.
+  await page.evaluate(`${shadow("[data-cx]")}.click()`);
   assert.equal(await page.evaluate(() => pr.state), "intro", "END PRACTICE goes back to the start");
+  await page.evaluate(async () => {
+    pr.destroy();
+    const { createBlitz } = await import("/blitz.mjs");
+    window.pr = createBlitz(document.getElementById("board"), { mode: "board" });
+  });
+  assert.deepEqual(await page.evaluate(() => pr.tune.values), saved, "the levers persist");
+  assert.match(await page.evaluate(`${shadow(".tuned")}.textContent`), /TUNED · 4 LEVERS CHANGED/);
+  await pick("solo");
+  assert.equal(await page.evaluate(() => pr.world.tanks.length), 4, "SOLO BOTS: you + 3 bots");
+  // The levers reach the match: a shell at the tuned speed with the old reach, the respawn delay.
+  await page.evaluate(() => {
+    pr.start();
+    pr.engine.stop();
+    for (let f = 0; f < 60 * 8 && !(pr.state === "play" && pr.world.tanks[0].alive && pr.world.tanks[0].drop >= 1); f++) pr.engine.advance(1 / 60);
+  });
+  await page.keyboard.down("Space");
+  const fired = await page.evaluate(() => {
+    const t = pr.world.tanks[0];
+    t.cool = t.hot = t.charge = 0;
+    pr.world.shells.forEach((q) => (q.on = false));
+    pr.engine.advance(1 / 60);
+    const s = pr.world.shells.find((q) => q.on && q.owner === 0 && !q.rail);
+    pr.engine.start();
+    return s ? [Math.round(Math.hypot(s.vx, s.vy)), Math.round(s.life * 100) / 100] : [pr.state, t.alive, t.drop, t.cool];
+  });
+  await page.keyboard.up("Space");
+  assert.ok(fired && fired[0] === 450 && fired[1] > 1.3 && fired[1] <= 600 / 450, "a tuned shell: 450 px/s, the same reach " + JSON.stringify(fired));
+  // RESET restores every default (and clears the saved settings).
+  await page.evaluate(`pr.tune.open(), ${shadow("[data-tune-reset]")}.click()`); // the card's RESET key (one task: render would close it outside practice)
+  assert.deepEqual(await page.evaluate(() => pr.tune.values), DEFAULTS, "RESET restores the defaults");
+  assert.equal(await page.evaluate(() => localStorage.getItem("blitz:tune")), null, "and forgets the saved ones");
   await page.evaluate(() => (pr.destroy(), localStorage.clear()));
 
   where = "drop-in";
@@ -250,7 +314,7 @@ try {
   assert.equal(calm.hash, moving.hash, "reduced motion plays the same match");
 
   assert.deepEqual(errors, []);
-  console.log("Blitz: reduced motion (no shake, same match), board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
+  console.log("Blitz: reduced motion (no shake, same match), board match (intro → play → pad: auto, lock, long shot, airstrike, crate, theme, pause/resume, full screen → result), platoons (picker, teams, surrender), practice (coach, still targets, harmless dummies, grab bar, locate pulse; TUNE: sliders, keys, saved, copy, persist, SOLO BOTS, shell speed and reach, RESET), demo mode, drop-in (PLAY key, arena, Escape, page restored) passed.");
 } catch (e) {
   console.error(`::error title=Blitz browser test (${where})::${e.message}`);
   throw e;

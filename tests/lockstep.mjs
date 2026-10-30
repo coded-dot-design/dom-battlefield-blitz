@@ -23,7 +23,7 @@ try {
 
   /** Two peers, `frames` lockstep frames, a digest of each world every 600 frames. */
   const run = (opts) =>
-    page.evaluate(async ({ frames, latency, jitter, seed, scripted }) => {
+    page.evaluate(async ({ frames, latency, jitter, seed, scripted, squads }) => {
       const { createBlitz, memory } = await import("/blitz-net.mjs");
       for (const id of ["a", "b"]) document.getElementById(id).replaceChildren();
       const hub = memory({ peers: 2, latency, jitter, seed: 5 });
@@ -43,7 +43,7 @@ try {
         };
       };
       const peers = [0, 1].map((slot) =>
-        createBlitz(document.getElementById(slot ? "b" : "a"), { seed, seconds: 600, bots: 4, net: { transport: hub.ends[slot], slot, players: 2, ...(scripted ? { input: hands(slot) } : {}) } }),
+        createBlitz(document.getElementById(slot ? "b" : "a"), { seed, seconds: 600, bots: 4, net: { transport: hub.ends[slot], slot, players: 2, ...(scripted ? { input: hands(slot) } : {}), ...(squads ? { squad: squads[slot] } : {}) } }),
       );
       for (const g of peers) g.engine.stop(); // step by hand: the shared clock must not add frames
       Math.random = () => (calls++, real());
@@ -67,7 +67,9 @@ try {
       const out = {
         frames: peers.map((g) => g.net.frame), stalls: peers.map((g) => g.net.stalls), desync: peers.map((g) => g.net.desync),
         digests, calls, final: peers.map((g) => g.hash()),
-        kills: peers[0].world.tanks.reduce((a, t) => a + t.kills, 0), humanShots: peers[0].world.tanks.slice(0, 2).map((t) => t.rail + "/" + t.strikes),
+        kills: peers[0].world.tanks.reduce((a, t) => a + t.kills, 0),
+        squad: peers.map((g) => g.squad), rosters: peers.map((g) => g.world.tanks.map((t) => `${t.team}${t.you ? "H" : "A"}`).join(" ")),
+        ready: peers.map((g) => g.world.tanks.filter((t) => t.alive || t.deaths > 0).length), humanShots: peers[0].world.tanks.slice(0, 2).map((t) => t.rail + "/" + t.strikes),
       };
       peers.forEach((g) => g.destroy());
       return out;
@@ -97,10 +99,30 @@ try {
   assert.equal(keys.final[0], keys.final[1]);
   assert.deepEqual(keys.desync, [-1, -1]);
 
+  // Team sizes (two players): P1's pick is the match's on both screens (P2 asked for another), the
+  // humans lead sides 0 and 1, and each side gets squad - 1 AI wingmen. No desync.
+  const sizes = [];
+  for (const k of [1, 2, 3, 4]) {
+    const t = await run({ frames: 900, latency: 2, jitter: 1, seed: 11 + k, scripted: true, squads: [k, (k % 4) + 1] });
+    assert.deepEqual(t.frames, [900, 900]);
+    assert.deepEqual(t.desync, [-1, -1], `${k}v${k}: no desync`);
+    assert.equal(t.final[0], t.final[1], `${k}v${k}: the same match`);
+    assert.deepEqual(t.squad, [k, k], `${k}v${k}: both peers play P1's pick`);
+    const want = ["0H", "1H", ...Array.from({ length: 2 * (k - 1) }, (_, i) => `${(i / (k - 1)) | 0}A`)].join(" ");
+    assert.equal(t.rosters[0], want, `${k}v${k}: ${2 * k} tanks, ${k} a side`);
+    assert.equal(t.rosters[1], want);
+    assert.equal(t.ready[0], 2 * k, `${k}v${k}: every tank dropped in`);
+    sizes.push(`${k}v${k}`);
+  }
+  // No pick: free-for-all with the bots, as before.
+  const ffa = await run({ frames: 300, latency: 0, jitter: 0, seed: 3, scripted: true, squads: [0, 3] });
+  assert.deepEqual(ffa.squad, [0, 0]);
+  assert.equal(ffa.rosters[0], "0H 1H 2A 3A 4A 5A", "free-for-all: 2 players + 4 bots, every tank its own side");
+
   assert.deepEqual(errors, []);
   console.log(
     `Blitz lockstep: 2 peers (1100×640 and 700×460 screens), ${FRAMES} frames identical every 600 frames and at the end; ` +
-      `latency 6±5 ticks too (stalls ${slow.stalls.join("/")}), same match as no latency; ${fast.kills} kills; 0 desyncs; 0 Math.random in play.`,
+      `latency 6±5 ticks too (stalls ${slow.stalls.join("/")}), same match as no latency; ${fast.kills} kills; 0 desyncs; 0 Math.random in play; team sizes ${sizes.join(", ")} (P1's pick on both screens) and free-for-all spawn the right sides, 0 desyncs.`,
   );
 } finally {
   await browser.close();

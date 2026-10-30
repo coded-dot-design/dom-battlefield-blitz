@@ -126,7 +126,8 @@ async function layout(p, label) {
 
 let where = "start", runs = 0;
 try {
-  for (const [n, width, theme, mode] of [[2, 1440, "dark", "new"], [2, 390, "light", "old"], [2, 1440, "light", "new"], [2, 390, "dark", "old"], [4, 1440, "dark", "new"], [4, 390, "light", "old"]]) {
+  // The last number: the TEAMS pick (two players: 0 free-for-all, k = kVk with AI wingmen).
+  for (const [n, width, theme, mode, teams] of [[2, 1440, "dark", "new", 0], [2, 390, "light", "old", 2], [2, 1440, "light", "new", 4], [2, 390, "dark", "old", 1], [4, 1440, "dark", "new", 0], [4, 390, "light", "old", 0]]) {
     const tag = `${n}p-${width}-${theme}-${mode}`, room = runs++;
     where = tag;
     const url = `${base}play/two/?rooms=wss://rooms.test&room=${room}&players=${n}&code=${CODE}`;
@@ -147,6 +148,12 @@ try {
       assert.deepEqual(leaks.splice(0), ["WRONG-CODE-9"]);
       await me.fill("input[name=code]", CODE);
     }
+    // TEAMS: two players only; P1 (you, first in) picks.
+    assert.equal(await me.evaluate(() => document.querySelector("[data-squad-pick]").hidden), n !== 2, `${tag}: the teams pick shows for two players only`);
+    if (teams) {
+      await me.click(`[data-squad="${teams}"]`);
+      assert.equal(await me.getAttribute(`[data-squad="${teams}"]`, "aria-pressed"), "true");
+    }
     await shot(me, `${tag}-1-join`);
     await layout(me, `${tag} join`);
     await me.click("[data-join]");
@@ -162,7 +169,7 @@ try {
     });
     await me.click("[data-share]");
     const link = await me.waitForFunction(() => window.shared).then((h) => h.jsonValue());
-    assert.match(link, new RegExp(`room=${room}&players=${n}`), `${tag}: the link carries room and players`);
+    assert.match(link, new RegExp(`room=${room}&players=${n}${teams ? `&teams=${teams}` : ""}`), `${tag}: the link carries room, players${teams ? " and teams" : ""}`);
     assert.doesNotMatch(link, new RegExp(`code=|invite=|${CODE}`, "i"), `${tag}: the link has no code`);
     const others = [];
     for (let i = 1; i < n; i++) {
@@ -178,6 +185,11 @@ try {
       const s = await p.evaluate(() => ({ desync: window.blitz.net.desync, conn: document.querySelector(".room").dataset.conn, rows: [...document.querySelectorAll("[data-rows] tr")].map((r) => [r.className.includes("you"), r.querySelector(".sw").style.getPropertyValue("--c"), r.querySelector("th").textContent]) }));
       assert.equal(s.desync, -1, `${tag}: no desync`);
       assert.equal(s.conn, "live");
+      // P1's teams pick on every screen (the others never picked): 2 × teams tanks, else 2 players + 4 bots.
+      const m = await p.evaluate(() => ({ squad: window.blitz.squad, tanks: window.blitz.world.tanks.length, sub: document.querySelector("[data-sub]").textContent }));
+      assert.equal(m.squad, n === 2 ? teams : 0, `${tag}: the match plays P1's teams`);
+      assert.equal(m.tanks, n === 2 && teams ? 2 * teams : n + 4, `${tag}: the right number of tanks`);
+      if (n === 2 && teams) assert.match(m.sub, new RegExp(`${teams}V${teams}`), `${tag}: the card says ${teams}V${teams}`);
       assert.equal(s.rows.length, n, `${tag}: a scoreboard row per player`);
       assert.equal(s.rows.filter((r) => r[0]).length, 1, `${tag}: exactly one YOU`);
       assert.deepEqual(s.rows.map((r) => r[1]), ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"].slice(0, n), `${tag}: seat colours = tank colours`);
@@ -212,7 +224,7 @@ try {
     assert.deepEqual(leaks, [], `${tag}: no code in a URL or referrer on the new server`);
     for (const c of contexts.splice(0)) await c.close();
   }
-  console.log(`Multiplayer: 2 and 4 players through a mock room (old and new invite forms), ${runs} runs at 1440 and 390 in light and dark: join, waiting seats, live match with a row per player in its tank colour, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
+  console.log(`Multiplayer: 2 and 4 players through a mock room (old and new invite forms), ${runs} runs at 1440 and 390 in light and dark: join, the TEAMS pick (FFA, 1v1, 2v2, 4v4: P1's pick on every screen, the right tank count, carried by the link), waiting seats, live match with a row per player in its tank colour, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
 } catch (e) {
   console.error(`multiplayer test failed at ${where}`);
   throw e;
