@@ -7,6 +7,8 @@
  * no clones); from a step it is queued and written in render. Recall gives every glyph back, and
  * a newer edit by the host page wins. Coordinates are viewport CSS px (getBoundingClientRect).
  * Glyph indices hold for a frame: a rescan (read phase, after the page changed) renumbers them.
+ * Targets only (`text: false`) with `still: Infinity`: a scene that reads page elements (headings,
+ * buttons) re-measures only when the page moves or changes, so its still frames read nothing.
  */
 import { STEP, RENDER, IDLE, type Engine, type System } from "./kernel/engine";
 import { Grid } from "./collide";
@@ -14,8 +16,8 @@ import { Grid } from "./collide";
 export interface BoardPageOptions {
   /** The part of the page that is the board (default document.body). */
   root?: Element;
-  /** Text containers (default headings, p, li, blockquote, [data-fizlet-text]); 160 at most. */
-  text?: string;
+  /** Text containers (default headings, p, li, blockquote, [data-fizlet-text]); 160 at most. false: no glyphs, targets only. */
+  text?: string | false;
   /** Targets (default button, [role=button], a.button, a.btn, [data-fizlet-target]). */
   targets?: string;
   /** More to leave alone, on top of fields, editable, code, live regions, dialogs, [data-fizlet-ignore]. */
@@ -28,6 +30,8 @@ export interface BoardPageOptions {
   letters?: boolean;
   /** Range reads per refresh at most (default 900); the rest are measured on the next refresh. */
   reads?: number;
+  /** Seconds between re-measures while the page is still (default 0.5; Infinity: only after a scroll, resize or change). */
+  still?: number;
   /** Hex colour for consumed glyphs (a CSS Custom Highlight, where supported). Off by default. */
   color?: string;
 }
@@ -57,7 +61,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   const textSel = o.text ?? "h1,h2,h3,h4,h5,h6,p,li,blockquote,[data-fizlet-text]";
   const targetSel = o.targets ?? "button,[role=button],a.button,a.btn,[data-fizlet-target]";
   const skip = o.exclude ? SKIP + "," + o.exclude : SKIP, skipText = skip + NOT_TEXT;
-  const MAX = o.maxGlyphs ?? 8000, READS = o.reads ?? 900, MAXT = o.maxTargets ?? 32;
+  const MAX = textSel ? o.maxGlyphs ?? 8000 : 1, READS = o.reads ?? 900, MAXT = o.maxTargets ?? 32;
   const eligible = o.letters ? /\p{L}/u : /\p{L}|\p{N}/u;
   const x = new Float32Array(MAX), y = new Float32Array(MAX), w = new Float32Array(MAX), h = new Float32Array(MAX);
   const spent = new Uint8Array(MAX), gr = new Int32Array(MAX), gk = new Int32Array(MAX), queue = new Int32Array(MAX), found = new Int32Array(MAX);
@@ -68,10 +72,13 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   // Small integers stay unboxed in `let`s; times and the hit fraction (doubles) live in a typed array.
   let count = 0, queued = 0, cursor = 0, reads = 0, dirty = 1, rescan = 1, mark = 0;
   let shown = new Int32Array(0);
-  const n = new Float64Array([-9, -9, 2]), SCANNED = 0, MEASURED = 1, T = 2;
   // Query scratch: the grid's typed form and the plain-number API's own copies, so the hot path
   // never passes a number to a call V8 may not inline (each would box: one allocation).
   const qx = new Float64Array(1), qy = new Float64Array(1), qrad = new Float64Array(1), arg = new Float64Array(4);
+  // The refresh clock: seconds summed from `engine.timing` in read (reading the engine's `time`
+  // getter boxed a number every frame: 12 B a frame in steady state).
+  const STILL = o.still ?? 0.5;
+  const n = new Float64Array([-9, -9, 2, 0]), SCANNED = 0, MEASURED = 1, T = 2, NOW = 3;
 
   const hex = o.color && /^#[\da-f]{3,8}$/i.test(o.color) ? o.color : "", name = "fizlet-board-" + ++seq;
   const hl = hex && typeof Highlight === "function" ? new Highlight() : null;
@@ -96,7 +103,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     rescan = 0;
     const seen = new Set<Rec>();
     let total = 0, visited = 0;
-    for (const el of [...root.querySelectorAll(textSel)].slice(0, 160)) {
+    if (textSel) for (const el of [...root.querySelectorAll(textSel)].slice(0, 160)) {
       if (el.closest(skipText) || mine(el)) continue;
       const walk = doc.createTreeWalker(el, 4);
       for (let t: Node | null; total < MAX && visited++ < 6000 && (t = walk.nextNode()); ) {
@@ -225,9 +232,9 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   });
 
   function refresh(force?: boolean) {
-    const now = e.time;
+    const now = n[NOW]!;
     if (rescan && (force || now - n[SCANNED]! >= 0.5)) (n[SCANNED] = now), scan(), (force = true);
-    if (force || now - n[MEASURED]! >= (dirty ? 0.08 : 0.5)) (n[MEASURED] = now), measure();
+    if (force || now - n[MEASURED]! >= (dirty ? 0.08 : STILL)) (n[MEASURED] = now), measure();
   }
 
   function nearIn(p: Float64Array, i: number, out: Int32Array) {
@@ -268,7 +275,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   }
 
   const system: System = {
-    read: () => e.signal.aborted || refresh(),
+    read: () => e.signal.aborted || ((n[NOW] = n[NOW]! + e.timing[0]!), refresh()),
     render() {
       for (let q = 0; q < queued; q++) write(qr[q]!, queue[q]!);
       queued = 0;
