@@ -115,7 +115,7 @@ createBlitz(document.querySelector("#arena"), { seed, net: { transport, slot, pl
 - Controls travel as one 32-bit word: drive (8 ways), fire, long shot, airstrike at the pointer,
   aim (pointer, auto, hull) and the pointer in 256ths of the arena. Aim lock acts as auto in net play.
 - [`examples/two-player.html`](examples/two-player.html): the demo page (invite code, room, play).
-- Net play ships as its own module, `dist/blitz-net.mjs` (budget 42 KB gzip), so the drop-in and
+- Net play ships as its own module, `dist/blitz-net.mjs` (budget 43 KB gzip), so the drop-in and
   `blitz.mjs` don't carry the lockstep code.
 
 ## Develop
@@ -123,7 +123,7 @@ createBlitz(document.querySelector("#arena"), { seed, net: { transport, slot, pl
 ```sh
 npm ci
 npm run check          # typecheck + build dist/ (committed)
-npm run size           # budget: 40 KB gzip (today ~34 KB, engine, art and the Board UI kit included)
+npm run size           # budget: 41 KB gzip (today 41,798 B, engine, art and the Board UI kit included)
 npm run test:browser   # board match + every key, demo, drop-in (Chromium)
 npm run test:replay    # same seed, same match; no Math.random in play
 npm run test:lockstep  # two net peers over the memory link stay identical (and under jitter)
