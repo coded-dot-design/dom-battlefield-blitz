@@ -14,7 +14,8 @@ import { STEP, RENDER, IDLE, type Engine, type System } from "./kernel/engine";
 import { Grid } from "./collide";
 
 export interface BoardPageOptions {
-  /** The part of the page that is the board (default document.body). */
+  /** The part of the page that is the board (default document.body). The board lives in its document
+   *  and window (an iframe's page works too). */
   root?: Element;
   /** Text containers (default headings, p, li, blockquote, [data-fizlet-text]); 160 at most. false: no glyphs, targets only. */
   text?: string | false;
@@ -47,7 +48,7 @@ export interface BoardTarget {
   hp: number;
 }
 
-/** One Text node: our last value of it; per glyph offset, length, state (0, 1 binary, 2 erase), range. */
+/** One Text node: our last value of it; per glyph offset, length, state (0, 1 binary, 2 erase, 3 "0", 4 "1"), range, letter. */
 type Rec = [node: Text, value: string, off: number[], len: number[], state: number[], ranges: (Range | undefined)[], chars: string[]];
 
 /** Never a target or food: fields, editable, live regions, dialogs, opted out, a Fizlet host. */
@@ -57,7 +58,7 @@ const NOT_TEXT = ",option,button,a,script,style,noscript,pre,code";
 let seq = 0;
 
 export function boardPage(e: Engine, o: BoardPageOptions = {}) {
-  const doc = document, root = o.root ?? doc.body, host = e.root, L = e.ledger;
+  const root = o.root ?? document.body, doc = root.ownerDocument, win = doc.defaultView!, host = e.root, L = e.ledger;
   const textSel = o.text ?? "h1,h2,h3,h4,h5,h6,p,li,blockquote,[data-fizlet-text]";
   const targetSel = o.targets ?? "button,[role=button],a.button,a.btn,[data-fizlet-target]";
   const skip = o.exclude ? SKIP + "," + o.exclude : SKIP, skipText = skip + NOT_TEXT;
@@ -70,7 +71,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   const recs: Rec[] = [], byNode = new Map<Text, Rec>(), targets: BoardTarget[] = [], byEl = new Map<Element, BoardTarget>();
   const grid = new Grid(32, MAX, 1, 1), range = doc.createRange(), seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   // Small integers stay unboxed in `let`s; times and the hit fraction (doubles) live in a typed array.
-  let count = 0, queued = 0, cursor = 0, reads = 0, dirty = 1, rescan = 1, mark = 0;
+  let count = 0, queued = 0, cursor = 0, reads = 0, dirty = 1, rescan = 1, mark = 0, scans = 0;
   let shown = new Int32Array(0);
   // Query scratch: the grid's typed form and the plain-number API's own copies, so the hot path
   // never passes a number to a call V8 may not inline (each would box: one allocation).
@@ -81,26 +82,27 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   const n = new Float64Array([-9, -9, 2, 0]), SCANNED = 0, MEASURED = 1, T = 2, NOW = 3;
 
   const hex = o.color && /^#[\da-f]{3,8}$/i.test(o.color) ? o.color : "", name = "fizlet-board-" + ++seq;
-  const hl = hex && typeof Highlight === "function" ? new Highlight() : null;
+  const hl = hex && win.Highlight && new win.Highlight();
   if (hl) {
     const st = L.add(doc.createElement("style"));
     st.textContent = `::highlight(${name}){color:${hex}}`;
     doc.head.append(st);
-    CSS.highlights.set(name, hl);
+    win.CSS.highlights.set(name, hl);
   }
 
   // Ours: the engine's root, or any Fizlet host on the page (a game's in-page art). Its mutations
   // never make the board rescan, and its text is never terrain.
   const mine = (node: Node) => !!host?.contains(node) || !!(node.nodeType === 1 ? (node as Element) : node.parentElement)?.closest("[data-fizlet-host]");
-  const drop = (r: Rec) => (byNode.delete(r[0]), r[5].forEach((g) => g && hl!.delete(g)));
+  const drop = (r: Rec) => (byNode.delete(r[0]), r[5].forEach((g) => g && (hl as Highlight).delete(g)));
   const ours = (r: Rec) => r[0].isConnected && r[0].data === r[1];
   const visible = (el: Element, b: DOMRect) => {
-    const s = getComputedStyle(el);
-    return b.width > 0 && b.height > 0 && b.right > 0 && b.bottom > 0 && b.left < innerWidth && b.top < innerHeight && s.visibility !== "hidden" && s.opacity !== "0";
+    const s = win.getComputedStyle(el);
+    return b.width > 0 && b.height > 0 && b.right > 0 && b.bottom > 0 && b.left < win.innerWidth && b.top < win.innerHeight && s.visibility !== "hidden" && s.opacity !== "0";
   };
 
   function scan() {
     rescan = 0;
+    scans++;
     const seen = new Set<Rec>();
     let total = 0, visited = 0;
     if (textSel) for (const el of [...root.querySelectorAll(textSel)].slice(0, 160)) {
@@ -145,7 +147,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   }
 
   function measure() {
-    const W = innerWidth, H = innerHeight;
+    const W = win.innerWidth, H = win.innerHeight;
     dirty = reads = 0;
     mark++;
     if (grid.cols * grid.cell < W || grid.rows * grid.cell < H) grid.resize(W, H);
@@ -195,13 +197,13 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
 
   function write(r: Rec, k: number) {
     const off = r[2][k]!, len = r[3][k]!;
-    const bit = r[4][k] === 2 ? " " : e.random() < 0.5 ? "0" : "1", next = r[1].slice(0, off) + bit + r[1].slice(off + len);
+    const s = r[4][k], bit = s === 2 ? " " : s === 3 ? "0" : s === 4 ? "1" : e.random() < 0.5 ? "0" : "1", next = r[1].slice(0, off) + bit + r[1].slice(off + len);
     if (!L.text(r[0], next)) return;
     r[1] = next;
     r[3][k] = 1;
     for (let j = 0; j < r[2].length; j++) if (r[2][j]! > off) r[2][j]! += 1 - len;
     if (hl) {
-      hl.add((r[5][k] = new Range()));
+      hl.add((r[5][k] = doc.createRange()));
       // A nodeValue write collapses the live ranges in that node: put every one back.
       r[5].forEach((g, j) => g && (g.setStart(r[0], r[2][j]!), g.setEnd(r[0], r[2][j]! + 1)));
     }
@@ -210,9 +212,9 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
 
   const touch = () => (dirty = 1);
   const on = { signal: e.signal, passive: true, capture: true };
-  addEventListener("scroll", touch, on);
-  addEventListener("resize", touch, on);
-  const mo = new MutationObserver((list) => {
+  win.addEventListener("scroll", touch, on);
+  win.addEventListener("resize", touch, on);
+  const mo = new win.MutationObserver((list) => {
     for (const m of list)
       if (!mine(m.target) && (m.type !== "characterData" || byNode.get(m.target as Text)?.[1] !== m.target.nodeValue)) {
         if (m.type !== "attributes") rescan = 1;
@@ -220,12 +222,12 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
       }
   });
   mo.observe(root, { subtree: true, childList: true, characterData: true, attributeFilter: ["class", "style", "hidden"] });
-  const ro = new ResizeObserver(touch);
+  const ro = new win.ResizeObserver(touch);
   ro.observe(root);
   e.signal.addEventListener("abort", () => {
     mo.disconnect();
     ro.disconnect();
-    if (hl) CSS.highlights.delete(name);
+    if (hl) win.CSS.highlights.delete(name);
     byNode.clear();
     recs.length = qr.length = targets.length = count = queued = 0;
     grid.clear();
@@ -327,17 +329,22 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
       return n[T]!;
     },
     /** Range reads made by the last refresh (never more than `reads`). */
+    /** Rescans so far: glyph indices from before a rescan mean nothing after it. */
+    get scans() {
+      return scans;
+    },
     get reads() {
       return reads;
     },
     /**
-     * Consume glyph i: a 0/1 ("binary") or a no-break space ("erase") in the page's own text,
-     * through the ledger; from a step it is written in render. False if spent or not ours anymore.
+     * Consume glyph i: a 0/1 ("binary": the board's random draw; "0" / "1": the game's) or a no-break
+     * space ("erase") in the page's own text, through the ledger; from a step it is written in
+     * render. False if spent or not ours anymore.
      */
-    consume(i: number, as?: "binary" | "erase") {
+    consume(i: number, as?: "binary" | "erase" | "0" | "1") {
       if (!(i >= 0 && i < count) || spent[i] || !ours(recs[gr[i]!]!)) return false;
       spent[i] = 1;
-      recs[gr[i]!]![4][gk[i]!] = as === "erase" ? 2 : 1;
+      recs[gr[i]!]![4][gk[i]!] = as === "erase" ? 2 : as === "0" ? 3 : as === "1" ? 4 : 1;
       w[i] = h[i] = 0;
       if (e.phase === RENDER || e.phase === IDLE) write(recs[gr[i]!]!, gk[i]!);
       else (qr[queued] = recs[gr[i]!]!), (queue[queued++] = gk[i]!);
