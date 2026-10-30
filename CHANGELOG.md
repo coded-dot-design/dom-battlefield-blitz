@@ -16,8 +16,19 @@
   changed the match (one more reason a replay with a human could drift). Shake has its own random now.
 - Crates (`fizlet/rules` drops) step inside the match step in net play, so a peer waiting for input
   doesn't move them.
-- Size: `dist/blitz.js` 37,813 → 39,632 B gzip, `dist/blitz.mjs` 37,899 → 40,393 (presence and
+- Size: `dist/blitz.js` 37,885 → 39,697 B gzip, `dist/blitz.mjs` 37,970 → 40,460 (presence and
   the net code). Budget 40,960 B.
+- Solo play is unchanged: `test:replay` still plays the pinned 0.8.2 matches value for value.
+
+## 0.8.3
+
+E3 acceptance work (`fe port-check`). Gameplay is unchanged, value for value: seeds 41, 42 and 7 (platoons) play the 0.8.2 matches bit for bit (every number of every tank, shell, tile, block, plane, bomb, mark and crate, every frame for 3,600 frames), and `npm run test:replay` now checks that (digests pinned per Chrome major: V8's math differs in the last bit between versions; 145 is CI's, 153 a newer local build).
+
+- **On Fizlet 0.15.0** (was 0.14.1): `vendor/fizlet` re-synced with `scripts/sync.mjs` from the v0.15.0 release commit (`c6ffc1e`). 0.8.2's snapshot named the pre-squash branch commit (`5e21221`); the files were the v0.14.1 release, the provenance wasn't. Brings board-page's refresh clock from `engine.timing` and the kernel's every-frame maximum (no deopt on a new record).
+- **No `Math.hypot` in the step** (26 calls): V8's allocates on every call. A module `dist` returns exactly what `Math.hypot` returned (it scales by the larger side as V8 does), so no number moves.
+- **No wall clock in the step.** A cover's knock cool-down (embed) runs on match time instead of `performance.now()`: the knock draws `engine.random`, so a page-cover match no longer depends on the wall clock. The remaining `performance.now()` calls are the read phase (page re-measure throttle) and the draw (tile colour cycle), marked `port-check: ok` with why.
+- **Tests:** `npm test` (node:test, files one at a time) runs `tests/zero-gc.test.mjs`: 20,000 busy demo steps with no read or render (`world.steps(n)`, a new debug hook), minor GCs counted from V8's trace events. It is a TODO: the step still allocates (10 minor GCs in 20,000 steps; its tanks and shells are objects and the numbers it passes to the collide and fx bricks box) until the step's E3 port.
+- Size: `dist/blitz.js` 37,813 → 37,885 B gzip (`dist/blitz.mjs` 37,899 → 37,970). Budget 40,960 B.
 
 ## 0.8.2
 

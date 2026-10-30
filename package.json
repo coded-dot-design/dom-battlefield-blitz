@@ -10,6 +10,7 @@
     "build": "npm run typecheck && node scripts/build.mjs",
     "check": "npm run build",
     "size": "node scripts/size.mjs",
+    "test": "node --expose-gc --test --test-concurrency=1 tests/*.test.mjs",
     "test:browser": "node tests/browser.mjs",
     "test:replay": "node tests/determinism.mjs",
     "test:lockstep": "node tests/lockstep.mjs",

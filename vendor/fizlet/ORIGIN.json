@@ -1,8 +1,8 @@
 {
   "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/fizlet",
-  "version": "0.14.1",
-  "commit": "5e21221a84a0d2dd80acb516353b891ac9adabc4",
+  "version": "0.15.0",
+  "commit": "c6ffc1e1e701a68e4bcb2a7023fcf14640aa228e",
   "files": [
     {
       "path": "arcade.ts",
@@ -10,7 +10,7 @@
     },
     {
       "path": "board-page.ts",
-      "sha256": "199916d3f6ffabc31183077bf5694683ec212dff202923bed70a6013fd5471c3"
+      "sha256": "3a4dac7ede6c40682b3aaf7353466430c992fd9eee8e71fe7ec60a7875730321"
     },
     {
       "path": "camera.ts",
@@ -50,7 +50,7 @@
     },
     {
       "path": "kernel/engine.ts",
-      "sha256": "4b3c34195769c2dca52cb88cadf9d25869082246fe0b0b74800d7bc818766fe6"
+      "sha256": "e993cb68a1944c562d082bf37a56aed91d0b7b03f7feb83bb5a20a90962c4462"
     },
     {
       "path": "kernel/index.ts",

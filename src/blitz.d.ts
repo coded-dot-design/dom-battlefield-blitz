@@ -36,7 +36,7 @@ export interface Blitz {
   /** A hash of the match state. */
   hash(): number;
   readonly engine: { stats(): unknown; stop(): void; start(): void; advance(sec: number): void; readonly running: boolean };
-  readonly world: { tanks: unknown[]; tiles: unknown[]; shells: unknown[]; blocks: unknown[]; planes: unknown[]; bombs: unknown[]; crates: unknown[]; marks: unknown[] };
+  readonly world: { tanks: unknown[]; tiles: unknown[]; shells: unknown[]; blocks: unknown[]; planes: unknown[]; bombs: unknown[]; crates: unknown[]; marks: unknown[]; steps(n: number): void };
   /** Your controls (debug / tests). */
   readonly controls: { readonly auto: boolean; readonly lock: boolean; readonly lockTarget: number; readonly targeting: boolean; crate(): void };
 }
