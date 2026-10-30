@@ -13,7 +13,7 @@ if (!URL_) {
   process.exit(0);
 }
 // A loopback http origin: a local room server (ws://127.0.0.1) is then reachable from the page.
-const ORIGIN = "http://127.0.0.1:8797";
+const ORIGIN = process.env.ROOMS_ORIGIN ?? "http://127.0.0.1:8797"; // a deployed room only lets its ALLOWED_ORIGINS in
 const PAGE = `<!doctype html><meta charset="utf-8"><title>room</title><style>body{margin:0}</style>
 <div id="a" style="position:relative;width:1100px;height:640px"></div><div id="b" style="position:relative;width:800px;height:500px"></div>`;
 
