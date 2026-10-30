@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Multiplayer: invite codes out of URLs** (for fizlet-rooms hardening, fizlet#114 / #113).
+  - The code is checked by `POST /invite` (code in the body, a simple request: no preflight) and
+    joins with the WebSocket subprotocols `["fizlet-rooms", "invite." + code]`, not `?invite=`.
+  - Works on both servers: the deployed one ignores the method and answers a POST with `403`, so on
+    `403`/`404`/`405` the page asks once more by `?code=` and, if that passes, joins by `?invite=`.
+    **Next release:** drop that fallback when fizlet-rooms drops the URL forms. Until then, a wrong
+    code on the new server also goes once by `?code=` (its invocation logs are off); a right one never does.
+  - A `?code=` (or `?invite=`) link prefills the form from memory, and the page takes it out of the
+    address bar and history (`history.replaceState`) before anything loads; the page is
+    `referrer: no-referrer`. SEND LINK carries the room and players only: tell friends the code.
+  - A rate-capped check (`429`) says "Too many tries. Wait a minute".
+  - `join(url, signal, protocols)` is a local shim (`src/join.ts`) until the next Fizlet vendor sync
+    brings fizlet#113; `vendor/` is untouched. `dist/blitz-net.mjs` +85 B gzip (42,143 / 43,008);
+    `blitz.js` and `blitz.mjs` are unchanged.
+  - `tests/multiplayer.mjs` runs against both servers (alternating runs): "new" refuses a join
+    without the subprotocol and records any code in a URL or referrer (must be none); "old" fails a
+    handshake that offers protocols, like a browser without the `101` echo. Also checks the `?code=`
+    prefill and strip, a wrong code refused, and a share link without the code.
 - **Multiplayer page (`/play/two/`): the full board, one room card, and 2 to 4 players.**
   - The board fills the stage like `/play/` (an attract match runs behind until yours starts). The
     dimmed lobby is gone: everything about the room is ONE Board UI card over the board (kit card,

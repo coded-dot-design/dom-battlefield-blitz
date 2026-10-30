@@ -12,6 +12,21 @@ const title = 'Battlefield Blitz · multiplayer';
 const description = 'Two to four players, one Blitz match, over the internet. Enter an invite code and pick a room.';
 ---
 <Base title={title} description={description} page="play" app>
+  <Fragment slot="head">
+    <!-- The invite code never stays in the address bar, history or a referrer: a link with ?code= (or
+         ?invite=) prefills the form from memory, and the URL loses it before anything else loads. -->
+    <meta name="referrer" content="no-referrer" />
+    <script is:inline>
+      (function () {
+        var u = new URL(location.href), p = u.searchParams, c = p.get("code") || p.get("invite");
+        if (!p.has("code") && !p.has("invite")) return;
+        p.delete("code");
+        p.delete("invite");
+        history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+        if (c) window.__blitzInvite = c;
+      })();
+    </script>
+  </Fragment>
   <section class="blitz-stage two" aria-labelledby="two-title" data-rooms={ROOMS}>
     <h1 id="two-title" class="vh">Battlefield Blitz · multiplayer</h1>
     <div id="arena" class="blitz-host"></div>
@@ -57,7 +72,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
         <div class="step" data-for="wait">
           <ol class="seats" data-wait-seats aria-label="Seats"></ol>
           <p class="big" data-wait-say>Waiting for player 2.</p>
-          <p class="fine">Send your friends the link, or tell them the code and room.</p>
+          <p class="fine">Send your friends the link and tell them the code (the link never carries it).</p>
           <div class="keys">
             <button class="bui-key bui-sticker-key" type="button" data-share><b data-share-say>SEND LINK</b></button>
             <button class="bui-key bui-sticker-key bui-second" type="button" data-cancel><b>CANCEL</b></button>
@@ -121,7 +136,10 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   let players = Math.min(4, Math.max(2, Number(q.get("players")) | 0 || 2));
   let maxPlayers = 2; // what the server allows: /invite says (an older server doesn't: two)
   const size = () => Math.min(players, maxPlayers); // the room size we ask for
-  field("code").value = q.get("code") ?? keep.get("blitz-code", tab);
+  // A ?code= link: the head script took it out of the URL and left it here (memory only).
+  const w = window as unknown as { __blitzInvite?: string };
+  field("code").value = w.__blitzInvite || keep.get("blitz-code", tab);
+  delete w.__blitzInvite;
   const showRoom = () => ((field("room").value = String(room)), ((gate.elements.namedItem("roomShow") as HTMLOutputElement).value = String(room)));
   const showPlayers = () => {
     stage.querySelectorAll<HTMLButtonElement>("[data-players]").forEach((b) => {
@@ -220,7 +238,9 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     // A rematch can arrive a beat before the last match's sockets are gone: try again for a few seconds.
     for (let tries = 0; ; tries++) {
       try {
-        const seat = await join(`${ws}/room/${room}?players=${players}&invite=${encodeURIComponent(code)}`, signal);
+        const at = `${ws}/room/${room}?players=${players}`;
+        // The invite rides in the WebSocket subprotocols, never the URL (only the old server needs ?invite=).
+        const seat = via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal) : await join(at, signal, ["fizlet-rooms", `invite.${code}`]);
         return start(seat);
       } catch {
         if (signal.aborted) return;
@@ -285,10 +305,21 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     step("gone");
   }
 
-  /** Is the code on the list? Also learns how many players a room may hold. null: no server. */
+  // How the room server takes the code. "body": POST /invite, then a WebSocket subprotocol (fizlet-rooms
+  // from fizlet#114: the code stays out of URLs and logs). "url": the server deployed before it, which
+  // reads ?code= / ?invite= only (it answers a POST with 403). Next release: drop "url" and the fallback.
+  let via: "body" | "url" = "body";
+  /** Is the code on the list? Also learns how many players a room may hold. null: no server; "slow": rate capped. */
   async function check(c: string) {
-    const r = await fetch(`${http}/invite?code=${encodeURIComponent(c)}`).catch(() => null);
+    const ask = (url: string, init?: RequestInit) => fetch(url, { referrerPolicy: "no-referrer", ...init }).catch(() => null);
+    via = "body";
+    let r = await ask(`${http}/invite`, { method: "POST", body: c }); // text/plain: no CORS preflight
+    if (r && !r.ok && [403, 404, 405].includes(r.status)) {
+      const old = await ask(`${http}/invite?code=${encodeURIComponent(c)}`);
+      if (old?.ok) (r = old), (via = "url");
+    }
     if (!r) return null;
+    if (r.status === 429) return "slow";
     const body = await r.json().catch(() => ({}));
     if (Number.isInteger(body.players)) (maxPlayers = Math.min(4, Math.max(2, body.players))), showPlayers();
     return r.ok;
@@ -300,6 +331,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     say("Checking the code…");
     const ok = await check(code);
     if (ok === null) return say("Can't reach the game server. Check your connection and try again.");
+    if (ok === "slow") return say("Too many tries. Wait a minute, then try again.");
     if (!ok) return say("That invite code isn't on the list.");
     say("");
     keep.set("blitz-code", code, tab);
@@ -310,7 +342,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   $("[data-again]").addEventListener("click", () => enter());
   $("[data-new]").addEventListener("click", () => (idle(), step("join")));
   $("[data-share]").addEventListener("click", async () => {
-    const url = `${location.origin}${location.pathname}?room=${room}&players=${size()}&code=${encodeURIComponent(code)}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}`;
+    const url = `${location.origin}${location.pathname}?room=${room}&players=${size()}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}`;
     const label = $("[data-share-say]");
     try {
       if (navigator.share) await navigator.share({ title: "Battlefield Blitz · multiplayer", text: `Join me in Blitz, room ${room}.`, url });
