@@ -14,6 +14,7 @@ export const BLOCKED = 1, COVER = 2, OCCUPIED = 4;
 // Orthogonal steps first, then diagonals (k > 3).
 const DX = [1, -1, 0, 0, 1, -1, 1, -1], DY = [0, 0, 1, -1, 1, 1, -1, -1];
 
+/** Options for `board()`: the cell size in world units and whether moves go 8-way. */
 export interface BoardOptions {
   /** World units per cell (default 1: world = grid units). */
   cell?: number;
@@ -21,6 +22,8 @@ export interface BoardOptions {
   diagonal?: boolean;
 }
 
+/** The board `board()` makes: typed-array terrain, cost and flags per cell, plus the searches (A*
+ *  paths, line of sight, movement range) on buffers made once. Make one with `board()`. */
 export class Board {
   declare readonly cols: number;
   declare readonly rows: number;

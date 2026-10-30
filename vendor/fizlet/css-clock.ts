@@ -17,6 +17,8 @@
 import { createEngine } from "./kernel/engine";
 import { timeline } from "./timeline";
 
+/** Options for `cssClock()`: the loop length, how many plays before it rests, the custom property,
+ *  the frame cap, reduced motion and an abort signal. */
 export interface CssClockOptions {
   /** Seconds in one play: the loop length (the longest animation, or a common multiple). Default 6. */
   span?: number;
@@ -32,6 +34,9 @@ export interface CssClockOptions {
   signal?: AbortSignal;
 }
 
+/** Run the CSS @keyframes under `root` on the kernel clock: each paused animation reads its time from
+ *  one custom property a timeline moves. It settles after `loops` plays and wakes on pointer, focus or
+ *  coming back into view; `destroy()` gives the root's style back. */
 export function cssClock(root: HTMLElement, o: CssClockOptions = {}) {
   const span = o.span ?? 6, T = span * (o.loops ?? 3), { fps, signal, motion } = o;
   const engine = createEngine({ root, settle: 0.5, ...(fps && { fps }), ...(signal && { signal }) });
@@ -66,4 +71,5 @@ export function cssClock(root: HTMLElement, o: CssClockOptions = {}) {
     destroy: () => engine.destroy(),
   };
 }
+/** The clock `cssClock()` returns. */
 export type CssClock = ReturnType<typeof cssClock>;

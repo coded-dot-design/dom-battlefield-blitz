@@ -10,6 +10,7 @@
 import type { Engine } from "./kernel/engine";
 import { need } from "./kernel/need";
 
+/** Options for `camera()`: easing rate, zoom limits, containment and reduced-motion handling. */
 export interface CameraOptions {
   /** Easing rate per second (default 7; higher is snappier). A move settles in about 6 / ease s. */
   ease?: number;
@@ -22,6 +23,8 @@ export interface CameraOptions {
   motion?: boolean;
 }
 
+/** A camera on stage `el`: pan and zoom it with one `transform` written through the engine's ledger
+ *  (so Recall gives it back). Moves ease and settle; `to()`, `pan()` and `home()` drive it. */
 export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOptions = {}) {
   const rate = need(o.ease ?? 7, "ease", 1), lo = need(o.min ?? 1, "min", 1), hi = need(o.max ?? 4, "max", 1), box = o.contain !== false;
   // The focus (world point) shows at the pin (screen point): translate = pin - focus * zoom.
@@ -147,6 +150,7 @@ export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOp
   engine.add(cam);
   return cam;
 }
+/** The camera `camera()` returns. */
 export type Camera = ReturnType<typeof camera>;
 
 // Helpers stand alone, so a hero that only zooms never ships them.

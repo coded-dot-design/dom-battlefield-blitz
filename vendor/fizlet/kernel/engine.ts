@@ -19,6 +19,7 @@ export interface System {
   pause?(e: Engine): void;
 }
 
+/** Options for `createEngine()`. Every field is optional. */
 export interface EngineOptions {
   /** The element the engine lives in; it pauses while this is off screen. */
   root?: Element | null;
@@ -47,6 +48,8 @@ export interface EngineOptions {
   pause?: { hidden?: boolean; offscreen?: boolean; editable?: boolean; reducedMotion?: boolean };
 }
 
+/** What `engine.stats()` reports: frame and step counts, frame time, the event ring and pool
+ *  fill, the ledger's size and the auto-pause rules holding the engine right now. */
 export interface EngineStats {
   frames: number;
   steps: number;
@@ -59,6 +62,7 @@ export interface EngineStats {
   paused: string[];
 }
 
+/** The engine `createEngine()` returns: what every system and brick takes. */
 export type Engine = ReturnType<typeof createEngine>;
 
 // ---------- The shared scheduler: one requestAnimationFrame for every engine on the page ----------
@@ -107,6 +111,9 @@ const STOPPED = 1, HIDDEN = 2, OFFSCREEN = 4, EDITABLE = 8, MOTION = 16, SETTLED
 /** Systems removed mid-frame are swapped for this until the frame ends. */
 const GONE: System = {};
 
+/** Make an engine: a fixed-step loop on the page's shared clock, with its own pools, event ring,
+ *  seeded random and ledger. Add systems with `add()`, then `start()`; `destroy()` (or aborting
+ *  `o.signal`) stops it and gives the page back. */
 export function createEngine(o: EngineOptions = {}) {
   const dt = need(o.step ?? 1 / 60, "step", 1), maxSteps = need(o.maxSteps ?? 4, "maxSteps", 2), root = o.root ?? null;
   const settle = o.settle == null ? 0 : need(o.settle, "settle", 1), gap = o.fps == null ? 0 : 1000 / need(o.fps, "fps", 1) - 4;

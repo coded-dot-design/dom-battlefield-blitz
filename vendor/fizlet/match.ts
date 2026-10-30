@@ -8,10 +8,13 @@
  */
 import { READ, STEP, type Engine, type System } from "./kernel/engine";
 
+/** Where a match is: the intro, the countdown, play, paused or the end. */
 export type Phase = "intro" | "count" | "play" | "paused" | "end";
 /** A sticker: kicker (small, blinking) and word (big). */
 export type Sticker = [kicker: string, word: string];
+/** The overlay's sticker keys, by what they do. */
 export type MatchKey = "start" | "resume" | "surrender" | "again" | "next";
+/** Every word on the match overlay: the stickers per phase, the countdown kicker and the key labels. */
 export interface MatchLabels extends Record<MatchKey, string> {
   intro: Sticker;
   /** The kicker over the 3-2-1. */
@@ -22,6 +25,7 @@ export interface MatchLabels extends Record<MatchKey, string> {
   /** Lost by surrender (the white flag). */
   flag: Sticker;
 }
+/** How a match ended: won or lost, why, and the clock. */
 export interface MatchResult {
   won: boolean;
   /** "time" (the clock ran out), "flag" (surrender) or what the game passed to finish(). */
@@ -29,6 +33,7 @@ export interface MatchResult {
   /** The clock when it ended. */
   clock: number;
 }
+/** Options for `match()`: the countdown, the match length, labels and key icons, the pause keys. */
 export interface MatchOptions {
   /** Countdown beats of one second before play (default 3; 0 skips it). */
   count?: number;
@@ -69,6 +74,9 @@ const WORDS: MatchLabels = {
 };
 const svg = (d: string) => `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${d}</svg>`;
 
+/** The shared match flow on engine `e`, intro → count → play → paused → end, on the Board UI overlay
+ *  in `root`. Every transition is an event on the ring (`match:play`, …). Drive it with `start()`,
+ *  `pause()`, `finish()`, `restart()`; read `phase` and `clock`. */
 export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {}) {
   const lab = { ...WORDS, ...o.labels }, L = e.ledger, total = o.seconds ?? 0, beats = o.count ?? 3;
   const codes = o.keys ?? ["Escape", "KeyP"];
@@ -263,4 +271,5 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
   paint();
   return m;
 }
+/** The match flow `match()` returns. */
 export type Match = ReturnType<typeof match>;

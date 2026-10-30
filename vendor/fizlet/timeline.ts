@@ -30,6 +30,7 @@ const table = (key: unknown, f: Ease) => TABLES.get(key) ?? (TABLES.set(key, Flo
  *  Keyframes share one shape: the same words, only the numbers change. A single value starts where
  *  the property's last track ended (or is set at once if it has none). */
 export type Value = number | string | readonly (number | string)[];
+/** Options for one track: where it starts (`at`), its duration, delay, easing and stagger. */
 export interface TrackOptions {
   /** Seconds (default 0.4). */
   dur?: number;
@@ -42,6 +43,7 @@ export interface TrackOptions {
   /** Where it starts: seconds, "<" (with the track before) or a label (default: the end so far). */
   at?: number | string;
 }
+/** Options for `timeline()`: repeats, yoyo, speed and reduced-motion handling. */
 export interface TimelineOptions {
   /** Extra plays after the first (default 0; Infinity loops). */
   repeat?: number;
@@ -260,4 +262,5 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
   engine.add(tl);
   return tl;
 }
+/** The timeline `timeline()` returns: add tracks with `to()`, then play it. */
 export type Timeline = ReturnType<typeof timeline>;

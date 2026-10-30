@@ -41,6 +41,7 @@ export type { SkirmishOptions, SkirmishReadout } from "./arcade-skirmish";
  *  reduced motion (1/0). The game writes TARGET_HP: the full health of a target, for its paint. */
 export const MODE = 0, PX = 1, PY = 2, PON = 3, KX = 4, KY = 5, FIRE = 6, VW = 7, VH = 8, CALM = 9, TARGET_HP = 10;
 
+/** One action key: the intent it drives, its keyboard code and its scoreboard text. */
 export interface ArcadeAction {
   /** The controls intent: `ctx.input.hit(id)` in a step. */
   id: string;
@@ -49,7 +50,10 @@ export interface ArcadeAction {
   /** Scoreboard key text, e.g. "B · Cover". */
   label: string;
 }
+/** Where a run is: idle, running, paused, won, game over or destroyed. */
 export type ArcadeStatus = "idle" | "running" | "paused" | "won" | "gameover" | "destroyed";
+/** Options for `arcade()`: the board and its selectors, theme, seed, reduced motion, sound and
+ *  controls, and the `onState` / `onEvent` / `onError` hooks. */
 export interface ArcadeOptions<S> {
   /** The board: a selector or an element (default document.body). */
   root?: string | Element;
@@ -68,6 +72,7 @@ export interface ArcadeOptions<S> {
   onEvent?: (event: { type: string; game: string; [key: string]: unknown }) => void;
   onError?: (error: unknown) => void;
 }
+/** What the controller reports about a run: its status, time and frame cost, plus the game's own state. */
 export type ArcadeSnapshot<S> = Partial<S> & {
   id: string;
   status: ArcadeStatus;
@@ -80,6 +85,7 @@ export type ArcadeSnapshot<S> = Partial<S> & {
   /** Sparks alive (at most 100). */
   particles?: number;
 };
+/** The controller `arcade()` returns: start, pause, resume, stop and destroy a run, and read its snapshot. */
 export interface ArcadeController<S> {
   start(): ArcadeSnapshot<S>;
   pause(): void;
@@ -111,6 +117,8 @@ export interface ArcadeContext {
    *  or reset (it reads computed style), never from a step. Null for replaced elements. */
   attach(el: Element): ShadowRoot | null;
 }
+/** One run of your game, as the shell drives it: reset, draw, the HUD and meter, page scroll,
+ *  reactions to events, stats, and whether the run is over. */
 export interface ArcadeGame<S> {
   /** A fresh run (the viewport is in ctl[VW], ctl[VH]). */
   reset(): void;
@@ -129,6 +137,8 @@ export interface ArcadeGame<S> {
   /** The snapshot's game fields (not a hot path). */
   stats(): S;
 }
+/** Your game for `arcade()`: its id, title, accent, hint, CSS, actions, readouts, sound cues and
+ *  `create()`, which makes a run. */
 export interface ArcadeDef<S> {
   id: string;
   title: string;
@@ -187,6 +197,7 @@ export interface HudRun {
    *  the end (won, lost), a rematch (restart) or Recall (exit). */
   go(to: ArcadeFlow | "restart" | "exit"): void;
 }
+/** A change in a run's flow the HUD is told about: paused, resumed, won or lost. */
 export type ArcadeFlow = "pause" | "resume" | "won" | "lost";
 /** A mounted HUD. Keys are `button[data-a]` (sound, pause, exit, restart, gate, auto, fold, or the
  *  HUD's own) and `button[data-act]` (an action): the shell runs them, then calls `key`. */
@@ -229,6 +240,7 @@ const HEAD = {
   fold: `<button type="button" data-a="fold" aria-expanded="true" aria-label="Minimize scoreboard">${ICON.fold}</button>`,
   exit: `<button type="button" data-a="exit" aria-label="Close game and restore page (Esc)">${ICON.exit}</button>`,
 };
+/** Options for the default HUD: which header keys and which nav keys, in order. */
 export interface ArcadeHudOptions {
   /** Header keys, in order (default all four). */
   header?: ("sound" | "pause" | "fold" | "exit")[];
@@ -323,6 +335,9 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
   };
 }
 
+/** The shell every page arcade game repeats: one engine per run over the host page (its words are
+ *  terrain, its buttons targets), a Board UI overlay with a canvas and scoreboard, input, sound and
+ *  the run's flow. `def` is only the game's rules and art. */
 export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): ArcadeController<S> {
   let status: ArcadeStatus = "idle", destroyed = false, notice = "";
   let run: ReturnType<typeof begin> | null = null;

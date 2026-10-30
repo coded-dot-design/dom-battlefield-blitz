@@ -16,6 +16,7 @@ import { pad } from "./pad";
 import type { PadAction } from "./pad";
 import { toast } from "./ui/board-ui";
 
+/** One readout on the skirmish bar: its label, how the value shows and its tone. */
 export interface SkirmishReadout {
   label: string;
   /** How the value shows: `num` (default) 12 · `clock` 3:05 from seconds · `rank` #2 · `pct` 75%
@@ -25,6 +26,8 @@ export interface SkirmishReadout {
   /** A bar: class `low` at or under this (0..1). */
   low?: number;
 }
+/** Options for the `skirmish` HUD preset: its readouts, header and nav keys, feed, banner, overlays,
+ *  result, aim toggles and key counts. */
 export interface SkirmishOptions {
   /** Readouts, in the order `hud(out)` fills them. */
   readouts: SkirmishReadout[];

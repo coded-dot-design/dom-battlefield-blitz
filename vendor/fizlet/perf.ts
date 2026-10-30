@@ -14,7 +14,9 @@
  */
 import type { Engine } from "./kernel/engine";
 
+/** A corner of the host: top left, top right, bottom left or bottom right. */
 export type Corner = "tl" | "tr" | "bl" | "br";
+/** Options for `perf()`: where the overlay goes, the toggle key and the frame budget. */
 export interface PerfOptions {
   /** Where the overlay goes (default the engine root, else `document.body`, where it is fixed). */
   host?: HTMLElement | null;
@@ -73,6 +75,9 @@ const LABELS = ["FPS", "MS", "DROP", "WORK", "LIVE", "MB"];
 // Board UI tokens: go / hurt / critical bars (under 1.25, 2 and over 2 budgets), the budget line.
 const VARS = ["--k-go", "--hurt", "--critical", "--line"], TONES = ["#39ffb0", "#ffc21a", "#f0506e", "#3b3170"];
 
+/** A performance overlay for `engine`, off until shown (F9 by default): fps, a frame-time chart
+ *  against the budget, dropped frames, the engine's work per frame, pooled entities and the JS heap.
+ *  `show()` toggles it; `destroy()` removes it. */
 export function perf(engine: Engine, o: PerfOptions = {}) {
   const L = engine.ledger, clock = engine.timing, budget = o.budget ?? 1000 / 60, ring = new FrameRing(BARS), s = new Float64Array(5);
   const host = o.host ?? (engine.root as HTMLElement | null) ?? document.body, corner = o.corner ?? "tr", key = o.key === undefined ? "F9" : o.key;

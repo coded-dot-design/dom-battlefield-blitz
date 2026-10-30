@@ -14,6 +14,8 @@
  * defaults are its tank numbers, so a port keeps its feel. Nothing allocates: call them from a step,
  * one mover at a time. Pass `engine.random` as `random` so seeded runs replay.
  */
+/** Options for `steer()`: how many movers, their pace, turn rate and arrival bands, the wander area
+ *  and timing, the wall check and the random source. */
 export interface SteerOptions {
   /** Movers (fixed: the arrays never grow). */
   cap: number;
@@ -59,6 +61,9 @@ export const hypot = (dx: number, dy: number) => {
   return ax === Infinity || ay === Infinity ? Infinity : Math.sqrt(p * p + q * q) * max;
 };
 
+/** Steering for `o.cap` movers on typed arrays: `seek`, `flee`, `arrive`, `wander` and `patrol`, each
+ *  with a turn-limited heading and a per-axis wall check. DOM-free and allocation-free: call them
+ *  from a step, one mover at a time. */
 export function steer(o: SteerOptions) {
   const n = Math.max(1, o.cap | 0), speed = o.speed ?? 150, scale = o.scale ?? 1, rate = o.turn ?? 7, stop = o.stop ?? 16;
   const near = o.near ?? 14, slow = o.slow ?? 140, fast = o.fast ?? 1.05, calm = o.calm ?? 0.8, far = o.far ?? 240;
@@ -151,4 +156,5 @@ export function steer(o: SteerOptions) {
     },
   };
 }
+/** The movers `steer()` returns. */
 export type Steer = ReturnType<typeof steer>;

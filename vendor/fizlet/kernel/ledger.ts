@@ -33,6 +33,9 @@ let probe: HTMLElement | undefined;
  *  probe comes from the element's own document (an iframe's page has no global `document` of its own). */
 const withStyle = (text: string, el: El) => ((probe ??= el.ownerDocument.createElement("i")).setAttribute("style", text), probe.style.cssText);
 
+/** Records every change the engine makes to the page (styles, attributes, classes, text, added
+ *  nodes) so `restore()` puts it back exactly. Writes that change nothing touch nothing, and an
+ *  edit the host page made after ours always wins. Each engine has one: `engine.ledger`. */
 export class Ledger {
   private readonly texts = new Map<CharacterData, Rec<string | null>>();
   private readonly els = new Map<El, Entry>();

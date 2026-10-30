@@ -14,6 +14,8 @@ import { STEP, RENDER, IDLE, type Engine, type System } from "./kernel/engine";
 import { Grid } from "./collide";
 import { hypot } from "./steer";
 
+/** Options for `boardPage()`: which part of the page is the board, which elements are text and
+ *  targets, and the measuring budget. */
 export interface BoardPageOptions {
   /** The part of the page that is the board (default document.body). The board lives in its document
    *  and window (an iframe's page works too). */
@@ -38,6 +40,7 @@ export interface BoardPageOptions {
   color?: string;
 }
 
+/** One target on the board (a button or link): its element and its viewport rect, measured in read. */
 export interface BoardTarget {
   readonly el: Element;
   /** Viewport rect, measured in read; w = h = 0 while hidden or off screen. */
@@ -58,6 +61,9 @@ const SKIP = "input,textarea,select,[contenteditable],[aria-live],dialog,[role=d
 const NOT_TEXT = ",option,button,a,script,style,noscript,pre,code";
 let seq = 0;
 
+/** The host page as the board for engine `e`: its glyphs become terrain and food, its buttons
+ *  targets. Measured only in the read phase, on a budget; `near()` and `hit()` in a step never read
+ *  layout or allocate. `consume()` changes a glyph through the ledger. */
 export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   const root = o.root ?? document.body, doc = root.ownerDocument, win = doc.defaultView!, host = e.root, L = e.ledger;
   const textSel = o.text ?? "h1,h2,h3,h4,h5,h6,p,li,blockquote,[data-fizlet-text]";
@@ -364,4 +370,5 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     system,
   };
 }
+/** The board `boardPage()` returns. */
 export type BoardPage = ReturnType<typeof boardPage>;

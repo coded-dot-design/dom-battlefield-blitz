@@ -56,6 +56,9 @@ interface Bind {
 }
 const NUM = 0, METER = 1, FLAG = 2, FEED = 3, BANNER = 4;
 
+/** Change-only HUD bindings on `engine`, finding readouts in `root` (default `document`): `num`,
+ *  `meter`, `flag`, `feed` and `banner`. Values are read every render and written only when what
+ *  shows changes; every write goes through the ledger. */
 export function hud(engine: Engine, root: ParentNode = document) {
   const L = engine.ledger, vals: Bind[] = [], evs: Bind[] = [];
   // Last value per binding, in a typed array: updating it never boxes a number.
@@ -163,4 +166,5 @@ export function hud(engine: Engine, root: ParentNode = document) {
   };
   return api;
 }
+/** The HUD `hud()` returns. */
 export type Hud = ReturnType<typeof hud>;

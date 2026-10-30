@@ -2,7 +2,7 @@
   "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/fizlet",
   "version": "0.20.0",
-  "commit": "69d17077d1eb5c8ba16a3b8805fab04b84330b30",
+  "commit": "09d31433c3f48d7165a5c5bffedb376ec34467a6",
   "files": [
     {
       "path": "arcade-parts.ts",
@@ -10,23 +10,23 @@
     },
     {
       "path": "arcade-skirmish.ts",
-      "sha256": "3b6b17c0ef08af164ac144f2067664c98585a476ca74893714f55c01b63a21ab"
+      "sha256": "e28de878314e6a6764f0f14af67809d5cae25d8608346294385a15c9a6b47c47"
     },
     {
       "path": "arcade.ts",
-      "sha256": "8f38913e02d71ba6b40fd660c4b5f1662da237b094e2a07999d5e1475a0e9b44"
+      "sha256": "e3e9c8004fd6cfe530946f40ef6a2759baf6197456d55f03449e9c6e3b954d12"
     },
     {
       "path": "board-page.ts",
-      "sha256": "2d83a64e7fc3b61323b2a895254e6feb14dff0eb7398366544442df70bd947a6"
+      "sha256": "db32df463fd0ff37feaeeb7822c05aed6189757c7a2a5da1302d5aff56656738"
     },
     {
       "path": "camera.ts",
-      "sha256": "6da4f75b1f2a4f7fb5956db2fb795e8dec212663965442d4820a9101b6cefedb"
+      "sha256": "a45393bc029fd4720b468e543bbd7b296fe8848ce67bc6ab08950daad94b7042"
     },
     {
       "path": "coach.ts",
-      "sha256": "8827f28a5e51b4fc6973832f76b7ba81c1ed027fd7c66632e01adb5fe98f3a23"
+      "sha256": "924d15a54d4ae0ff9f8fc87725061c7ac4b0394afc961abdefd729e74855a553"
     },
     {
       "path": "collide.ts",
@@ -34,7 +34,7 @@
     },
     {
       "path": "css-clock.ts",
-      "sha256": "e7587cdd56ad4663603c00b1831b2492768c8338b608476e962b407574e94ba5"
+      "sha256": "91ec32ed87d0756be12df6ad6edb38f12c1749380530370b1733f624b98df1b4"
     },
     {
       "path": "debug.ts",
@@ -42,19 +42,19 @@
     },
     {
       "path": "embed.ts",
-      "sha256": "9c06b988a05d31a1a2688bd1336922e3e68e14a909a80184e671746df5fefffd"
+      "sha256": "0c29f706030cc373f6179685a57d75250964d5f4bc70495cd19c3306ef12dfef"
     },
     {
       "path": "fx.ts",
-      "sha256": "06fc2232479bfd987e61317ff700243a28ab33f5f484d9bfba9a1e04d9667b2a"
+      "sha256": "83a64697dd6f9f6b4325147037294534ed571afc9b680d8f1784a91046a5392a"
     },
     {
       "path": "grid.ts",
-      "sha256": "15f62a2b0f877acb802211a9278db280983f8e43c73eafb2e7c9706bc6b7752e"
+      "sha256": "3976c3cbadc52edfcaa999a0ed6c44ef81ad004c1d1ded73824b5abd80b353fd"
     },
     {
       "path": "hud.ts",
-      "sha256": "a83b6420f88124000830b822cf9c42d2f37703f3195bc839bb29abd91d365968"
+      "sha256": "d6ad41581c466dcbce54d7846cff50446cd694da14b29655a0d929449cad694e"
     },
     {
       "path": "index.ts",
@@ -62,11 +62,11 @@
     },
     {
       "path": "input.ts",
-      "sha256": "7fe5fe9d1b10845d92647b6bfb8a51f168eb3b2786ea64ecf23fec60527cbbd4"
+      "sha256": "b132dfd755109f7fec662e0de33aed13bc66e8892aa8d909238981a29bdd2394"
     },
     {
       "path": "kernel/engine.ts",
-      "sha256": "97b15971d27e5090f979e105661e020afbe40f45e0e4942c49fd322689f687c6"
+      "sha256": "11ed48a6ae6b4e4467bd0f6d19f9412c61928290ce8808fc10fafd8c1096f2a0"
     },
     {
       "path": "kernel/index.ts",
@@ -74,7 +74,7 @@
     },
     {
       "path": "kernel/ledger.ts",
-      "sha256": "f11fe030976a8ad0fccb733c4f485157990a6c75e3c57834e789b8ac0c2af3aa"
+      "sha256": "835870c0e522cb3f14a9e7c13d4eb369cedcd85bc28300befe609c79615e0994"
     },
     {
       "path": "kernel/need.ts",
@@ -86,7 +86,7 @@
     },
     {
       "path": "kernel/random.ts",
-      "sha256": "fe38d96f0634ee0c067f6a2bea4a03417915bde70016a6928a2d383449a1c284"
+      "sha256": "9f57fdfa7ca9eaa5cc8b52bfb60c37e0e617b87195e733f8ec3f332c09824750"
     },
     {
       "path": "kernel/ring.ts",
@@ -94,47 +94,47 @@
     },
     {
       "path": "match.ts",
-      "sha256": "262c5e915b60e8ec3bea0c46364d75d6b1cbc4cc1a4b64677e0283c84e92f7cf"
+      "sha256": "23a5e19d2108fafae9d008f6e4583c380ff90413c0e7c5e92a771788dbefbf8a"
     },
     {
       "path": "pad.ts",
-      "sha256": "7258427e20a2f1f25f031e9b41122cdef4aba44fa8dddd50c5310013bdcd09b4"
+      "sha256": "504f91ef8b51d67d8febabed6b79c0ced3671cf47fbb162e7a89c6ef21336361"
     },
     {
       "path": "perf.ts",
-      "sha256": "83eb2ffd66fa31a6d96c3d954240519f0c8e00e13fdba0102b2ae16a537c7bc6"
+      "sha256": "8f76660594a8640260418131cb836e0d907d954156a53b505620513cbf116203"
     },
     {
       "path": "presence-check.ts",
-      "sha256": "827d5e825ca69a52848bb00540fe488af1a67d239f1c3df57060f0f7e97c7e16"
+      "sha256": "00403328da88ed6f783cc32118eb4d806d2806274c70790756caf1cab875a86d"
     },
     {
       "path": "presence.ts",
-      "sha256": "35c43808c88974f44b87d75cb44d8d691a47e7ecb201aafdaf7a8cb76707db80"
+      "sha256": "929ea96b83048e2561fe26fe7f2a368d63817ef7d92cc7bca01b44f470e80fda"
     },
     {
       "path": "rules.ts",
-      "sha256": "a07897ce035b0b67f96df64b7def3c500cbdd34e0b1f75b1ad2ce6017d9de960"
+      "sha256": "a50ba66c13d110bf4e7e0ffae234efafce7ee1878aa64596cd059e7b6decea2b"
     },
     {
       "path": "slot.ts",
-      "sha256": "477e506f06dcaa57a0b25afe86bcd8e6f8afe58ab89606966f3db62e201362f8"
+      "sha256": "09bf109b70fbc9b434768b819a2fc721bc6eace2c0301917ac8dca90d0f4aff7"
     },
     {
       "path": "sound.ts",
-      "sha256": "53ce1e92c189c26833bb70a5f107cec0bcfe20a79f3d63aa885054edd58be51b"
+      "sha256": "e090b860d965832ffaea0c1a3b1ea94b1fd8e84b61679cf3991cea14950a56be"
     },
     {
       "path": "sprite.ts",
-      "sha256": "8468e9aba3c499567342aaa5d621be1b86cb73788e4e0c5e4e0163a647c044cd"
+      "sha256": "6f8af65550c6b0f46f123d473e1c26f963ecd7bca9f3dfd0f573c0b65f4f0bcb"
     },
     {
       "path": "steer.ts",
-      "sha256": "7764375bb2535b7dbfbef358ff179c6ec190a99f6cd3fae0d41305deb3a33645"
+      "sha256": "9dfac89d40aa88ebfbdb41b2cbd4aa71e6239a547011cc8876e7f5a4ec1d8cce"
     },
     {
       "path": "timeline.ts",
-      "sha256": "e593520cdbab21e8dc3e377bf7c6f710ee2f3158cb15a9addadb5d5277754cc8"
+      "sha256": "d6806e559eca80402751b3485c3d23eadbad9eb914fea3cc08813fa9606def89"
     },
     {
       "path": "touch.ts",
