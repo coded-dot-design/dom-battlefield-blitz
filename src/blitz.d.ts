@@ -13,8 +13,9 @@ export interface BlitzOptions {
   /** Seed for the match's randomness. Same seed + same input = the same match. Default: random. */
   seed?: number;
   /** Lockstep multiplayer (needs dist/blitz-net.mjs): same seed (the room's), only inputs cross the wire. A fixed 1100 × 640
-   *  arena scaled to fit; humans in seats 0..players-1, bots after; no pause. */
-  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number };
+   *  arena scaled to fit; humans in seats 0..players-1, bots after; no pause. `again` / `leave` put
+   *  REMATCH / NEW ROOM keys on the result (the page joins the next room). */
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void };
   onEnd?: (standings: { name: string; kills: number; deaths: number; you: boolean; team: number }[]) => void;
 }
 /** fizlet/presence transport: moves 12-byte messages. */
