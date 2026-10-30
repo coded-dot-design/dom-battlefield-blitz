@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0
+
+- **Two players in lockstep** (`net` option, demo). Every peer runs the same match from the room's
+  seed and only inputs travel, through `fizlet/presence`. A fixed 1100 × 640 arena scaled to fit (so
+  any two screens play one match), humans in seats 0..players-1 and bots after, one 32-bit input word
+  per player per frame (drive, fire, long shot, airstrike at the pointer, aim mode, pointer), and a
+  match hash compared every 30 frames. `join` and `memory` are exported from `blitz.mjs`;
+  `examples/two-player.html` is the demo page (invite code → room → play).
+- `npm run test:lockstep`: two peers on 1100 × 640 and 700 × 460 screens, scripted inputs, 3,600
+  frames identical every 600 frames; with 6 ± 5 ticks of jitter too, giving the same match as with no
+  latency; 0 desyncs, 0 `Math.random` in play. `tests/room.mjs` (needs a room server, skipped in CI):
+  measured locally through `wrangler dev`, 1,800 frames identical every 300 frames.
+- Fix: screen shake drew from the match's seeded random in `draw()`, so how much your screen shook
+  changed the match (one more reason a replay with a human could drift). Shake has its own random now.
+- Crates (`fizlet/rules` drops) step inside the match step in net play, so a peer waiting for input
+  doesn't move them.
+- Size: `dist/blitz.js` 37,813 → 39,632 B gzip, `dist/blitz.mjs` 37,899 → 40,393 (presence and
+  the net code). Budget 40,960 B.
+
 ## 0.8.2
 
 - **On Fizlet 0.14.1** (was 0.12.0): `vendor/fizlet` re-synced with `scripts/sync.mjs`, for the Board

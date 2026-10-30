@@ -97,6 +97,25 @@ game.start();             // intro → countdown → match
 // { platoons: true } starts in platoon mode; { demo: true } runs bots only with no HUD
 ```
 
+## Two players (lockstep, demo)
+
+Every peer runs the same match from the room's seed; only inputs travel, 12 bytes per player per
+frame, through [`fizlet/presence`](https://github.com/coded-dot-design/fizlet) and a
+[fizlet-rooms](https://github.com/coded-dot-design/fizlet/tree/main/rooms) room server
+(a Cloudflare Worker + Durable Object, gated by an invite code).
+
+```js
+import { createBlitz, join } from "./blitz.mjs";
+const { transport, slot, players, seed } = await join("wss://rooms.example/room/0?players=2&invite=CODE");
+createBlitz(document.querySelector("#arena"), { seed, net: { transport, slot, players } });
+```
+
+- The arena is a fixed 1100 × 640, scaled to fit each screen, so screens of any size play one match.
+- Humans take seats 0..players-1; bots (4 by default) fill the rest. No pause, no rematch yet.
+- Controls travel as one 32-bit word: drive (8 ways), fire, long shot, airstrike at the pointer,
+  aim (pointer, auto, hull) and the pointer in 256ths of the arena. Aim lock acts as auto in net play.
+- [`examples/two-player.html`](examples/two-player.html): the demo page (invite code, room, play).
+
 ## Develop
 
 ```sh
@@ -104,6 +123,9 @@ npm ci
 npm run check          # typecheck + build dist/ (committed)
 npm run size           # budget: 40 KB gzip (today ~34 KB, engine, art and the Board UI kit included)
 npm run test:browser   # board match + every key, demo, drop-in (Chromium)
+npm run test:replay    # same seed, same match; no Math.random in play
+npm run test:lockstep  # two net peers over the memory link stay identical (and under jitter)
+ROOMS_URL=ws://127.0.0.1:8787 ROOMS_INVITE=<code> node tests/room.mjs   # through a running room server
 node scripts/sync.mjs  # refresh vendor/fizlet and shared/ from sibling checkouts
 ```
 

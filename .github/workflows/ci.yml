@@ -22,6 +22,7 @@ jobs:
       - run: npm run test:browser
       # Same seed, same match: no Math.random in play (Fizlet multiplayer needs this).
       - run: npm run test:replay
+      - run: npm run test:lockstep
       # The site (landing, /play/, /blitz.js), built for github.io; pages.yml deploys it.
       - run: npm run site:build
       - run: npm run test:site
