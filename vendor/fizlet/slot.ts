@@ -11,6 +11,9 @@
  *   content (`accessible: true`); until then the stage is aria-hidden.
  * - Contained: the scene gets its own stage inside the slot (contain: strict). Every change the
  *   slot makes goes through a Ledger, so destroy() gives the page back exactly.
+ * - Off screen, off the page's frame: the stage is content-visibility: auto, so a scene scrolled
+ *   away is skipped for style, layout, paint and layers. Without it a 3D scene's composited
+ *   layers stayed in every repaint elsewhere on the page (Chromium layerizes the whole document).
  */
 import { Ledger } from "./kernel/ledger";
 
@@ -83,7 +86,7 @@ export function slot(target: string | HTMLElement, load: () => Promise<SlotMount
     for (const c of el.querySelectorAll<HTMLElement>(":scope > .ae-slot__placeholder, :scope > .ae-slot__fallback")) ledger.style(c, "display", "none");
     const stage = ledger.add(document.createElement("div"));
     stage.setAttribute("data-fizlet-slot", el.dataset.slotTarget ?? "");
-    stage.style.cssText = "position:absolute;inset:0;contain:strict;overflow:hidden";
+    stage.style.cssText = "position:absolute;inset:0;contain:strict;overflow:hidden;content-visibility:auto";
     el.append(stage);
     scene = make(stage, el, first);
     first = null;

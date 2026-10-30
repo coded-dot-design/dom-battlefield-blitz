@@ -111,14 +111,16 @@ export function press(el: HTMLElement, fn: () => void, signal: AbortSignal) {
  */
 export function pressCue(root: HTMLElement | Document, signal?: AbortSignal) {
   const key = (e: Event) => (e.target as Element | null)?.closest?.(".bui-key");
-  root.addEventListener("touchstart", () => {}, { passive: true, signal });
+  // An undefined signal is fine at runtime; the casts keep games on exactOptionalPropertyTypes compiling.
+  const on = { signal } as AddEventListenerOptions;
+  root.addEventListener("touchstart", () => {}, { passive: true, signal } as AddEventListenerOptions);
   root.addEventListener("keydown", (e) => {
     const k = key(e), code = (e as KeyboardEvent).key;
     if (k && (code === "Enter" || (code === " " && k.tagName === "BUTTON"))) k.classList.add("down");
-  }, { signal });
+  }, on);
   const up = (e: Event) => key(e)?.classList.remove("down");
-  root.addEventListener("keyup", up, { signal });
-  root.addEventListener("focusout", up, { signal });
+  root.addEventListener("keyup", up, on);
+  root.addEventListener("focusout", up, on);
 }
 
 /** localStorage key of the Settings "Performance overlay" switch (off by default). */

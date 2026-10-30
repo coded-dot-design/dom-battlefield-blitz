@@ -43,6 +43,10 @@
   --team-ink: var(--team);
   /* Derived (never passed in): a control's hard base is its own colour, deep. */
   --k-cmd-base: color-mix(in srgb, var(--k-cmd) 50%, var(--rim));
+  /* The command face under white text (back tab, pills): cmd one shade deeper, AA for #f6f3ff. */
+  --k-cmd-deep: color-mix(in srgb, var(--k-cmd) 80%, var(--rim));
+  /* The shortcut chip's fade: the lowest that keeps rim ink AA (4.5:1) on every arcade face. */
+  --bui-kbd-alpha: 0.88;
   /* Motion. */
   --bui-spring: cubic-bezier(0.34, 1.7, 0.5, 1);
   --bui-out: cubic-bezier(0.15, 0.8, 0.3, 1);
@@ -57,9 +61,9 @@
   --ink: #1b1636;
   --muted: #5d5684;
   --line: #b9b2e3;
-  --k-sys-ink: #0088b3;
+  --k-sys-ink: #006e91;
   --k-cmd-ink: #6a3ae6;
-  --k-fire-ink: #d4143a;
+  --k-fire-ink: #c01033;
   color-scheme: light;
 }
 .bui[data-side="1"] {
@@ -251,7 +255,7 @@
 .bui .bui-go { --c: var(--k-go); }
 /* Aim keys at rest are dim (on when pressed): a tinted face, aim-coloured ink. */
 .bui .bui-aim:not([aria-pressed="true"]) {
-  --c: color-mix(in srgb, var(--k-aim) 28%, var(--surface));
+  --c: color-mix(in srgb, var(--k-aim) 18%, var(--surface));
   color: var(--k-aim);
 }
 .bui[data-theme="light"] .bui-aim:not([aria-pressed="true"]) {
@@ -265,7 +269,7 @@
   border: calc(1 * var(--u)) solid currentColor;
   padding: calc(1 * var(--u)) calc(4 * var(--u));
   border-radius: calc(3 * var(--u));
-  opacity: 0.7;
+  opacity: var(--bui-kbd-alpha);
 }
 /* Icon key (header, small tools): square, outline style. */
 .bui .bui-icon-key {
@@ -436,7 +440,7 @@
   background: var(--k-cmd);
 }
 .bui .bui-sticker-key.bui-plan b {
-  color: #2a1f45;
+  color: var(--rim);
 }
 .bui .bui-sticker-key.bui-second {
   color: var(--ink);
@@ -595,7 +599,7 @@
   font: 800 calc(9 * var(--u)) / 1 ui-monospace, monospace;
   letter-spacing: calc(1.2 * var(--u));
   color: #f6f3ff;
-  background: var(--k-cmd);
+  background: var(--k-cmd-deep);
   border: calc(1.5 * var(--u)) solid var(--rim);
   border-radius: calc(6 * var(--u));
 }
