@@ -183,11 +183,15 @@ try {
   await page.evaluate(() => pr.start());
   await page.waitForFunction(() => pr.state === "play" && pr.world.tanks.every((t) => t.alive && t.drop >= 1), null, { timeout: 15000 });
   const still = await page.evaluate(() => pr.world.tanks.slice(1, 4).map((t) => [t.x, t.y]));
-  assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById("board").shadowRoot.querySelector("[data-coach]")).display), "grid", "the coach shows");
+  // The coach is fizlet/coach: its tour and the kit's coach card (dashed ring on the key a step is about).
+  const coachCard = () => page.evaluate(() => { const c = document.getElementById("board").shadowRoot.querySelector(".fizlet-coach"); return [getComputedStyle(c).display, c.textContent]; });
+  assert.deepEqual(await coachCard(), ["grid", "1/10DRIVEWASD or the arrow keys. On a phone, drag on the left half of the screen.END PRACTICE"], "the coach shows step 1");
   await page.keyboard.down("KeyD");
   await page.waitForTimeout(2200);
   await page.keyboard.up("KeyD");
   await page.waitForFunction(() => pr.coach >= 1, null, { timeout: 10000 });
+  await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector(".fizlet-coach").textContent.startsWith("2/10FIRE"), null, { timeout: 5000 });
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-k=fire]").style.outline), /dashed/, "the FIRE step rings the FIRE key");
   const moved = await page.evaluate((still) => pr.world.tanks.slice(1, 4).filter((t, i) => Math.hypot(t.x - still[i][0], t.y - still[i][1]) > 1).length, still);
   assert.ok(moved <= 1, `TARGETs stand still (${moved} moved; a mine may respawn one)`);
   assert.equal(await page.evaluate(() => pr.world.shells.filter((s) => s.on && s.owner !== 0).length), 0, "dummies never shoot");
@@ -199,8 +203,11 @@ try {
   await page.mouse.up();
   assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-pad]").style.translate), /-200px -80px/);
   assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("blitz:pad"))), [-200, -80]);
-  await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-cx]").click());
+  await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector(".fizlet-coach button").click());
   assert.equal(await page.evaluate(() => pr.state), "intro", "END PRACTICE goes back to the start");
+  await page.waitForTimeout(100);
+  assert.equal((await coachCard())[0], "none", "the coach card hides at the start screen");
+  assert.equal(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-k=fire]").style.outline), "", "the ring is gone");
   await page.evaluate(() => (pr.destroy(), localStorage.clear()));
 
   where = "drop-in";

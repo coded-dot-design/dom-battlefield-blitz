@@ -30,6 +30,8 @@ import { inRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 import { drops } from "../vendor/fizlet/rules";
+import { steer, hypot, turn, type Steer } from "../vendor/fizlet/steer";
+import { tour, card } from "../vendor/fizlet/coach";
 
 /** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
 declare const __KIT_CSS__: string;
@@ -57,16 +59,13 @@ export interface BlitzOptions {
 
 const TAU = Math.PI * 2;
 /**
- * Length of (x, y), bit for bit what Math.hypot returns for finite x, y, without its allocation
- * (V8's Math.hypot allocates on every call, even optimized). It scales by the larger side as V8 does,
- * so a seed replays the same match as before; a plain Math.sqrt(x * x + y * y) can differ in the last bit.
+ * How tanks move (fizlet/steer options, read when the steer is built: roster and resize): px/s at full
+ * stick (× scale / 1.4), the hull's turn in rad/s, the stop distance; wingmen's arrive band (stop
+ * inside `near`, `fast` pace outside `slow`, `calm` inside). Paces scale dt: practice movers wander,
+ * bots chase their goal.
  */
-function dist(x: number, y: number) {
-  if (x < 0) x = -x;
-  if (y < 0) y = -y;
-  const m = x > y ? x : y, r = x > y ? y / m : x / m;
-  return m === 0 ? 0 : m * Math.sqrt(1 + r * r);
-}
+const MOVE = { speed: 150, turn: 7, stop: 16, near: 14, slow: 140, fast: 1.05, calm: 0.8 };
+const WANDER_PACE = 0.55, CHASE_PACE = 0.85;
 const MAXHP = 5, RAIL_MAX = 9, STRIKE_MAX = 5, RAIL_START = 3;
 // Platoon mode: one colour per platoon; your wingmen have names, the others are numbered.
 const TEAM_COLORS = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"];
@@ -157,7 +156,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 /* AUTO and LOCK ride on FIRE's shoulders (the Battlefield cockpit); the two specials sit in a row above. */
 .bui .long{--c:var(--hurt);right:85px;bottom:150px}.bui .strike{--lock:var(--k-attack);right:9px;bottom:150px}
 .bui :is(.lock,.auto){width:52px;height:52px}.bui .auto{right:92px;bottom:84px}.bui .lock{right:12px;bottom:84px}.bui :is(.lock,.auto) svg{width:20px;height:20px}
-.coach-on{outline:3px dashed var(--ink);outline-offset:6px;animation:coach 1s ease-in-out infinite}@keyframes coach{50%{outline-offset:10px}}
 .net [data-pause]{display:none}
 .demo .hud,.demo .pad,.demo .help,.demo .feed,.demo .banner,.demo .tip{display:none}.demo canvas{cursor:default}
 .help{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100% - 240px);padding:6px 10px;font-size:10px;letter-spacing:.08em;color:var(--muted);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:8px;pointer-events:none}
@@ -175,10 +173,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .modes{margin-top:-6px;flex-wrap:wrap;justify-content:center;gap:12px;max-width:calc(100vw - 24px)}
 .bui .mode{flex:1 1 120px;display:grid;justify-items:center;align-content:center;gap:4px;min-width:0;padding:10px 14px 9px;--py:5px}
 .mode b{font:900 14px/1 ui-monospace,monospace;letter-spacing:.12em}.mode small{font-size:9px;letter-spacing:.06em;color:var(--muted)}.mode[aria-pressed=true] small{color:inherit;opacity:.8}
-.coach{position:absolute;left:50%;top:max(76px,calc(env(safe-area-inset-top) + 66px));translate:-50% 0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:2px 12px;width:min(520px,calc(100% - 24px));padding:10px 12px 10px 14px;color:#f6f3ff;background:#10233f;border:2.5px solid #f6f3ff;border-radius:12px;box-shadow:0 5px 0 #f6f3ff}
-.bui[data-theme=light] .coach{color:var(--rim);background:#f6f3ff;border-color:var(--rim);box-shadow:0 5px 0 var(--rim)}
-.coach[hidden]{display:none}.coach span{grid-row:span 2;font:900 11px/1 ui-monospace,monospace;color:var(--k-sys-ink)}.coach b{font:900 14px/1.1 ui-monospace,monospace;letter-spacing:.08em;color:var(--hurt)}.bui[data-theme=light] .coach b{color:#b07400}.coach small{grid-column:2;font-size:11px;line-height:1.35;opacity:.85}
-.bui .coach button{grid-row:1/span 2;grid-column:3;min-height:0;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.08em}
+.fizlet-coach[hidden]{display:none!important}
 .bui .fs{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
 .bui .pz{position:absolute;z-index:3;left:max(60px,calc(env(safe-area-inset-left) + 48px));top:max(10px,env(safe-area-inset-top));height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
@@ -223,7 +218,6 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <button class="rk bui-arcade bui-fire fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : net ? "" : " · ESC PAUSE"}</div>
-<div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div>
 <div class="over" data-over hidden></div>
 <div class="bui-overlay ov" data-ov hidden role="dialog"></div>`;
   root.append(style, wrap);
@@ -275,7 +269,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     fxLen = 0;
   }
-  const sfx = sound(e, { cues: { shot: "fire", boom: "boom", hit: "hit", power: "power", strike: "hurt", land: "click", lock: "click", win: "win", end: "end", ready: "ready", streak: "win", nuke: "end" } });
+  const sfx = sound(e, { cues: { shot: "fire", boom: "boom", hit: "hit", power: "power", "coach:step": "power", strike: "hurt", land: "click", lock: "click", win: "win", end: "end", ready: "ready", streak: "win", nuke: "end" } });
   const drawTank = tankSprites(document);
   // Every random number in the match comes from the engine's seeded random, so a seed replays a match.
   const R = e.random;
@@ -284,8 +278,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const shakeRandom = () => ((shakeSeed[0] = Math.imul(shakeSeed[0]!, 1664525) + 1013904223), shakeSeed[0]! / 4294967296);
   // The match's running numbers that the step writes each frame. A double stored in a closure variable
   // is a new heap number on every write; in a typed array it is stored in place.
-  const G = new Float64Array(10);
-  const CLK = 0, CNT = 1, MATCH = 2, TILE_IN = 3, CRATE_IN = 4, QUAKE = 5, WHITE = 6, NUKE_T = 7, MOVED = 8, COACH_T = 9;
+  const G = new Float64Array(9);
+  const CLK = 0, CNT = 1, MATCH = 2, TILE_IN = 3, CRATE_IN = 4, QUAKE = 5, WHITE = 6, NUKE_T = 7, MOVED = 8;
   G[CLK] = o.seconds ?? 180; // the match clock (board)
   G[TILE_IN] = 1.2; // the next power tile
   G[CRATE_IN] = 12; // the next supply crate
@@ -311,6 +305,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // (TARGET), three drive about (MOVER). Rewards and streaks work as in a match.
   let platoon = !net && (o.platoons ?? saved === "platoon"), practice = !net && !embed && !demo && o.platoons === undefined && saved === "practice";
   let N = 0, tanks: Tank[] = [], you: Tank = null!;
+  /** The tanks' movement (fizlet/steer, see Movement): built again by roster() and resize(). */
+  let motor: Steer = null!;
   const per = embed ? 3 : 4;
   function roster() {
     N = net ? P + (o.bots ?? 4) : practice ? 7 : platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : 7));
@@ -326,6 +322,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       };
     });
     you = tanks[net ? net.slot : 0]!;
+    motor = mkSteer();
     wrap.classList.toggle("platoon", platoon);
     wrap.classList.toggle("practice", practice);
   }
@@ -368,6 +365,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       view[0] = Math.min(cw / W, ch / H);
       view[1] = (cw - W * view[0]) / 2;
       view[2] = (ch - H * view[0]) / 2;
+      motor = mkSteer();
       return;
     }
     W = Math.max(320, r.width);
@@ -379,6 +377,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     T = W < 600 ? 36 : 44;
     cols = Math.floor(W / T);
     rows = Math.floor(H / T);
+    motor = mkSteer();
     if (!embed) layBlocks();
     coverDirty = true;
   }
@@ -396,17 +395,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const F = new Float64Array(21);
   const BX = 0, BY = 1, BR = 2; // blockedF: the point and the radius
   const TF = 3, TT = 4, TM = 5, TO = 6; // turnF: from, to, max turn → out
-  const DX = 7, DY = 8, DT = 9; // drive: the stick and dt
   const SX = 10, SY = 11, SR = 12; // shellHits: where the shell is going, the hit radius
-  const HX = 13, HY = 14, HO = 15; // hyp: dist(F[HX], F[HY]) → F[HO]
+  const HX = 13, HY = 14, HO = 15; // hyp: hypot(F[HX], F[HY]) → F[HO]
   const KX = 16, KY = 17; // callStrike: the target
   const PX = 18, PY = 19; // spawn: where the platoon drops
   const LAST = 20; // callStrike: when its last bomb lands
   function hyp() {
-    F[HO] = dist(F[HX]!, F[HY]!);
+    F[HO] = hypot(F[HX]!, F[HY]!);
   }
   /** a and b (tanks, shells) are closer than r (a constant: a literal never boxes). */
-  const within = (a: { x: number; y: number }, b: { x: number; y: number }, r: number) => dist(a.x - b.x, a.y - b.y) < r;
+  const within = (a: { x: number; y: number }, b: { x: number; y: number }, r: number) => hypot(a.x - b.x, a.y - b.y) < r;
   /** The live block that a circle at (F[BX], F[BY]) of radius F[BR] touches (fizlet/collide circleRect, inline), or null. */
   function blockedF() {
     const cx = F[BX]!, cy = F[BY]!, r = F[BR]!;
@@ -461,7 +459,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function knockAround(x: number, y: number, rad: number, power: number) {
     if (!embed) return;
     for (const c of covers) {
-      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, d = dist(cx - x, cy - y);
+      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, d = hypot(cx - x, cy - y);
       if (d < rad) knock(c, (cx - x) / (d || 1), (cy - y) / (d || 1), power * (1 - d / rad) + 0.4, false);
     }
   }
@@ -519,7 +517,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const x = FQ[0]!, y = FQ[1]!, power = FQ[2]!;
     fxPush(FX_BLAST);
     if (demo || !you.alive || state !== "play") return;
-    const reach = 250 * (scale / 1.4), d = dist(x - you.x, y - you.y);
+    const reach = 250 * (scale / 1.4), d = hypot(x - you.x, y - you.y);
     if (d < reach) G[QUAKE] = Math.min(18, G[QUAKE]! + power * 3.5 * (1 - d / reach) ** 1.5);
   }
 
@@ -787,7 +785,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (s.type === MINE) {
       ((FQ[0] = cx), (FQ[1] = cy), (FQ[2] = 2.6), (FQ[3] = 3), boomQ());
       ((FQ[0] = cx), (FQ[1] = cy - 26), (FQ[2] = W_MINE), (FQ[3] = 3), (FQ[4] = 20), fxPush(FX_WORD));
-      for (const o2 of tanks) if (dist(o2.x - cx, o2.y - cy) < 80 * (scale / 1.4)) damage(o2, -1, 3);
+      for (const o2 of tanks) if (hypot(o2.x - cx, o2.y - cy) < 80 * (scale / 1.4)) damage(o2, -1, 3);
       e.events.emit("boom", -1);
       return;
     }
@@ -862,34 +860,25 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   };
   /** Turn F[TF] toward F[TT] by at most F[TM]: the result in F[TO]. */
   function turnF() {
-    const from = F[TF]!, to = F[TT]!, max = F[TM]!, d = Math.atan2(Math.sin(to - from), Math.cos(to - from));
-    F[TO] = from + Math.sign(d) * Math.min(Math.abs(d), max);
+    F[TO] = turn(F[TF]!, F[TT]!, F[TM]!);
   }
-  const turn = (from: number, to: number, max: number) => ((F[TF] = from), (F[TT] = to), (F[TM] = max), turnF(), F[TO]!);
-  /** The hull toward t.a's target angle at most `max`; the turret (ta) the same. */
-  const hullTo = (t: Tank) => (turnF(), (t.a = F[TO]!));
+  /** The turret (ta) toward F[TT] by at most F[TM]. */
   const turretTo = (t: Tank) => (turnF(), (t.ta = F[TO]!));
-  /** Drive tank t by the stick (F[DX], F[DY]) for F[DT] seconds. */
-  function drive(t: Tank) {
-    const ax = F[DX]!, ay = F[DY]!, dt = F[DT]!;
-    F[HX] = ax;
-    F[HY] = ay;
-    hyp();
-    const m = Math.min(1, F[HO]!);
-    if (m < 0.05) return;
-    F[TF] = t.a;
-    F[TT] = Math.atan2(ay, ax);
-    F[TM] = 7 * dt;
-    hullTo(t);
-    const sp = 150 * m * (scale / 1.4) * dt, nx = t.x + Math.cos(t.a) * sp, ny = t.y + Math.sin(t.a) * sp, rad = 14 * scale;
-    F[BX] = nx;
-    F[BY] = t.y;
-    F[BR] = rad;
-    if (!blockedF()) t.x = nx;
-    F[BX] = t.x;
-    F[BY] = ny;
-    F[BR] = rad;
-    if (!blockedF()) t.y = ny;
+  // ---------- Movement: fizlet/steer ----------
+  // Steer is Blitz's own drive (the hull's turn and speed from MOVE, × scale / 1.4, walls tested per
+  // axis so a tank slides along them), with seek, arrive and wander on top. A tank keeps its own
+  // numbers: a move copies x, y, a into the tank's steer slot and back, so nothing else changes, and
+  // a new scale, arena or roster only builds a new steer (outside the step).
+  function mkSteer() {
+    return steer({ ...MOVE, cap: tanks.length, scale: scale / 1.4, area: [60, 90, W - 120, H - 160], random: R, blocked: (_, at) => ((F[BX] = at[0]!), (F[BY] = at[1]!), (F[BR] = 14 * scale), blockedF() !== null) });
+  }
+  const toMotor = (t: Tank) => ((motor.x[t.i] = t.x), (motor.y[t.i] = t.y), (motor.a[t.i] = t.a));
+  /** Back from the slot; treads roll and the coach's DRIVE step counts what it went. */
+  function fromMotor(t: Tank) {
+    const i = t.i, sp = motor.moved[i]!;
+    t.x = motor.x[i]!;
+    t.y = motor.y[i]!;
+    t.a = motor.a[i]!;
     t.tread += sp * 0.15;
     if (t.you) G[MOVED]! += sp;
   }
@@ -927,25 +916,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         if (s.on && s.roll <= 0 && s.type === HEAL && ((F[HX] = (s.c + 0.5) * T - t.x), (F[HY] = (s.r + 0.5) * T - t.y), hyp(), F[HO]! < 220)) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
     gx = Math.max(30, Math.min(W - 30, gx));
     gy = Math.max(60, Math.min(H - 30, gy));
-    const dx = gx - t.x, dy = gy - t.y;
-    F[HX] = dx;
-    F[HY] = dy;
-    hyp();
-    const d = F[HO]!;
-    if (d > 14) (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt * (d > 140 ? 1.05 : 0.8)), drive(t);
+    toMotor(t), motor.arrive(t.i, gx, gy, dt), fromMotor(t);
     gun(t, dt);
   }
   function bot(t: Tank, dt: number) {
     if (practice) {
       // Practice dummies: TARGETs stand still, MOVERs roll about. Nobody shoots.
       if (t.i <= 3) return void ((F[TF] = t.ta), (F[TT] = t.a + Math.sin(e.time / 0.9 + t.i)), (F[TM] = 1.5 * dt), turretTo(t));
-      if ((t.think -= dt) <= 0) (t.think = 2 + R() * 2), (t.gx = 60 + R() * (W - 120)), (t.gy = 90 + R() * (H - 160));
-      const dx = t.gx - t.x, dy = t.gy - t.y;
-      F[HX] = dx;
-      F[HY] = dy;
-      hyp();
-      const d = F[HO]!;
-      if (d > 16) (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt * 0.55), drive(t);
+      const i = t.i;
+      (motor.think[i] = t.think), (motor.gx[i] = t.gx), (motor.gy[i] = t.gy), toMotor(t), motor.wander(i, dt, WANDER_PACE), fromMotor(t);
+      (t.think = motor.think[i]!), (t.gx = motor.gx[i]!), (t.gy = motor.gy[i]!);
       (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 3 * dt), turretTo(t);
       return;
     }
@@ -986,16 +966,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         else if (t.rail > 0 && d > 380 && R() < 0.4) charge(t, o2.i);
       }
     }
-    const dx = t.gx - t.x, dy = t.gy - t.y;
-    F[HX] = dx;
-    F[HY] = dy;
-    hyp();
-    const d = F[HO]!;
-    if (d > 16) {
-      const before = t.x + t.y;
-      (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt * 0.85), drive(t);
-      if (Math.abs(t.x + t.y - before) < 0.01) t.think = Math.min(t.think, 0.05); // stuck: rethink
-    }
+    const before = t.x + t.y;
+    toMotor(t), motor.seek(t.i, t.gx, t.gy, dt, CHASE_PACE), fromMotor(t);
+    if (motor.moved[t.i]! > 0 && Math.abs(t.x + t.y - before) < 0.01) t.think = Math.min(t.think, 0.05); // drove but stuck: rethink
     gun(t, dt);
   }
   /** Bots' turret: track the target, fire when lined up and in range. */
@@ -1018,7 +991,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function player(dt: number) {
     const t = you;
-    (F[DX] = input.axis("left", "right", 0)), (F[DY] = input.axis("up", "down", 1)), (F[DT] = dt), drive(t);
+    toMotor(t), motor.drive(t.i, input.axis("left", "right", 0), input.axis("up", "down", 1), dt), fromMotor(t);
     const touch = input.stick.active || coarse.matches, aim = aimTarget();
     if (aim >= 0) {
       const o2 = tanks[aim]!;
@@ -1046,7 +1019,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function human(t: Tank, b: number, dt: number) {
     const mx = b & 3, my = (b >>> 2) & 3, aimMode = (b >>> 7) & 3;
     const px = (((b >>> 16) & 255) + 0.5) * (W / 256), py = (((b >>> 24) & 255) + 0.5) * (H / 256);
-    (F[DX] = mx === 1 ? -1 : mx === 2 ? 1 : 0), (F[DY] = my === 1 ? -1 : my === 2 ? 1 : 0), (F[DT] = dt), drive(t);
+    toMotor(t), motor.drive(t.i, mx === 1 ? -1 : mx === 2 ? 1 : 0, my === 1 ? -1 : my === 2 ? 1 : 0, dt), fromMotor(t);
     const aim = aimMode === 1 ? nearestEnemy(t, 520) : -1;
     if (aim >= 0) (F[TF] = t.ta), (F[TT] = Math.atan2(tanks[aim]!.y - t.y, tanks[aim]!.x - t.x)), (F[TM] = 8 * dt), turretTo(t);
     else if (aimMode === 0) (F[TF] = t.ta), (F[TT] = Math.atan2(py - t.y, px - t.x)), (F[TM] = 10 * dt), turretTo(t);
@@ -1316,7 +1289,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         if (!done && embed)
           for (const c of covers)
             if (inRect(nx, ny, c.x, c.y, c.w, c.h) && (s.rail || R() < 0.5)) {
-              const d = dist(s.vx, s.vy) || 1;
+              const d = hypot(s.vx, s.vy) || 1;
               knock(c, s.vx / d, s.vy / d, s.rail ? 2 : 1.2, false);
               if (!s.rail) {
                 done = true;
@@ -1390,34 +1363,28 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     "In PLATOON, your three wingmen follow you and go after whoever shoots you.",
     "Esc cancels an airstrike. Double-click the grab bar to put the keys back.",
   ];
-  let cCrate = 0, cStep = 0, cShots = 0, cRail = 0, cStrike = 0, cTile = 0, cDrag = 0, coachShown = -1;
+  let cCrate = 0, cShots = 0, cRail = 0, cStrike = 0, cTile = 0, cDrag = 0;
+  // fizlet/coach: the tour counts time on a step and moves on when the game says it is done
+  // (coach:step on the ring, which plays the power cue), then a trick every 6 s; the card is the
+  // Board UI kit's coach card (END PRACTICE back to the start).
+  const coach = tour(e, { steps: COACH.length, tips: TRICKS.length, every: 6 });
+  const coachCard = card(wrap, { onEnd: () => toIntro(), signal: e.signal });
   function coachStep(dt: number) {
     // Never run dry while practising.
     if (you.rail < 1) you.rail = 3;
     if (you.strikes < 1 && !targeting) you.strikes = 2;
-    G[COACH_T]! += dt;
-    const done = [G[MOVED]! > 220, cShots >= 6, autoOn, lockOn, cRail > 0, cStrike > 0, cTile > 0, you.run >= 3, cCrate > 0, cDrag > 0 || G[COACH_T]! > 9][cStep];
-    if (cStep < COACH.length && done) {
-      cStep++;
-      G[COACH_T] = 0;
-      e.events.emit("power", 0);
-      if (COACH[cStep]?.[0] === "SUPPLY CRATE") dropCrate();
-    }
+    coach.tick(dt);
+    const done = [G[MOVED]! > 220, cShots >= 6, autoOn, lockOn, cRail > 0, cStrike > 0, cTile > 0, you.run >= 3, cCrate > 0, cDrag > 0 || coach.time[0]! > 9][coach.step];
+    if (done && coach.pass() && COACH[coach.step]?.[0] === "SUPPLY CRATE") dropCrate();
     // The crate step: if the crate timed out (or someone else took it), drop another.
-    if (COACH[cStep]?.[0] === "SUPPLY CRATE" && supply.count === 0) dropCrate();
+    if (COACH[coach.step]?.[0] === "SUPPLY CRATE" && supply.count === 0) dropCrate();
   }
   function coachFrame() {
-    const key = cStep < COACH.length ? cStep : COACH.length + (((G[COACH_T]! / 6) | 0) % TRICKS.length);
-    if (key === coachShown) return;
-    coachShown = key;
-    for (const el of wrap.querySelectorAll(".coach-on")) el.classList.remove("coach-on");
-    const [title, text, k] = cStep < COACH.length ? COACH[cStep]! : ["TRICK", TRICKS[key - COACH.length]!, ""];
-    $<HTMLElement>("[data-cs]").textContent = cStep < COACH.length ? `${cStep + 1}/${COACH.length}` : "✓";
-    $<HTMLElement>("[data-ct]").textContent = cStep < COACH.length ? title : `FREE PLAY · ${title}`;
-    $<HTMLElement>("[data-cm]").textContent = text;
-    if (k) wrap.querySelector(k === "grab" ? "[data-grab]" : `[data-k=${k}]`)?.classList.add("coach-on");
+    const k = coach.show();
+    if (k < 0) return;
+    const [title, text, key] = k < COACH.length ? COACH[k]! : ["FREE PLAY · TRICK", TRICKS[k - COACH.length]!, ""];
+    coachCard.show(k < COACH.length ? `${k + 1}/${COACH.length}` : "✓", title, text, key ? wrap.querySelector<HTMLElement>(key === "grab" ? "[data-grab]" : `[data-k=${key}]`) : null);
   }
-  $<HTMLButtonElement>("[data-cx]").addEventListener("click", () => toIntro(), { signal: e.signal });
   /** Back to the start screen (End practice). */
   function toIntro() {
     closeOverlay();
@@ -1468,7 +1435,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   function begin() {
     state = "play";
-    if (practice) (cStep = cCrate = cShots = G[MOVED] = cRail = cStrike = cTile = cDrag = G[COACH_T] = 0), (coachShown = -1);
+    if (practice) (cCrate = cShots = G[MOVED] = cRail = cStrike = cTile = cDrag = 0), coach.reset();
     wrap.classList.remove("pre");
     over.hidden = true;
     over.innerHTML = "";
@@ -1556,10 +1523,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   function hudFrame() {
     const coaching = practice && state === "play";
     if (coaching) coachFrame();
-    if ($<HTMLElement>("[data-coach]").hidden === coaching) {
-      $<HTMLElement>("[data-coach]").hidden = !coaching;
-      if (!coaching) for (const el of wrap.querySelectorAll(".coach-on")) el.classList.remove("coach-on");
-    }
+    if (coachCard.el.hidden === coaching) coaching ? (coachCard.el.hidden = false) : coachCard.hide();
     const k = String(you.kills);
     let lead = tanks[0]!;
     for (const t of tanks) if (t.kills > lead.kills) lead = t;
@@ -2232,9 +2196,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     get practice() {
       return practice;
     },
-    /** Practice coach: the step you're on (0-based; 8 = done). */
+    /** Practice coach: the step you're on (0-based; 10 = done). */
     get coach() {
-      return cStep;
+      return coach.step;
     },
     /** Debug / tests: your controls. */
     controls: {
