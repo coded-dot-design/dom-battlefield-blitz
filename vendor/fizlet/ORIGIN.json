@@ -2,7 +2,7 @@
   "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/fizlet",
   "version": "0.20.0",
-  "commit": "bf42a8c8e642168c55f7b4bf4900c2197525874c",
+  "commit": "69d17077d1eb5c8ba16a3b8805fab04b84330b30",
   "files": [
     {
       "path": "arcade-parts.ts",
@@ -31,6 +31,10 @@
     {
       "path": "collide.ts",
       "sha256": "464659a2ea07c36976ac18965b872dfcc53dd9effe1e614e8d1357db52856282"
+    },
+    {
+      "path": "css-clock.ts",
+      "sha256": "e7587cdd56ad4663603c00b1831b2492768c8338b608476e962b407574e94ba5"
     },
     {
       "path": "debug.ts",
@@ -62,7 +66,7 @@
     },
     {
       "path": "kernel/engine.ts",
-      "sha256": "9cacf0ad396c688adec088da31a37ac50a48589083195bde2848c31488ce62d5"
+      "sha256": "97b15971d27e5090f979e105661e020afbe40f45e0e4942c49fd322689f687c6"
     },
     {
       "path": "kernel/index.ts",
@@ -126,7 +130,7 @@
     },
     {
       "path": "steer.ts",
-      "sha256": "1f88f6b2ac51cf773fefed194edeb6ad38b65d5bba9c7c2c5d99a094d6633002"
+      "sha256": "7764375bb2535b7dbfbef358ff179c6ec190a99f6cd3fae0d41305deb3a33645"
     },
     {
       "path": "timeline.ts",

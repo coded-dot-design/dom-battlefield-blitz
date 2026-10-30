@@ -5,6 +5,8 @@
  * - `seek`: drive at a point, stop inside `stop`;
  * - `flee`: drive straight away from a point until `far`;
  * - `arrive`: seek with an arrival band: full pace far off, slower inside `slow`, stop inside `near`;
+ *   `arriveGoal` is the same toward the goal the game wrote in `gx[i]`, `gy[i]` (a target that moves
+ *   every frame: no double crosses a call, so nothing is boxed);
  * - `wander`: pick a random goal in `area` every `every + random × jitter` s and seek it;
  * - `patrol`: seek waypoints in turn, looping.
  * Each writes the distance moved this call to `moved[i]` (0 when standing). The heading turn and the per-axis
@@ -80,16 +82,17 @@ export function steer(o: SteerOptions) {
     if (!blocked?.(i, at)) y[i] = ny;
     moved[i] = sp;
   }
-  /** Toward goal (v[0], v[1]) for v[2] seconds at `pace`, until inside `within`. */
+  /** Toward goal (v[0], v[1]) for v[2] seconds at `pace`, until inside `within`. A pace below 0 is
+   *  arrive's band (`fast` outside `slow`, `calm` inside): one distance, and no extra call to inline. */
   function toward(i: number, pace: number, within: number) {
     const dx = v[0]! - x[i]!, dy = v[1]! - y[i]!, d = hypot(dx, dy);
     if (d <= within) return void (moved[i] = 0);
-    v[0] = dx / d; v[1] = dy / d; v[2] = v[2]! * pace;
+    v[0] = dx / d; v[1] = dy / d; v[2] = v[2]! * (pace < 0 ? (d > slow ? fast : calm) : pace);
     go(i);
   }
   return {
     x, y, a,
-    /** Wander's current goal, and seconds until it picks the next. */
+    /** The goal: wander's current one (and seconds until it picks the next), or one the game writes for `arriveGoal`. */
     gx, gy, think,
     /** Patrol: the waypoint each mover is heading for. */
     leg,
@@ -118,8 +121,16 @@ export function steer(o: SteerOptions) {
     },
     arrive(i: number, tx: number, ty: number, dt: number) {
       v[0] = tx; v[1] = ty; v[2] = dt;
-      const d = hypot(tx - x[i]!, ty - y[i]!);
-      toward(i, d > slow ? fast : calm, near);
+      toward(i, -1, near);
+    },
+    /**
+     * `arrive` toward (gx[i], gy[i]): write the goal there, then call it. For a goal computed every
+     * frame (a slot behind a leader): passed as two numbers, V8 boxes each one whenever it doesn't
+     * inline the call (3 young GCs per 20k steps in Blitz's platoons); a typed array never boxes.
+     */
+    arriveGoal(i: number, dt: number) {
+      v[0] = gx[i]!; v[1] = gy[i]!; v[2] = dt;
+      toward(i, -1, near);
     },
     wander(i: number, dt: number, pace = 1) {
       if ((think[i]! -= dt) <= 0) {

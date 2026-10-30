@@ -30,7 +30,7 @@ import { inRect } from "../vendor/fizlet/collide";
 import { tankSprites } from "../shared/sherman-sprites";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 import { drops } from "../vendor/fizlet/rules";
-import { steer, hypot, turn, type Steer } from "../vendor/fizlet/steer";
+import { steer, hypot, type Steer } from "../vendor/fizlet/steer";
 import { tour, card } from "../vendor/fizlet/coach";
 
 /** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
@@ -400,11 +400,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const KX = 16, KY = 17; // callStrike: the target
   const PX = 18, PY = 19; // spawn: where the platoon drops
   const LAST = 20; // callStrike: when its last bomb lands
+  /** Steer's exact `hypot`, inline on F (finite inputs): passed as arguments to a call V8 doesn't
+   *  inline, the two doubles and the result are boxed (Chrome 145 platoons, zero-GC test). Same bits. */
   function hyp() {
-    F[HO] = hypot(F[HX]!, F[HY]!);
+    const ax = Math.abs(F[HX]!), ay = Math.abs(F[HY]!), m = ax > ay ? ax : ay, z = m === 0 ? 1 : m, p = ax / z, q = ay / z;
+    F[HO] = Math.sqrt(p * p + q * q) * m;
   }
   /** a and b (tanks, shells) are closer than r (a constant: a literal never boxes). */
-  const within = (a: { x: number; y: number }, b: { x: number; y: number }, r: number) => hypot(a.x - b.x, a.y - b.y) < r;
+  const within = (a: { x: number; y: number }, b: { x: number; y: number }, r: number) => ((F[HX] = a.x - b.x), (F[HY] = a.y - b.y), hyp(), F[HO]! < r);
   /** The live block that a circle at (F[BX], F[BY]) of radius F[BR] touches (fizlet/collide circleRect, inline), or null. */
   function blockedF() {
     const cx = F[BX]!, cy = F[BY]!, r = F[BR]!;
@@ -858,9 +861,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     return best;
   };
-  /** Turn F[TF] toward F[TT] by at most F[TM]: the result in F[TO]. */
+  /** Turn F[TF] toward F[TT] by at most F[TM]: the result in F[TO]. Steer's `turn`, inline on F: three
+   *  doubles passed to a call V8 doesn't inline are boxed (Chrome 145 platoons, zero-GC test). */
   function turnF() {
-    F[TO] = turn(F[TF]!, F[TT]!, F[TM]!);
+    const from = F[TF]!, to = F[TT]!, d = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+    F[TO] = from + Math.sign(d) * Math.min(Math.abs(d), F[TM]!);
   }
   /** The turret (ta) toward F[TT] by at most F[TM]. */
   const turretTo = (t: Tank) => (turnF(), (t.ta = F[TO]!));
@@ -914,9 +919,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (t.hp <= 2)
       for (const s of tiles)
         if (s.on && s.roll <= 0 && s.type === HEAL && ((F[HX] = (s.c + 0.5) * T - t.x), (F[HY] = (s.r + 0.5) * T - t.y), hyp(), F[HO]! < 220)) (gx = (s.c + 0.5) * T), (gy = (s.r + 0.5) * T);
-    gx = Math.max(30, Math.min(W - 30, gx));
-    gy = Math.max(60, Math.min(H - 30, gy));
-    toMotor(t), motor.arrive(t.i, gx, gy, dt), fromMotor(t);
+    // The slot goes in the steer's own goal (arriveGoal): passed as two arguments, V8 boxes them
+    // whenever it doesn't inline the call (3 young GCs per 20k steps in platoons on Chrome 145).
+    motor.gx[t.i] = Math.max(30, Math.min(W - 30, gx));
+    motor.gy[t.i] = Math.max(60, Math.min(H - 30, gy));
+    toMotor(t), motor.arriveGoal(t.i, dt), fromMotor(t);
     gun(t, dt);
   }
   function bot(t: Tank, dt: number) {
