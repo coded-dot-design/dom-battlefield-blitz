@@ -81,7 +81,7 @@ export function perf(engine: Engine, o: PerfOptions = {}) {
   const tpl = document.createElement("div");
   tpl.innerHTML =
     `<div class=fizlet-perf role=group aria-label=Performance data-fizlet-ignore hidden aria-hidden=true style="position:${host === document.body ? "fixed" : "absolute"};${corner[0] === "t" ? "top" : "bottom"}:8px;${corner[1] === "l" ? "left" : "right"}:8px;` +
-    "z-index:60;contain:layout paint style;pointer-events:none;width:120px;padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:2px 6px;" +
+    "z-index:60;contain:layout paint style;pointer-events:none;box-sizing:content-box;width:120px;padding:6px;display:grid;grid-template-columns:1fr 1fr;gap:2px 6px;" +
     "background:var(--surface,#110d22);color:var(--muted,#aea4d6);border:2px solid var(--rim,#07060f);border-radius:6px;box-shadow:0 3px 0 var(--rim,#07060f);" +
     'font:700 9px/1.3 ui-monospace,monospace;letter-spacing:.08em;font-variant-numeric:tabular-nums"><canvas aria-hidden=true style="grid-column:1/-1;width:120px;height:36px;background:var(--bg,#07060f)"></canvas>' +
     LABELS.map((l) => `<span><b style="color:var(--ink,#f6f3ff)">0</b> ${l}</span>`).join("") +

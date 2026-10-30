@@ -11,6 +11,12 @@
  * stop) destroys the engine, so every letter and button comes back exactly; a run that ends keeps
  * the scoreboard with the result until Recall. The game supplies `create(ctx)`: its own systems on
  * `ctx.engine`, reading `ctx.ctl` (written in the read phase) and drawing in render.
+ *
+ * The scoreboard and controls are a HUD preset, chosen per game with `hud` (BOARD-UI.md §19):
+ * `arcadeHud()` is today's card and the default (no `hud` renders it byte for byte);
+ * `skirmishHud({...})` is Battlefield Blitz's top bar with a clock, rank and armor bar, a feed, a
+ * banner, pause / surrender / countdown / result overlays, aim toggles and counted keys. Each
+ * preset is its own export, so a game ships only the one it names.
  */
 import { createEngine } from "./kernel/engine";
 import type { Engine, System } from "./kernel/engine";
@@ -24,6 +30,9 @@ import type { PadAction } from "./pad";
 import { sound } from "./sound";
 import type { Cue } from "./sound";
 import { mount, readouts, toast } from "./ui/board-ui";
+import { BASE, ICON, drag, esc } from "./arcade-parts";
+export { skirmishHud } from "./arcade-skirmish";
+export type { SkirmishOptions, SkirmishReadout } from "./arcade-skirmish";
 
 /** Controls and view, written once per frame in the read phase (a step reads them): mode (0 keys or
  *  stick, 1 pointer), pointer x, y and on, move x, y (-1..1), fire, viewport width and height, and
@@ -134,8 +143,9 @@ export interface ArcadeDef<S> {
   pad?: "stick" | "dpad";
   /** Keys (or the stick) only: the mouse never steers. */
   keyboard?: boolean;
-  /** Readouts: label, tone, how the value shows, and whether it hides when the board is folded. */
-  readouts: [label: string, tone?: "team" | "enemy" | undefined, fmt?: ((v: number) => string) | undefined, fold?: boolean | undefined][];
+  /** The card's readouts: label, tone, how the value shows, and whether it hides when the board is
+   *  folded. A preset with its own readouts (skirmish) leaves this out. */
+  readouts?: [label: string, tone?: "team" | "enemy" | undefined, fmt?: ((v: number) => string) | undefined, fold?: boolean | undefined][];
   meter?: { label: string };
   /** Spark colours, by index. */
   colors: string[];
@@ -143,40 +153,166 @@ export interface ArcadeDef<S> {
   cues: Record<string, Cue>;
   /** Paint targets with their health (default true). */
   paint?: boolean;
+  /** The scoreboard and controls: a HUD preset (default `arcadeHud()`, today's card). */
+  hud?: ArcadeHud;
   create(ctx: ArcadeContext): ArcadeGame<S>;
+}
+
+/** A HUD preset: its CSS (after the game's kit CSS) and a mount, once per run. */
+export interface ArcadeHud {
+  css: string;
+  /** Extra controls intents the HUD drives (e.g. aim toggles): intent → key codes. */
+  keys?: Record<string, string[]>;
+  mount(run: HudRun): HudView;
+}
+/** What the shell gives a HUD when a run starts. */
+export interface HudRun {
+  /** The kit root (`.bui`), the canvas already in it. */
+  ui: HTMLElement;
+  def: ArcadeDef<any>;
+  engine: Engine;
+  input: Controls;
+  /** A coarse pointer: build the touch pad. */
+  coarse: boolean;
+  /** The game, once `create` returned: read it in `write`, never in `mount`. */
+  game: ArcadeGame<any>;
+  /** Sound (a scoreboard key flips `on`). */
+  sfx: { on: boolean };
+  /** Aborts at Recall: the overlay's life. */
+  signal: AbortSignal;
+  status(): ArcadeStatus;
+}
+/** A mounted HUD. Keys are `button[data-a]` (sound, pause, exit, restart, gate, auto, surrender, or
+ *  the HUD's own) and `button[data-act]` (an action): the shell runs them, then calls `key`. */
+export interface HudView {
+  /** The comms toast. */
+  msg: HTMLElement;
+  /** Every render and once at start: change-only writes, nothing allocated in the steady state. */
+  write(): void;
+  /** The status changed: the pause key, overlays. */
+  sync(): void;
+  /** A scoreboard key ran: repaint its face (`auto`: auto fire is on). */
+  key(a: string, b: HTMLElement, auto: boolean): void;
+  /** At start, in place of starting the engine: a countdown that calls `go` when it is done. */
+  begin?(go: () => void): void;
+  /** Before the engine goes at the end of a run (its ledger takes back what went through it). */
+  hold?(): void;
+  /** The run ended and the page is back: show the result. */
+  end(won: boolean, notice: string, stats: Record<string, unknown>): void;
 }
 
 const EDIT = 'input,textarea,select,[contenteditable],form,dialog,[role="dialog"]';
 const PROTECTED = "[data-virus-ignore],[data-fizlet-ignore]";
-const svg = (d: string) => `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-const ICON = {
-  sound: svg('<path d="M3 8h3l4-4v12l-4-4H3ZM14 6q4 4 0 8"/>'),
-  mute: svg('<path d="M3 8h3l4-4v12l-4-4H3ZM14 8l4 4m0-4-4 4"/>'),
-  pause: svg('<path d="M7 5v10M13 5v10"/>'),
-  play: svg('<path d="m7 4 9 6-9 6Z"/>'),
-  fold: svg('<path d="M4 10h12"/>'),
-  open: svg('<path d="M4 10h12M10 4v12"/>'),
-  exit: svg('<path d="m5 5 10 10M15 5 5 15"/>'),
-  fire: svg('<path d="M10 1v5M10 14v5M1 10h5M14 10h5"/><circle cx="10" cy="10" r="5"/>'),
-};
-const esc = (t: string) => t.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
-const CSS = `
-:host{all:initial!important;position:fixed!important;inset:0!important;display:block!important;z-index:2147483000!important;pointer-events:none!important}
-.bui{position:absolute;inset:0;background:none;font:500 12px/1.4 ui-monospace,monospace}
-canvas{position:absolute;inset:0;pointer-events:none}
+// The card (the `arcade` preset): bottom right, folded to the top on phones.
+const CARD = `
 .ar{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:min(300px,calc(100% - 24px));display:grid;gap:10px;padding:10px 12px 12px;pointer-events:auto;color:var(--ink);background:color-mix(in srgb,var(--card) 94%,transparent);border:2.5px solid var(--line);border-radius:10px;box-shadow:0 5px 0 var(--rim)}
 .ar header{display:flex;align-items:center;gap:6px}.ar header b{flex:1;font:900 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:var(--team-a)}
 .ar header button{width:34px;height:34px;min-height:0;padding:0;display:grid;place-items:center}.ar header svg{width:18px;height:18px}
 .ar .bui-readouts{justify-content:space-between;gap:12px}
 .mt{display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:10px;letter-spacing:.08em;color:var(--muted)}.mt b{color:var(--ink)}
 .mt i{grid-column:1/-1;height:6px;border-radius:3px;background:var(--surface);border:1.5px solid var(--line);overflow:hidden}.mt u{display:block;height:100%;width:0;background:var(--team-a)}
-.ar nav{display:flex;flex-wrap:wrap;gap:6px}.ar nav button{flex:1 1 auto;white-space:nowrap;min-height:0;padding:7px 6px;font:800 10px/1 ui-monospace,monospace;letter-spacing:.08em}
+.ar nav{display:flex;flex-wrap:wrap;gap:6px}.ar nav button{flex:1 1 auto;white-space:nowrap;min-height:0;padding:7px 6px;font:800 10px/1 ui-monospace,monospace;letter-spacing:.08em}.ar nav:empty{display:none}
 .ar.compact .mt,.ar.compact nav,.ar.compact [data-fold]{display:none}
-.bui .msg{position:absolute;left:50%;bottom:max(16px,env(safe-area-inset-bottom));translate:-50% 0;max-width:calc(100% - 24px);pointer-events:none}
-.bui .msg[hidden]{display:none}
-.bui .bui-pad{pointer-events:auto}
-@media (pointer:coarse),(max-width:600px){.ar{top:max(10px,env(safe-area-inset-top));bottom:auto;width:min(260px,calc(100% - 20px))}.bui .msg{bottom:auto;top:max(150px,calc(env(safe-area-inset-top) + 140px))}}
-@media (prefers-reduced-motion:reduce){.bui *{transition:none!important;animation:none!important}}`;
+@media (pointer:coarse),(max-width:600px){.ar{top:max(10px,env(safe-area-inset-top));bottom:auto;width:min(260px,calc(100% - 20px))}.bui .msg{bottom:auto;top:max(150px,calc(env(safe-area-inset-top) + 140px))}}`;
+const HEAD = {
+  sound: `<button type="button" data-a="sound" aria-pressed="true" aria-label="Mute game sound">${ICON.sound}</button>`,
+  pause: `<button type="button" data-a="pause" aria-label="Pause game (P)">${ICON.pause}</button>`,
+  fold: `<button type="button" data-a="fold" aria-expanded="true" aria-label="Minimize scoreboard">${ICON.fold}</button>`,
+  exit: `<button type="button" data-a="exit" aria-label="Close game and restore page (Esc)">${ICON.exit}</button>`,
+};
+export interface ArcadeHudOptions {
+  /** Header keys, in order (default all four). */
+  header?: ("sound" | "pause" | "fold" | "exit")[];
+  /** The nav row after the action keys (default all three; `auto` needs `fire`). */
+  nav?: ("next" | "restart" | "auto")[];
+}
+
+/**
+ * The `arcade` preset, the default: one card with the title, sound / pause / fold / exit keys,
+ * the readouts, one meter, the nav row (actions, Next gate, Restart, Auto fire) and the toast;
+ * phones get the pad and the card folded at the top. `arcadeHud()` renders exactly what leaving
+ * `hud` out renders. Values: `hud(out)` fills the readouts in order, then the meter's change key.
+ */
+export function arcadeHud(o: ArcadeHudOptions = {}): ArcadeHud {
+  return {
+    css: CARD,
+    mount(r) {
+      const { ui, def, coarse } = r, R = def.readouts ?? [], actions = def.actions ?? [];
+      const nav = o.nav ?? ["next", "restart", "auto"];
+      ui.insertAdjacentHTML("beforeend", `<section class="ar" aria-label="${esc(def.title)} controls"><header><b>${esc(def.title.toUpperCase())}</b>${(o.header ?? ["sound", "pause", "fold", "exit"]).map((k) => "\n" + HEAD[k]).join("")}</header>
+${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-label="${esc(def.meter.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><u></u></i></div>` : ""}
+<nav>${actions.map((a) => `<button type="button" data-act="${esc(a.id)}">${esc(a.label)}</button>`).join("")}${nav.includes("next") ? '<button type="button" data-a="gate">Next gate</button>' : ""}${nav.includes("restart") ? '<button type="button" data-a="restart">Restart</button>' : ""}${def.fire && nav.includes("auto") ? '<button type="button" data-a="auto" aria-pressed="false">Auto fire</button>' : ""}</nav></section>
+<div class="bui-toast msg" role="status" hidden></div>`);
+      const $ = <T extends Element>(s: string) => ui.querySelector<T>(s);
+      const panel = $<HTMLElement>(".ar")!, msg = $<HTMLElement>(".msg")!, meter = $<HTMLElement>(".mt");
+      const { group, values } = readouts(panel, R.map(([l, t]) => (t ? [l, t] : [l])) as [string, ("team" | "enemy")?][]);
+      panel.insertBefore(group, meter ?? $("nav"));
+      R.forEach(([, , , fold], i) => fold && group.children[i]!.setAttribute("data-fold", ""));
+      if (coarse) {
+        // Without fire, the first action is the big primary key.
+        const pads: PadAction[] = actions.map((a, i) => ({ intent: a.id, label: a.label.replace(/^[^·]*· /, ""), role: !def.fire && !i ? "go" : "sys" }));
+        if (def.fire) pads.unshift({ intent: "fire", label: "", name: "Hold to fire (Space)", icon: ICON.fire, hold: true, role: "fire" });
+        pad(r.engine, r.input, { scheme: def.pad ?? "stick", host: ui, actions: pads });
+      }
+      const k = { sound: $<HTMLButtonElement>("[data-a=sound]"), pause: $<HTMLButtonElement>("[data-a=pause]"), fold: $<HTMLButtonElement>("[data-a=fold]") };
+      const fold = (compact: boolean) => {
+        panel.classList.toggle("compact", compact);
+        k.fold!.innerHTML = compact ? ICON.open : ICON.fold;
+        k.fold!.setAttribute("aria-expanded", String(!compact));
+        k.fold!.setAttribute("aria-label", compact ? "Expand scoreboard" : "Minimize scoreboard");
+      };
+      if (k.fold) fold(coarse || innerWidth <= 600);
+      const syncSound = () => {
+        if (!k.sound) return;
+        k.sound.innerHTML = r.sfx.on ? ICON.sound : ICON.mute;
+        k.sound.setAttribute("aria-pressed", String(r.sfx.on));
+        k.sound.setAttribute("aria-label", r.sfx.on ? "Mute game sound" : "Turn game sound on");
+      };
+      const sync = () => {
+        const s = r.status();
+        if (!k.pause) return;
+        k.pause.innerHTML = s === "paused" ? ICON.play : ICON.pause;
+        k.pause.setAttribute("aria-label", s === "paused" ? "Resume game (P)" : "Pause game (P)");
+        k.pause.disabled = s !== "running" && s !== "paused";
+      };
+      syncSound();
+      // Change-only writes.
+      const N = R.length, hv = new Float64Array(N + 1), shown = new Float64Array(N + 1).fill(NaN);
+      return {
+        msg,
+        sync,
+        write() {
+          const game = r.game;
+          game.hud(hv);
+          for (let i = 0; i < N; i++)
+            if (hv[i] !== shown[i]) {
+              const fmt = R[i]![2];
+              values[i]!.textContent = fmt ? fmt(hv[i]!) : String(hv[i]);
+              shown[i] = hv[i]!;
+            }
+          if (meter && game.meter && hv[N] !== shown[N]) {
+            shown[N] = hv[N]!;
+            const [l, rt, f] = game.meter(), pct = Math.round(Math.min(1, Math.max(0, f)) * 100);
+            meter.children[0]!.textContent = l;
+            meter.children[1]!.textContent = rt;
+            (meter.querySelector("u") as HTMLElement).style.width = `${pct}%`;
+            meter.children[2]!.setAttribute("aria-valuenow", String(pct));
+          }
+        },
+        key(a, b, auto) {
+          if (a === "sound") syncSound();
+          else if (a === "fold") fold(!panel.classList.contains("compact"));
+          else if (a === "auto") b.setAttribute("aria-pressed", String(auto)), (b.textContent = auto ? "Fire: on" : "Auto fire");
+        },
+        end(won, notice) {
+          panel.classList.remove("compact");
+          sync();
+          toast(msg, `${won ? "STAGE CLEAR" : "GAME OVER"} · ${notice}`, 1e9);
+        },
+      };
+    },
+  };
+}
 
 export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): ArcadeController<S> {
   let status: ArcadeStatus = "idle", destroyed = false, notice = "";
@@ -202,22 +338,10 @@ export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): Ar
     host.dataset.virusIgnore = "";
     host.setAttribute("data-fizlet-host", def.id);
     const theme = options.theme === "dark" || options.theme === "light" ? options.theme : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    const ui = mount(host, def.css + CSS, { theme, palette: { teamA: def.color } });
-    ui.innerHTML = `<canvas aria-hidden="true"></canvas>
-<section class="ar" aria-label="${esc(def.title)} controls"><header><b>${esc(def.title.toUpperCase())}</b>
-<button type="button" data-a="sound" aria-pressed="true" aria-label="Mute game sound">${ICON.sound}</button>
-<button type="button" data-a="pause" aria-label="Pause game (P)">${ICON.pause}</button>
-<button type="button" data-a="fold" aria-expanded="true" aria-label="Minimize scoreboard">${ICON.fold}</button>
-<button type="button" data-a="exit" aria-label="Close game and restore page (Esc)">${ICON.exit}</button></header>
-${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-label="${esc(def.meter.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><u></u></i></div>` : ""}
-<nav>${actions.map((a) => `<button type="button" data-act="${esc(a.id)}">${esc(a.label)}</button>`).join("")}<button type="button" data-a="gate">Next gate</button><button type="button" data-a="restart">Restart</button>${def.fire ? '<button type="button" data-a="auto" aria-pressed="false">Auto fire</button>' : ""}</nav></section>
-<div class="bui-toast msg" role="status" hidden></div>`;
-    const $ = <T extends Element>(s: string) => ui.querySelector<T>(s)!;
-    const panel = $<HTMLElement>(".ar"), msg = $<HTMLElement>(".msg"), meter = ui.querySelector<HTMLElement>(".mt");
-    const { group, values } = readouts(panel, def.readouts.map(([l, t]) => (t ? [l, t] : [l])) as [string, ("team" | "enemy")?][]);
-    panel.insertBefore(group, meter ?? $("nav"));
-    def.readouts.forEach(([, , , fold], i) => fold && group.children[i]!.setAttribute("data-fold", ""));
-    const canvas = $<HTMLCanvasElement>("canvas"), c2d = canvas.getContext("2d")!;
+    const preset = def.hud ?? arcadeHud();
+    const ui = mount(host, def.css + BASE + preset.css, { theme, palette: { teamA: def.color } });
+    ui.innerHTML = `<canvas aria-hidden="true"></canvas>\n`;
+    const canvas = ui.firstChild as HTMLCanvasElement, c2d = canvas.getContext("2d")!;
     // The overlay is the one page change outside the engine's ledger: the scoreboard outlives the
     // engine when a run ends (the page is already back), and the controller removes it on Recall.
     doc.documentElement.append(host);
@@ -248,15 +372,12 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
       const keys: Record<string, string[]> = { up: ["KeyW", "ArrowUp"], down: ["KeyS", "ArrowDown"], left: ["KeyA", "ArrowLeft"], right: ["KeyD", "ArrowRight"] };
       if (def.fire) keys.fire = ["Space"];
       for (const a of actions) keys[a.id] = [a.key];
+      Object.assign(keys, preset.keys);
       const input = controls(e, { keys, target: host });
-      const coarse = matchMedia("(pointer: coarse)").matches;
-      if (coarse) {
-        // Without fire, the first action is the big primary key.
-        const pads: PadAction[] = actions.map((a, i) => ({ intent: a.id, label: a.label.replace(/^[^·]*· /, ""), role: !def.fire && !i ? "go" : "sys" }));
-        if (def.fire) pads.unshift({ intent: "fire", label: "", name: "Hold to fire (Space)", icon: ICON.fire, hold: true, role: "fire" });
-        pad(e, input, { scheme: def.pad ?? "stick", host: ui, actions: pads });
-      }
       const sfx = sound(e, { on: options.sound !== false, cues: def.cues });
+      const r: HudRun = { ui, def, engine: e, input, coarse: matchMedia("(pointer: coarse)").matches, game: null!, sfx, signal: life.signal, status: () => status };
+      const hud = preset.mount(r);
+      drag(ui.querySelector<HTMLElement>(":scope>section")!, life.signal); // every preset's panel drags
       const ctl = new Float64Array(11);
 
       // Sparks (3 px squares, a pool of 100) and popups (24, stacked when they land close together).
@@ -283,7 +404,7 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
             n--;
           }
         },
-        say: (text, ms) => toast(msg, text, ms),
+        say: (text, ms) => toast(hud.msg, text, ms),
         emit,
         attach(el) {
           if (!(el instanceof HTMLElement) || /^(IMG|INPUT|BR|HR|CANVAS|VIDEO|IFRAME|TEXTAREA|SELECT)$/.test(el.tagName)) return null;
@@ -296,7 +417,7 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
           return art.attachShadow({ mode: "open" });
         },
       };
-      const game = def.create(context);
+      const game = (r.game = def.create(context));
 
       // Pointer, fire and the page's own clicks: while running, a click on the page fires instead
       // of following a link or pressing a button. The HUD, fields and opted-out parts keep theirs.
@@ -332,40 +453,22 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
         else if (ev.code === "KeyG" && live()) ev.preventDefault(), (jump = 1);
       }, { signal: life.signal, capture: true });
 
-      // ---------- Scoreboard keys ----------
-      const k = { sound: $<HTMLButtonElement>("[data-a=sound]"), pause: $<HTMLButtonElement>("[data-a=pause]"), fold: $<HTMLButtonElement>("[data-a=fold]") };
-      const fold = (compact: boolean) => {
-        panel.classList.toggle("compact", compact);
-        k.fold.innerHTML = compact ? ICON.open : ICON.fold;
-        k.fold.setAttribute("aria-expanded", String(!compact));
-        k.fold.setAttribute("aria-label", compact ? "Expand scoreboard" : "Minimize scoreboard");
-      };
-      fold(coarse || innerWidth <= 600);
-      const syncSound = () => {
-        k.sound.innerHTML = sfx.on ? ICON.sound : ICON.mute;
-        k.sound.setAttribute("aria-pressed", String(sfx.on));
-        k.sound.setAttribute("aria-label", sfx.on ? "Mute game sound" : "Turn game sound on");
-      };
-      const syncPause = () => {
-        k.pause.innerHTML = status === "paused" ? ICON.play : ICON.pause;
-        k.pause.setAttribute("aria-label", status === "paused" ? "Resume game (P)" : "Pause game (P)");
-        k.pause.disabled = status !== "running" && status !== "paused";
-      };
+      // ---------- Scoreboard keys: the shell runs them, the HUD repaints their faces ----------
       ui.addEventListener("click", (ev) => {
         const b = (ev.target as Element).closest<HTMLButtonElement>("button[data-a],button[data-act]");
         if (!b) return;
-        const a = b.dataset.a;
+        const a = b.dataset.a!;
         if (b.dataset.act) live() && input.press(b.dataset.act), live() && input.press(b.dataset.act, false);
-        else if (a === "sound") (sfx.on = !sfx.on), syncSound();
+        else if (a === "sound") sfx.on = !sfx.on;
         else if (a === "pause") status === "paused" ? resume() : pause();
-        else if (a === "fold") fold(!panel.classList.contains("compact"));
         else if (a === "exit") stop();
         else if (a === "restart") start();
-        else if (a === "gate" && live()) jump = 1;
-        else if (a === "auto") (auto = !auto), b.setAttribute("aria-pressed", String(auto)), (b.textContent = auto ? "Fire: on" : "Auto fire");
+        else if (a === "gate") live() && (jump = 1);
+        else if (a === "auto") auto = !auto;
+        else if (a === "surrender") finish(false);
+        hud.key(a, b, auto);
         if (live()) b.blur();
       });
-      syncSound();
 
       // G / Next gate: scroll to a live target, preferring one off screen (a page write: render).
       function gate() {
@@ -388,7 +491,6 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
         }
       }
 
-      const N = def.readouts.length, hv = new Float64Array(N + 1), shown = new Float64Array(N + 1).fill(NaN);
       const view = new Float64Array(3), DPR = 0, NOTE = 1;
       const shell: System = {
         read() {
@@ -464,29 +566,11 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
             c2d.fillText(text, px[i]!, py[i]!);
           }
           c2d.globalAlpha = 1;
-          hud();
+          hud.write();
           if ((view[NOTE]! += dt) >= 0.1) (view[NOTE] = 0), notify();
         },
       };
       e.add(shell);
-      // The scoreboard: change-only writes.
-      function hud() {
-        game.hud(hv);
-        for (let i = 0; i < N; i++)
-          if (hv[i] !== shown[i]) {
-            const fmt = def.readouts[i]![2];
-            values[i]!.textContent = fmt ? fmt(hv[i]!) : String(hv[i]);
-            shown[i] = hv[i]!;
-          }
-        if (meter && game.meter && hv[N] !== shown[N]) {
-          shown[N] = hv[N]!;
-          const [l, rt, f] = game.meter(), pct = Math.round(Math.min(1, Math.max(0, f)) * 100);
-          meter.children[0]!.textContent = l;
-          meter.children[1]!.textContent = rt;
-          (meter.querySelector("u") as HTMLElement).style.width = `${pct}%`;
-          meter.children[2]!.setAttribute("aria-valuenow", String(pct));
-        }
-      }
       function stats(): Record<string, unknown> {
         let visible = 0, spent = 0, sparks = 0;
         const g = board.glyphs;
@@ -502,7 +586,7 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
       p[P_Y] = innerHeight * 0.65;
       board.refresh();
       game.reset();
-      return { engine: e as Engine, life, host, ui, panel, msg, stats, syncPause, hud };
+      return { engine: e as Engine, life, host, ui, view: hud, stats };
     } catch (err) {
       // A run that fails to start leaves nothing behind.
       built?.destroy();
@@ -526,10 +610,11 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
     try {
       run = begin();
       status = "running";
-      run.engine.start();
-      run.syncPause();
-      run.hud();
-      toast(run.msg, matchMedia("(pointer: coarse)").matches ? def.touchHint ?? def.hint : def.hint, 4200);
+      const go = () => status === "running" && run?.engine.start();
+      run.view.begin ? run.view.begin(go) : go();
+      run.view.sync();
+      run.view.write();
+      toast(run.view.msg, matchMedia("(pointer: coarse)").matches ? def.touchHint ?? def.hint : def.hint, 4200);
       emit("start");
     } catch (err) {
       teardown();
@@ -544,7 +629,7 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
     if (status !== "running" || !run) return;
     status = "paused";
     run.engine.stop();
-    run.syncPause();
+    run.view.sync();
     notify();
     emit("pause");
   }
@@ -552,7 +637,7 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
     if (status !== "paused" || !run || document.hidden) return;
     status = "running";
     run.engine.start();
-    run.syncPause();
+    run.view.sync();
     notify();
     emit("resume");
   }
@@ -563,14 +648,13 @@ ${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-la
     last = run.stats();
     status = won ? "won" : "gameover";
     notice = won ? "Page cleared and restored. Restart for another run." : "Run ended. Page restored. Restart for another run.";
-    const { host, ui, panel, msg, syncPause } = run;
+    const { host, ui, view } = run;
+    view.hold?.();
     run.engine.destroy();
     const ended = last;
     run = { ...run, stats: () => ended };
-    panel.classList.remove("compact");
     ui.querySelector("canvas")?.remove();
-    syncPause();
-    toast(msg, `${won ? "STAGE CLEAR" : "GAME OVER"} · ${notice}`, 1e9);
+    view.end(won, notice, ended);
     emit(status, { score: last.score });
     notify();
     host.dataset.over = status;

@@ -1,7 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.10.0
 
+- **The scoreboard drags.** Board UI rule: in-page scoreboards always drag.
+  - Drag the bar at the top from any part of it. It stays whole on the board and is remembered on
+    this device; a double-click puts it back. The keys keep their grab bar and work the same way.
+  - Both use one `movable()` helper in Blitz. Fizlet 0.19's `drag()` places by viewport
+    coordinates, which only works for a full-window overlay; Blitz's board sits below a page header
+    on `/play/`, so Blitz keeps its own (and `drag()` isn't bundled).
+  - `test:browser` drags the scoreboard, checks it's remembered, and double-clicks it back.
+- **Fizlet 0.19.0** (vendored from 0.15.0). No game change: `test:replay` plays the pinned 0.8.2
+  matches value for value, and `test:lockstep` stays identical.
+- Size: `dist/blitz.js` 40,298 → 40,507 B gzip, `dist/blitz.mjs` 40,399 → 40,609,
+  `dist/blitz-net.mjs` 41,836 → 42,057 (0.19 kernel and kit, plus the drag). Budgets unchanged
+  (40,960; blitz-net 43,008).
+- `test:browser`: LONG presses until a round is spent instead of waiting 3 s (a CI flake).
 - **Two players: a real lobby and a phone layout (`/play/two/`).** The page is one full-screen
   stage like `/play/` (no header, footer or scroll on phones), with a Board UI card over the arena:
   - **Join:** invite code, room − / + (`?room=` and `?code=` prefill it), JOIN.

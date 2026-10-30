@@ -29,8 +29,9 @@ interface Entry {
 }
 
 let probe: HTMLElement | undefined;
-/** How the browser normalises a style attribute's text (to check a restore is a no-op change). */
-const withStyle = (text: string) => ((probe ??= document.createElement("i")).setAttribute("style", text), probe.style.cssText);
+/** How the browser normalises a style attribute's text (to check a restore is a no-op change). The
+ *  probe comes from the element's own document (an iframe's page has no global `document` of its own). */
+const withStyle = (text: string, el: El) => ((probe ??= el.ownerDocument.createElement("i")).setAttribute("style", text), probe.style.cssText);
 
 export class Ledger {
   private readonly texts = new Map<CharacterData, Rec<string | null>>();
@@ -134,7 +135,7 @@ export class Ledger {
         else s.removeProperty(prop);
       });
       // Still ours end to end: put the original attribute text back byte for byte.
-      if (e.style && all && e.os !== null && el.style.cssText === withStyle(e.os)) el.setAttribute("style", e.os);
+      if (e.style && all && e.os !== null && el.style.cssText === withStyle(e.os, el)) el.setAttribute("style", e.os);
       if (e.style && !e.hadStyle && !el.getAttribute("style")) el.removeAttribute("style");
       if (e.cls && !e.hadClass && el.getAttribute("class") === "") el.removeAttribute("class");
     }
