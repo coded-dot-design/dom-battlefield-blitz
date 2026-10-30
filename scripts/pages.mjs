@@ -5,6 +5,7 @@
 //   /blitz.js   the drop-in    (dist/blitz.js, the committed build)
 import { cpSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
+import { PAGES, hidden } from "../site/src/sitemap.mjs";
 
 const out = resolve("artifacts/pages");
 if (!existsSync(join(out, "index.html"))) throw Error("Run astro build first (npm run site:build).");
@@ -35,4 +36,19 @@ for (const page of pages) {
   }
 }
 if (missing.length) throw Error(`Broken links:\n${missing.join("\n")}`);
+
+// The site map (site/src/sitemap.mjs) is the footer's one source: every built page is in PAGES
+// (indexable) or HIDDEN, and no PAGES entry is noindex or missing.
+const listed = new Set(PAGES.map((p) => p.path));
+const unmapped = [];
+for (const page of pages) {
+  const path = page.slice(out.length + 1).replace(/index\.html$/, "");
+  const noindex = /<meta\s+name="robots"\s+content="[^"]*noindex/.test(readFileSync(page, "utf8"));
+  if (listed.has(path)) {
+    if (noindex) unmapped.push(`/${path}: noindex, but in PAGES`);
+    listed.delete(path);
+  } else if (!hidden(path)) unmapped.push(`/${path}: add it to PAGES or HIDDEN in site/src/sitemap.mjs`);
+}
+for (const path of listed) unmapped.push(`/${path}: in PAGES, but not built`);
+if (unmapped.length) throw Error(`Site map:\n${unmapped.join("\n")}`);
 console.log(`Pages ready: ${pages.length} pages, Blitz ${JSON.parse(readFileSync("package.json", "utf8")).version} at /play/, drop-in at /blitz.js.`);

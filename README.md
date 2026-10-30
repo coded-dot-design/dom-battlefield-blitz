@@ -17,7 +17,7 @@ keeps working for existing embeds.
 
 Blitz is part of the DOM Battlefield brand: its own site (`site/`, Astro, dev only) wears the
 Battlefield styling and the Board UI kit. `npm run site:build` builds it into `artifacts/pages`;
-`npm run test:site` checks it. Custom domain: set the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com`
+`npm run test:site` checks it. The footer's site map comes from `site/src/sitemap.mjs`: add a new page there (or under `HIDDEN`) and the footer lists it; the build fails on a page that is in neither. Custom domain: set the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com`
 and `SITE_BASE=/`, then the custom domain in Settings → Pages; the Pages build writes `CNAME` from
 `SITE_URL`. This repo is also the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
 (the engine, snapshotted in `vendor/fizlet/` with provenance) and draws tanks with the art in
