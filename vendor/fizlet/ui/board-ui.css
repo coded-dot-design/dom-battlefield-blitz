@@ -70,6 +70,24 @@
   --team: var(--team-b);
 }
 
+/* Touch (with fizlet/touch's lockTouch for pinch): a tap is a tap, never a double-tap zoom. Game
+   surfaces take every gesture; animation slots let the page scroll up and down through them, but
+   never pan sideways or zoom. */
+.bui {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.bui:is([data-fizlet-host], [data-touch-lock]),
+.bui :is([data-fizlet-host], [data-touch-lock]) {
+  touch-action: none;
+  overscroll-behavior: none;
+}
+.bui :is(.ae-slot, [data-fizlet-slot], [data-touch-lock="y"]) {
+  touch-action: pan-y;
+  overscroll-behavior: none;
+}
+
 /* ---------- 2. The 3D key: one family, five states ----------
    A key is a face over a hard base STRAIGHT BELOW it (never to the side). Families only set the
    variables; the state rules below do all the motion, on one curve, so the face and its base

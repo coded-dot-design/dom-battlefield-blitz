@@ -47,6 +47,8 @@ interface Bind {
   line: ((a: number, b: number) => string) | null;
   text: ((a: number, b: number) => readonly [string, string?]) | null;
   play: ((el: HTMLElement) => void) | null;
+  /** What `play` gets: the newest row (feed) or the banner. */
+  p: HTMLElement;
   /** Text nodes written: one for num, `n` rows for feed, title + sub for banner. */
   t: Text[];
   lines: string[];
@@ -70,8 +72,8 @@ export function hud(engine: Engine, root: ParentNode = document) {
     return x.appendChild(L.add(x.ownerDocument.createTextNode("")));
   };
   const bind = (k: number, t: Target, g: Get | null, f: number, fn: Bind["fn"], c: string, n: number, line: Bind["line"], text: Bind["text"], play: Bind["play"]) => {
-    const fnGet = typeof g === "function";
-    const b: Bind = { k, el: el(t), g: fnGet ? g : null, a: g && !fnGet ? g[0] : null, i: g && !fnGet ? g[1] : 0, f, fn, c, n, line, text, play, t: [], lines: Array<string>(k === FEED ? n : 2).fill(""), dirty: false };
+    const fnGet = typeof g === "function", x = el(t);
+    const b: Bind = { k, el: x, g: fnGet ? g : null, a: g && !fnGet ? g[0] : null, i: g && !fnGet ? g[1] : 0, f, fn, c, n, line, text, play, p: x, t: [], lines: Array<string>(k === FEED ? n : 2).fill(""), dirty: false };
     if (k < FEED) {
       if (vals.length === last.length) {
         const o = last;
@@ -119,22 +121,24 @@ export function hud(engine: Engine, root: ParentNode = document) {
         const b = evs[i]!;
         if (!b.dirty) continue;
         b.dirty = false;
-        const kids = b.el.children;
-        if (b.k === FEED) {
-          if (!b.t.length)
+        // Rows and text nodes are found once, on the first event: an event frame reads no DOM.
+        if (!b.t.length) {
+          const kids = b.el.children;
+          if (b.k === FEED)
             for (let r = 0; r < b.n; r++) {
               const row = kids[r] ?? b.el.appendChild(L.add(b.el.ownerDocument.createElement(/^[OU]L$/.test(b.el.tagName) ? "li" : "div")));
+              if (!r) b.p = row as HTMLElement;
               b.t.push(textOf(row));
             }
-          for (let r = 0; r < b.n; r++) L.text(b.t[r]!, b.lines[r]!);
-          b.play?.(kids[0] as HTMLElement);
-        } else {
           // Title in the first child element (or the banner itself), sub in the second.
-          if (!b.t.length) b.t.push(textOf(kids[0] ?? b.el)), kids[1] && b.t.push(textOf(kids[1]));
+          else b.t.push(textOf(kids[0] ?? b.el)), kids[1] && b.t.push(textOf(kids[1]));
+        }
+        if (b.k === FEED) for (let r = 0; r < b.n; r++) L.text(b.t[r]!, b.lines[r]!);
+        else {
           L.text(b.t[0]!, b.lines[0]!);
           if (b.t[1]) L.text(b.t[1], b.lines[1]!);
-          b.play?.(b.el);
         }
+        b.play?.(b.p);
       }
     },
   };

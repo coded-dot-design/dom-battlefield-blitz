@@ -1,24 +1,24 @@
 {
   "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/fizlet",
-  "version": "0.19.0",
-  "commit": "7408af47af2c5bdd42b1159421b3a4b42650d6ae",
+  "version": "0.20.0",
+  "commit": "bf42a8c8e642168c55f7b4bf4900c2197525874c",
   "files": [
     {
       "path": "arcade-parts.ts",
-      "sha256": "2c36d9775bd06ca44ee38ec477e96dd32646e79a3fe214d80f21426d7c02e28b"
+      "sha256": "1ce7698f2ac96596d9f737356ccb61ef0817a6a9956a52111355b040f4d18a9d"
     },
     {
       "path": "arcade-skirmish.ts",
-      "sha256": "9009075b61943a50d39c3b9ae5c2585b31f82a7142eabebb5da8db054e02a980"
+      "sha256": "3b6b17c0ef08af164ac144f2067664c98585a476ca74893714f55c01b63a21ab"
     },
     {
       "path": "arcade.ts",
-      "sha256": "7476cb63e4229958720cdd7f0cedaaea22fd4d4d72db8c783e4cc32f7c217d80"
+      "sha256": "8f38913e02d71ba6b40fd660c4b5f1662da237b094e2a07999d5e1475a0e9b44"
     },
     {
       "path": "board-page.ts",
-      "sha256": "f8b7b392ef186abd09aa88bcf7de9164b1cdc2e708a6b0645b66f65e637374f3"
+      "sha256": "2d83a64e7fc3b61323b2a895254e6feb14dff0eb7398366544442df70bd947a6"
     },
     {
       "path": "camera.ts",
@@ -26,7 +26,7 @@
     },
     {
       "path": "coach.ts",
-      "sha256": "1e0b31d43ae3530c11b41c85e30949204af738e380ed656338da47c1d270586d"
+      "sha256": "8827f28a5e51b4fc6973832f76b7ba81c1ed027fd7c66632e01adb5fe98f3a23"
     },
     {
       "path": "collide.ts",
@@ -50,7 +50,7 @@
     },
     {
       "path": "hud.ts",
-      "sha256": "8ca771519d46e94d253f34fdab761d45b72d91767f00e16a40ef68e7e2ec1a5d"
+      "sha256": "a83b6420f88124000830b822cf9c42d2f37703f3195bc839bb29abd91d365968"
     },
     {
       "path": "index.ts",
@@ -58,11 +58,11 @@
     },
     {
       "path": "input.ts",
-      "sha256": "71d9160d439f7e3affea22e9aeff6ab685217c7e79971e018597839524798c46"
+      "sha256": "7fe5fe9d1b10845d92647b6bfb8a51f168eb3b2786ea64ecf23fec60527cbbd4"
     },
     {
       "path": "kernel/engine.ts",
-      "sha256": "c486c688ab20630d664ad9d5dede3903ffa32e5be4cecb192868b4c29c96e00e"
+      "sha256": "9cacf0ad396c688adec088da31a37ac50a48589083195bde2848c31488ce62d5"
     },
     {
       "path": "kernel/index.ts",
@@ -90,11 +90,11 @@
     },
     {
       "path": "match.ts",
-      "sha256": "9f0b77706ea07144117a0e62a47e1d32bca5150f17beb289ee73d08e2c897ce6"
+      "sha256": "262c5e915b60e8ec3bea0c46364d75d6b1cbc4cc1a4b64677e0283c84e92f7cf"
     },
     {
       "path": "pad.ts",
-      "sha256": "f79145cd1ecfd820ba81cfa328f62129ab0ba51a94c68536e4487e52d6e6db3f"
+      "sha256": "7258427e20a2f1f25f031e9b41122cdef4aba44fa8dddd50c5310013bdcd09b4"
     },
     {
       "path": "perf.ts",
@@ -106,7 +106,7 @@
     },
     {
       "path": "presence.ts",
-      "sha256": "6eb036e44ccbbe4d2719939ec492618ce5c83446e4672766c041134be356d027"
+      "sha256": "35c43808c88974f44b87d75cb44d8d691a47e7ecb201aafdaf7a8cb76707db80"
     },
     {
       "path": "rules.ts",
@@ -114,15 +114,15 @@
     },
     {
       "path": "slot.ts",
-      "sha256": "73dc55c7ecda227b8d04807466723cfeb728e04771e701938d839506d73d2775"
+      "sha256": "477e506f06dcaa57a0b25afe86bcd8e6f8afe58ab89606966f3db62e201362f8"
     },
     {
       "path": "sound.ts",
-      "sha256": "f8dd883369af276bc8f9a7fbd0596049408f3829ab517b53cf3f1816ae9ad801"
+      "sha256": "53ce1e92c189c26833bb70a5f107cec0bcfe20a79f3d63aa885054edd58be51b"
     },
     {
       "path": "sprite.ts",
-      "sha256": "b669c3719eb8cae38dc7eecd5b00662d2d24bbcccbccd70b0dfe325b555a6d4a"
+      "sha256": "8468e9aba3c499567342aaa5d621be1b86cb73788e4e0c5e4e0163a647c044cd"
     },
     {
       "path": "steer.ts",
@@ -130,15 +130,19 @@
     },
     {
       "path": "timeline.ts",
-      "sha256": "8d4f7e4117363d16027d39c5774fff774066301dc70a82e4c872a73b970c0c04"
+      "sha256": "e593520cdbab21e8dc3e377bf7c6f710ee2f3158cb15a9addadb5d5277754cc8"
+    },
+    {
+      "path": "touch.ts",
+      "sha256": "8f4024d77440fe58601d566ee1d8796da86024e7369abed46d68b2f4c04369fc"
     },
     {
       "path": "ui/board-ui.css",
-      "sha256": "372dc92556f2fd073f594867fcce3ed72d09968b4a618ee0e97ce32fbb17897e"
+      "sha256": "46989160f4d9e4ccaf07cf5437aae5725b45f9dcc5d15dce35d47fd51903ccb6"
     },
     {
       "path": "ui/board-ui.ts",
-      "sha256": "8718ae7038d18e56637bd55169f4fcd91167e70a3b7f3c37d2692daf0f862e66"
+      "sha256": "aff234dee4004fe07c0c3e39c7ebd5f20b5edf3f116668ba70910df0d78c1b33"
     },
     {
       "path": "ui/tokens.json",

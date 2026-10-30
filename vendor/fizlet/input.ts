@@ -2,8 +2,8 @@
  * fizlet/input: one controller for keys, pointer and a touch stick, mapped to named intents.
  * Listeners only record; the engine's read phase latches edges and measures the target, so a step
  * sees a stable snapshot. Keys typed into the host page's fields (or inside [data-fizlet-ignore])
- * never count. Held state is dropped on window blur, when the engine pauses, on dispose() and on
- * destroy: nothing stays stuck.
+ * never count. Keys, the pointer, `press()` and `steer()` wake a settled engine. Held state is
+ * dropped on window blur, when the engine pauses, on dispose() and on destroy: nothing stays stuck.
  *
  * `hit` (an intent or the pointer): a press is seen by exactly one fixed step, the first step after
  * it, even when that comes frames later (0-step frames while catching up) and never again in the
@@ -24,18 +24,21 @@ export interface ControlsOptions {
 }
 
 const EDIT = "input,textarea,select,[contenteditable],[data-fizlet-ignore]";
+/** An intent by name, or by the number `id(name)` gave. */
+export type Intent = string | number;
 
 export function controls(e: Engine, o: ControlsOptions = {}) {
   const ctl = new AbortController(), on = { signal: ctl.signal };
   const names = Object.keys(o.keys ?? {}), N = names.length;
-  // A key code can drive several intents; an intent can have several keys.
-  const byCode = new Map<string, number[]>();
-  names.forEach((n, i) => o.keys![n]!.forEach((c) => (byCode.get(c) ?? byCode.set(c, []).get(c)!).push(i)));
+  // A key code can drive several intents; an intent can have several keys. Each intent resolves
+  // once, here, by its name and by its number (`id()`): a lookup is one Map read, never a scan.
+  const byCode = new Map<string, number[]>(), ids = new Map<Intent, number>();
+  names.forEach((n, i) => (ids.set(n, i).set(i, i), o.keys![n]!.forEach((c) => (byCode.get(c) ?? byCode.set(c, []).get(c)!).push(i))));
   const keys = new Set<string>(); // physical keys down
   const cnt = new Uint8Array(N), btn = new Uint8Array(N); // keys down per intent, press() per intent
   // Edges for each intent plus the pointer (slot N): pending, latched this frame, the step it is for.
   const pend = new Uint8Array(N + 1), fresh = new Uint8Array(N + 1), at = new Float64Array(N + 1).fill(-1);
-  const index = (n: string) => names.indexOf(n);
+  const index = (n: Intent) => ids.get(n) ?? -1;
   const isDown = (i: number) => cnt[i]! + btn[i]! > 0;
   const hit = (i: number) => (e.phase === 2 /* STEP */ ? at[i] === e.steps : fresh[i] === 1);
   const target = o.target ?? (e.root as HTMLElement | null) ?? null;
@@ -148,12 +151,19 @@ export function controls(e: Engine, o: ControlsOptions = {}) {
   e.signal.addEventListener("abort", dispose, on);
 
   return {
+    /** An intent's number, for a hot path: `const FIRE = c.id("fire")`, then `c.hit(FIRE)` in a step.
+     *  A name that is not an intent throws here, at setup (a typo is never a silent `false`). */
+    id(intent: string) {
+      const i = index(intent);
+      if (i < 0) throw Error("fizlet/input: no " + intent);
+      return i;
+    },
     /** Held right now (any of its keys, or press()). */
-    down: (intent: string) => isDown(index(intent)),
+    down: (intent: Intent) => isDown(index(intent)),
     /** Pressed: true in the first step after the press; outside steps, for the frame it latched. */
-    hit: (intent: string) => hit(index(intent)),
+    hit: (intent: Intent) => hit(index(intent)),
     /** -1..1 from two intents (keys), plus the stick when it's active. */
-    axis(neg: string, pos: string, stickAxis?: 0 | 1) {
+    axis(neg: Intent, pos: Intent, stickAxis?: 0 | 1) {
       const k = +isDown(index(pos)) - +isDown(index(neg));
       return k || (stickAxis === undefined ? 0 : s[stickAxis]!);
     },
@@ -172,11 +182,13 @@ export function controls(e: Engine, o: ControlsOptions = {}) {
     press(intent: string, down = true) {
       const i = index(intent);
       if (i < 0) return;
+      e.wake(); // like a real key: a settled engine (page interactions) wakes for an on-screen one
       if (down && !isDown(i)) pend[i] = 1;
       btn[i] = +down;
     },
     /** Drive the stick from code (an on-screen stick, fizlet/pad): x, y in -1..1; `on = false` lets go. */
     steer(x: number, y: number, on = true) {
+      e.wake();
       s[0] = on ? x : 0;
       s[1] = on ? y : 0;
       s[2] = on ? 1 : 0;

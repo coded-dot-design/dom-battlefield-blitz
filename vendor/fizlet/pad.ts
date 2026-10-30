@@ -10,6 +10,7 @@
  */
 import type { Engine } from "./kernel/engine";
 import type { Controls } from "./input";
+import { hypot } from "./steer";
 
 export type Scheme = "stick" | "dpad" | "buttons";
 export type PadRole = "fire" | "aim" | "attack" | "advance" | "fallin" | "sys" | "cmd" | "go" | "flag";
@@ -51,9 +52,10 @@ const ARROW = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 12.5l5-5 
 const DIRS = ["Up", "Down", "Left", "Right"];
 
 /** Stick vector from a drag offset in radii: clamped to the unit circle, dead zone rescaled so a
- *  light push still creeps (Battlefield's feel). Writes out[0], out[1]; never allocates. */
+ *  light push still creeps (Battlefield's feel). Writes out[0], out[1]; never allocates
+ *  (the exact `hypot` from fizlet/steer: `Math.hypot` boxes its arguments, K5). */
 export function stickAt(dx: number, dy: number, out: Float64Array) {
-  const d = Math.hypot(dx, dy), k = d < DEAD ? 0 : (Math.min(1, d) - DEAD) / (1 - DEAD) / d;
+  const d = hypot(dx, dy), k = d < DEAD ? 0 : (Math.min(1, d) - DEAD) / (1 - DEAD) / d;
   out[0] = dx * k;
   out[1] = dy * k;
 }
@@ -61,7 +63,7 @@ export function stickAt(dx: number, dy: number, out: Float64Array) {
 /** D-pad direction mask (up 1, down 2, left 4, right 8; diagonals combine) from a drag offset in radii. */
 export function dpadAt(dx: number, dy: number) {
   // Eight equal 45° sectors: an axis counts once the direction is more than 22.5° off its normal.
-  const d = Math.hypot(dx, dy), t = d * 0.3827;
+  const d = hypot(dx, dy), t = d * 0.3827;
   return d < DPAD_DEAD ? 0 : (dy < -t ? 1 : dy > t ? 2 : 0) | (dx < -t ? 4 : dx > t ? 8 : 0);
 }
 
@@ -115,7 +117,7 @@ export function pad(e: Engine, c: Controls, o: PadOptions = {}) {
     if (!knob) return dir(dpadAt(dx, dy));
     stickAt(dx, dy, v);
     c.steer(v[0]!, v[1]!);
-    const k = g[2]! / Math.max(1, Math.hypot(dx, dy));
+    const k = g[2]! / Math.max(1, hypot(dx, dy));
     g[3] = dx * k;
     g[4] = dy * k;
   };

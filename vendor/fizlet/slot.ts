@@ -1,6 +1,9 @@
 /**
- * fizlet/slot: mount a Fizlet scene into an astro-base-engine slot,
- *   <figure class="ae-slot" data-slot-target="<page>#<slot>" role="img" aria-label="…">.
+ * fizlet/slot: mount a Fizlet scene into an astro-base-engine slot: the element carrying
+ *   class="ae-slot" data-slot-target="<page>#<slot>" role="img" aria-label="…". Both shapes the engine
+ *   has rendered are found: the figure itself (`<figure class="ae-slot">`), or a box inside one
+ *   (`<figure class="ae-slot-figure"><div class="ae-slot">…</div><figcaption class="ae-slot__fallback">`,
+ *   where the caption sits outside the role="img" box and stays: it is not over the scene).
  * - Lazy: nothing loads or runs until the slot comes near the viewport, and then only once the
  *   main thread is idle (or `idle` ms have passed), so the page's own work goes first.
  * - Safe first tap: a tap on the slot before the scene is up loads it at once and is handed to the
@@ -42,9 +45,9 @@ export interface SlotOptions {
 
 const REDUCE = "(prefers-reduced-motion: reduce)";
 
-/** The slot figure for "<page>#<slot>" (or null). */
+/** The slot for "<page>#<slot>" (or null): any `.ae-slot` carrying the target, figure or box. */
 export const findSlot = (target: string, doc: Document = document) =>
-  [...doc.querySelectorAll<HTMLElement>("figure.ae-slot[data-slot-target]")].find((f) => f.dataset.slotTarget === target) ?? null;
+  [...doc.querySelectorAll<HTMLElement>(".ae-slot[data-slot-target]")].find((f) => f.dataset.slotTarget === target) ?? null;
 
 export function slot(target: string | HTMLElement, load: () => Promise<SlotMount> | SlotMount, opts: SlotOptions = {}) {
   const el = typeof target === "string" ? findSlot(target) : target;

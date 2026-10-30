@@ -213,7 +213,10 @@ export function createEngine(o: EngineOptions = {}) {
       // fps cap: off the shared clock until its next slot (one timer, not a frame every vsync). Put
       // back early (a resume, a focus change), it frames at once and the timer starts over.
       // set(0) changes no bit: it puts the engine back on the clock unless it was paused or destroyed.
-      if (gap) clearTimeout(napT), schedule(engine, false), (napT = setTimeout(set, gap, 0, false));
+      // The slot counts from the frame's start: the nap is shortened by the work this frame took, so
+      // a slow frame (a throttled phone) still meets its next slot instead of missing a vsync. A
+      // negative delay is fine: setTimeout clamps it to 0 (no Math.max: page build ≤ 7,168 B gz).
+      if (gap) clearTimeout(napT), schedule(engine, false), (napT = setTimeout(set, gap - n[WORK]!, 0, false));
     },
     /** Run one frame's worth of time by hand (tests, headless, a server). A hook's error throws here. */
     advance(sec: number) {
@@ -277,6 +280,7 @@ export function createEngine(o: EngineOptions = {}) {
       if (dead) return;
       dead = true;
       n[ACC] = 0; // destroyed from inside a step: no more steps this frame
+      clearTimeout(napT); // the fps cap's pending wake-up: nothing of ours outlives destroy()
       set(STOPPED, true);
       ctl.abort();
       ledger.restore();

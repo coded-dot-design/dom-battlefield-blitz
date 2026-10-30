@@ -1,11 +1,17 @@
 // fizlet/arcade's `skirmish` preset (Battlefield Blitz's HUD): a bar across the top with the title,
 // readouts (kills, clock, rank, an armor bar, streak…), aim toggles, action keys with counts and
-// header keys; a feed and a banner driven by the event ring; pause / surrender / countdown /
-// result overlays (BOARD-UI.md §9); the pad on phones with counted keys and aim toggles. Values go
-// through fizlet/hud: change-only, from typed-array slots, nothing allocated in the steady state.
+// header keys; a feed and a banner driven by the event ring; the pad on phones with counted keys and
+// aim toggles. Values go through fizlet/hud: change-only, from typed-array slots, nothing allocated
+// in the steady state. The run's flow (countdown, pause / surrender, result: BOARD-UI.md §9) is
+// fizlet/match on a small engine of its own that lives as long as the overlay: its clock runs the
+// countdown while the game's engine waits, and its END sticker outlives the game's engine (whose end
+// gives the page back) until REMATCH, EXIT or Recall. Match owns the phase; the shell asks it.
 import type { ArcadeHud, HudView } from "./arcade";
-import { BASE, ICON, esc } from "./arcade-parts";
+import { ICON, esc } from "./arcade-parts";
 import { hud } from "./hud";
+import { createEngine } from "./kernel/engine";
+import { match } from "./match";
+import type { Phase } from "./match";
 import { pad } from "./pad";
 import type { PadAction } from "./pad";
 import { toast } from "./ui/board-ui";
@@ -22,13 +28,19 @@ export interface SkirmishReadout {
 export interface SkirmishOptions {
   /** Readouts, in the order `hud(out)` fills them. */
   readouts: SkirmishReadout[];
-  /** Header keys, in order (default all four). Full screen shows only where the page may use it. */
-  header?: ("fullscreen" | "sound" | "pause" | "exit")[];
+  /** Header keys, in order (default full screen, sound, pause, exit; `fold` hides the title and the
+   *  text keys). Full screen shows only where the page may use it. */
+  header?: ("fullscreen" | "sound" | "pause" | "fold" | "exit")[];
+  /** Text keys after the actions, as on the card (default none): `next` (Next gate, G), `restart`,
+   *  `auto` (Auto fire: needs `fire`). */
+  nav?: ("next" | "restart" | "auto")[];
   /** A feed of the last `rows` (default 4) events of type `on`, newest first. */
   feed?: { rows?: number; on: string; line: (a: number, b: number) => string };
   /** A centred banner (title, sub) on each event of type `on`. */
   banner?: { on: string; text: (a: number, b: number) => readonly [string, string?] };
-  /** Overlays (default all four). `countdown` holds the start for 3, 2, 1. */
+  /** Overlays (default all four; fizlet/match runs the flow either way). `countdown` holds the start
+   *  for 3, 2, 1 on the flow's clock; without `pause` or `result` that phase shows no overlay; without
+   *  `surrender` the pause card has no SURRENDER key. */
   overlays?: ("pause" | "surrender" | "countdown" | "result")[];
   /** The result card: `stats()` keys to list, and the one whose best is kept on this device. */
   result?: { stats: string[]; best?: string };
@@ -52,17 +64,16 @@ const CSS = `
 .sk-ban b{font:900 28px/1 ui-monospace,monospace;letter-spacing:.1em}.sk-ban span{font:800 11px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--team-a)}
 .sk-ban.a{animation:ska 1.8s both}.sk-ban.b{animation:skb 1.8s both}
 @keyframes ska{0%{opacity:0;scale:1.4}12%,75%{opacity:1;scale:1}100%{opacity:0}}@keyframes skb{0%{opacity:0;scale:1.4}12%,75%{opacity:1;scale:1}100%{opacity:0}}
-.bui .bui-overlay{pointer-events:auto}.bui .msg{z-index:31;bottom:auto;top:max(84px,calc(env(safe-area-inset-top) + 74px))}.bui-overlay-keys [hidden]{display:none}
+.bui .bui-overlay{pointer-events:auto}.bui .msg{z-index:31;bottom:auto;top:max(84px,calc(env(safe-area-inset-top) + 74px))}.sk.compact>b,.sk.compact nav>:not([aria-label]){display:none}
 .sk-res{position:absolute;left:50%;top:58%;translate:-50% 0;display:grid;grid-template-columns:auto auto;gap:6px 18px;margin:0;font:800 12px/1 ui-monospace,monospace;letter-spacing:.12em;color:#f6f3ff}.sk-res dd{margin:0;text-align:right}
-@media (pointer:coarse),(max-width:600px){.sk{width:calc(100% - 20px);flex-wrap:wrap;justify-content:space-between;gap:6px 8px;padding:6px 8px}.sk>b,.sk [data-act],.sk [data-aim]{display:none}.sk .bui-readouts{gap:12px}.sk .bui-readout i{width:48px}.sk-feed{top:max(112px,calc(env(safe-area-inset-top) + 102px))}.bui .msg{top:max(160px,calc(env(safe-area-inset-top) + 150px))}}
+@media (pointer:coarse),(max-width:600px){.sk{width:calc(100% - 20px);flex-wrap:wrap;justify-content:space-between;gap:6px 8px;padding:6px 8px}.sk>b,.sk [data-act],.sk [data-aim]{display:none}.sk nav{flex-wrap:wrap;justify-content:flex-end}.sk .bui-readouts{gap:12px}.sk .bui-readout i{width:48px}.sk-feed{top:max(112px,calc(env(safe-area-inset-top) + 102px))}.bui .msg{top:max(160px,calc(env(safe-area-inset-top) + 150px))}}
 @media (prefers-reduced-motion:reduce){.sk-ban.a,.sk-ban.b{opacity:1}}`;
-// Sticker keys draw filled icons (the kit's rule): play, a flag, a cross.
-const PLAY = "m6 3 11 7-11 7Z", FLAG = "M4 2h2v16H4ZM6 3h10l-2.5 4L16 11H6Z", CROSS = "m3 5 2-2 5 5 5-5 2 2-5 5 5 5-2 2-5-5-5 5-2-2 5-5Z";
+// EXIT on the result card (match's second END key): a filled cross, the kit's sticker-key icon rule.
+const CROSS = '<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges"><path d="m10 16 6-6 16 16 16-16 6 6-16 16 16 16-6 6-16-16-16 16-6-6 16-16Z"/></svg>';
 const FULL = '<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/></svg>';
-const NAME = { fullscreen: "Full screen", sound: "Mute game sound", pause: "Pause game (P)", exit: "Close game and restore page (Esc)" };
+const NAME = { fullscreen: "Full screen", sound: "Mute game sound", pause: "Pause game (P)", fold: "Minimize scoreboard", exit: "Close game and restore page (Esc)" };
+const NAV = { next: '<button type="button" data-a="gate">Next gate</button>', restart: '<button type="button" data-a="restart">Restart</button>', auto: '<button type="button" data-a="auto" aria-pressed="false">Auto fire</button>' };
 const FMT = { num: "int", clock: "clock", rank: "rank", pct: "pct" } as const;
-// Overlay states: none, countdown, pause, result.
-const NONE = 0, COUNT = 1, PAUSE = 2, RESULT = 3;
 
 /**
  * The `skirmish` preset (Battlefield Blitz): `hud: skirmishHud({ readouts: [{ label: "Kills",
@@ -71,10 +82,10 @@ const NONE = 0, COUNT = 1, PAUSE = 2, RESULT = 3;
  */
 export function skirmishHud(o: SkirmishOptions): ArcadeHud {
   const R = o.readouts, ov = o.overlays ?? ["pause", "surrender", "countdown", "result"], aims = (o.aim ?? []).map((a) => "aim-" + a);
-  const counts = o.counts ?? {}, keys: Record<string, string[]> = {};
+  const counts = o.counts ?? {}, keys: Record<string, string[]> = {}, give = ov.includes("surrender");
   for (const a of aims) keys[a] = [];
   return {
-    css: BASE + CSS,
+    css: CSS + (give ? "" : ".bui-overlay [data-k=surrender]{display:none!important}"),
     keys,
     mount(r): HudView {
       const { ui, def, engine: e, input } = r, actions = def.actions ?? [], doc = ui.ownerDocument;
@@ -83,16 +94,17 @@ export function skirmishHud(o: SkirmishOptions): ArcadeHud {
       const aimLabel = (a: string) => (a === "aim-auto" ? "Auto aim" : "Lock");
       ui.insertAdjacentHTML("beforeend", `<section class="sk" aria-label="${esc(def.title)} controls"><b>${esc(def.title.toUpperCase())}</b><div class="bui-readouts">${R.map((x) => `<span class="bui-readout"${x.tone ? ` data-tone="${x.tone}"` : ""}>${esc(x.label)}${x.kind === "bar" ? `<i><u role="progressbar" aria-label="${esc(x.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></u></i>` : "<b></b>"}</span>`).join("")}</div><nav>${aims
         .map((a) => `<button type="button" data-a="aim" data-aim="${a}" aria-pressed="false">${aimLabel(a)}</button>`)
-        .join("")}${actions.map((a) => `<button type="button" data-act="${esc(a.id)}">${esc(a.label)}${badge(a.id)}</button>`).join("")}${head
-        .map((k) => `<button type="button" data-a="${k === "fullscreen" ? "full" : k}" aria-label="${NAME[k]}">${k === "fullscreen" ? FULL : ICON[k]}</button>`)
+        .join("")}${actions.map((a) => `<button type="button" data-act="${esc(a.id)}">${esc(a.label)}${badge(a.id)}</button>`).join("")}${(o.nav ?? [])
+        .filter((k) => k !== "auto" || def.fire)
+        .map((k) => NAV[k])
+        .join("")}${head
+        .map((k) => `<button type="button" data-a="${k === "fullscreen" ? "full" : k}"${k === "fold" ? ' aria-expanded="true"' : ""} aria-label="${NAME[k]}">${k === "fullscreen" ? FULL : ICON[k]}</button>`)
         .join("")}</nav></section>
 ${o.feed ? '<ol class="sk-feed" aria-label="Feed"></ol>' : ""}${o.banner ? '<div class="sk-ban" role="status"><b></b><span></span></div>' : ""}
-<div class="bui-toast msg" role="status" hidden></div>
-<div class="bui-overlay" hidden><div class="bui-sticker"><span></span><b></b></div><dl class="sk-res"></dl><div class="bui-overlay-keys"><button type="button" class="bui-sticker-key"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="${PLAY}"/></svg><b></b></button><button type="button" class="bui-sticker-key bui-second"><svg viewBox="0 0 20 20" aria-hidden="true"><path/></svg><b></b></button></div></div>`);
+<div class="bui-toast msg" role="status" hidden></div><dl class="sk-res"></dl>`);
       const $ = <T extends Element = HTMLElement>(s: string) => ui.querySelector<T>(s);
-      const bar = $(".sk")!, group = bar.children[1]!, msg = $(".msg")!, layer = $(".bui-overlay")!, sticker = layer.firstChild as HTMLElement, res = $(".sk-res")!;
-      const [k1, k2] = layer.querySelectorAll<HTMLButtonElement>(".bui-sticker-key") as unknown as [HTMLButtonElement, HTMLButtonElement];
-      const k = { sound: $<HTMLButtonElement>("[data-a=sound]"), pause: $<HTMLButtonElement>("[data-a=pause]") };
+      const bar = $(".sk")!, group = bar.children[1]!, msg = $(".msg")!, res = $(".sk-res")!;
+      const k = { sound: $<HTMLButtonElement>("[data-a=sound]"), pause: $<HTMLButtonElement>("[data-a=pause]"), fold: $<HTMLButtonElement>("[data-a=fold]") };
       const aimKeys = bar.querySelectorAll<HTMLElement>("[data-aim]"), lit = new Uint8Array(aims.length);
 
       // Values: one typed array the game fills, bound slot by slot (a slot never boxes).
@@ -124,35 +136,34 @@ ${o.feed ? '<ol class="sk-feed" aria-label="Feed"></ol>' : ""}${o.banner ? '<div
       }
       for (const [b, slot] of counted) h.num(b as HTMLElement, [out, slot]);
 
-      // Overlays: one layer, one sticker, at most two keys (BOARD-UI.md §9).
-      let shown = NONE, kept = "";
-      const face = (b: HTMLButtonElement, a: string, label: string) => {
-        b.dataset.a = a;
-        b.hidden = !a;
-        b.lastChild!.textContent = label;
-      };
-      const show = (s: number, kicker = "", word = "", a1 = "", l1 = "", a2 = "", l2 = "") => {
-        shown = s;
-        layer.hidden = !s;
-        bar.inert = s > COUNT; // the countdown leaves the bar live (pause, exit)
-        if (s !== RESULT) res.textContent = "";
-        if (!s) return;
-        sticker.firstChild!.textContent = kicker;
-        sticker.lastChild!.textContent = word;
-        face(k1, a1, l1);
-        face(k2, a2, l2);
-        k2.querySelector("path")!.setAttribute("d", a2 === "exit" ? CROSS : FLAG);
-        if (a1) k1.focus();
-      };
+      // The flow: fizlet/match on its own engine, alive as long as the overlay (Recall destroys it,
+      // and its ledger takes the overlay back). Match owns the phase and its keys' clicks; the shell
+      // keeps the keyboard (P, Escape) and asks (`ask`); each phase change answers it (`go`).
+      let won = false, kept = "", play = () => {};
+      const over = () => r.status() === "won" || r.status() === "gameover";
+      const m = match(createEngine({ signal: r.signal }), ui, {
+        count: ov.includes("countdown") ? 3 : 0,
+        keys: [],
+        hide: (["pause", "result"] as const).filter((x) => !ov.includes(x)).map((x) => (x === "pause" ? "paused" : "end")),
+        labels: { paused: ["BATTLE PAUSED", give ? "GIVE UP?" : "PAUSED"], next: "EXIT" },
+        icons: { next: CROSS },
+        end: (x) => void (won = x.won),
+        on(p: Phase) {
+          if (p === "play") r.status() === "paused" ? r.go("resume") : play();
+          else if (p === "paused") r.go("pause");
+          else if (p === "end") r.go(won ? "won" : "lost");
+          // REMATCH (a new round from the result) is a new run; EXIT (match's NEW GAME) is Recall.
+          else if (p === "count" ? over() : p === "intro") r.go(p === "count" ? "restart" : "exit");
+        },
+      });
+      m.el!.insertBefore(res, m.el!.lastChild);
       const sync = () => {
-        const st = r.status(), give = ov.includes("surrender");
+        const st = r.status();
         if (k.pause) {
           k.pause.innerHTML = st === "paused" ? ICON.play : ICON.pause;
           k.pause.setAttribute("aria-label", st === "paused" ? "Resume game (P)" : "Pause game (P)");
           k.pause.disabled = st !== "running" && st !== "paused";
         }
-        if (st === "paused" && ov.includes("pause")) show(PAUSE, "BATTLE PAUSED", give ? "GIVE UP?" : "PAUSED", "pause", "KEEP FIGHTING", give ? "surrender" : "", "SURRENDER");
-        else if (shown === PAUSE) show(NONE);
       };
       const syncSound = () => {
         if (!k.sound) return;
@@ -175,31 +186,31 @@ ${o.feed ? '<ol class="sk-feed" aria-label="Feed"></ol>' : ""}${o.banner ? '<div
         msg,
         sync,
         write,
-        key(a, b) {
+        ask: (to) => (to === "pause" || to === "resume" ? m.pause(to === "pause") : m.finish(to === "won")),
+        key(a, b, auto) {
           if (a === "sound") syncSound();
+          else if (a === "auto") b.setAttribute("aria-pressed", String(auto)), (b.textContent = auto ? "Fire: on" : "Auto fire");
+          else if (a === "fold") {
+            const c = bar.classList.toggle("compact");
+            b.innerHTML = c ? ICON.open : ICON.fold;
+            b.setAttribute("aria-expanded", String(!c));
+            b.setAttribute("aria-label", c ? "Expand scoreboard" : "Minimize scoreboard");
+          }
           else if (a === "full") (doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen()).catch(() => {});
           else if (a === "aim") input.press(b.dataset.aim!, !input.down(b.dataset.aim!)), write();
         },
+        // The countdown runs on the flow's clock; the game's engine starts when play does.
         begin(go) {
-          if (!ov.includes("countdown")) return go();
-          let t = 3;
-          const tick = () => {
-            // Recall or a pause ends the countdown (resume starts the engine itself).
-            if (r.signal.aborted || r.status() !== "running") return;
-            if (!t) return void (show(NONE), go());
-            show(COUNT, "GET READY", "" + t--);
-            setTimeout(tick, 600);
-          };
-          tick();
+          play = go;
+          m.restart();
         },
         // The engine's ledger takes back what fizlet/hud wrote: the bar keeps the final numbers.
         hold: () => void (kept = group.innerHTML),
-        end(won, notice, stats) {
+        end(_, notice, stats) {
           group.innerHTML = kept;
           sync();
           toast(msg, notice, 1e9);
-          if (!ov.includes("result")) return show(NONE);
-          show(RESULT, won ? "STAGE CLEAR" : "INSERT COIN", won ? "MISSION COMPLETE" : "GAME OVER", "restart", "REMATCH", "exit", "EXIT");
+          if (!ov.includes("result")) return;
           const rows: [string, unknown][] = (o.result?.stats ?? []).map((s) => [s, stats[s]]), best = o.result?.best;
           if (best) {
             const id = `fizlet:${def.id}:best`;

@@ -15,8 +15,9 @@
  * The scoreboard and controls are a HUD preset, chosen per game with `hud` (BOARD-UI.md §19):
  * `arcadeHud()` is today's card and the default (no `hud` renders it byte for byte);
  * `skirmishHud({...})` is Battlefield Blitz's top bar with a clock, rank and armor bar, a feed, a
- * banner, pause / surrender / countdown / result overlays, aim toggles and counted keys. Each
- * preset is its own export, so a game ships only the one it names.
+ * banner, aim toggles and counted keys, and its flow (countdown, pause / surrender, result) on
+ * `fizlet/match`: then match owns the phase, the shell asks it to pause, resume or end and follows
+ * it (`HudView.ask`, `HudRun.go`). Each preset is its own export, so a game ships only the one it names.
  */
 import { createEngine } from "./kernel/engine";
 import type { Engine, System } from "./kernel/engine";
@@ -31,6 +32,7 @@ import { sound } from "./sound";
 import type { Cue } from "./sound";
 import { mount, readouts, toast } from "./ui/board-ui";
 import { BASE, ICON, drag, esc } from "./arcade-parts";
+import { lockTouch } from "./touch";
 export { skirmishHud } from "./arcade-skirmish";
 export type { SkirmishOptions, SkirmishReadout } from "./arcade-skirmish";
 
@@ -181,9 +183,13 @@ export interface HudRun {
   /** Aborts at Recall: the overlay's life. */
   signal: AbortSignal;
   status(): ArcadeStatus;
+  /** Moves the run, for a HUD that owns its flow (`ask`), once its phase changed: pause, resume,
+   *  the end (won, lost), a rematch (restart) or Recall (exit). */
+  go(to: ArcadeFlow | "restart" | "exit"): void;
 }
-/** A mounted HUD. Keys are `button[data-a]` (sound, pause, exit, restart, gate, auto, surrender, or
- *  the HUD's own) and `button[data-act]` (an action): the shell runs them, then calls `key`. */
+export type ArcadeFlow = "pause" | "resume" | "won" | "lost";
+/** A mounted HUD. Keys are `button[data-a]` (sound, pause, exit, restart, gate, auto, fold, or the
+ *  HUD's own) and `button[data-act]` (an action): the shell runs them, then calls `key`. */
 export interface HudView {
   /** The comms toast. */
   msg: HTMLElement;
@@ -199,6 +205,9 @@ export interface HudView {
   hold?(): void;
   /** The run ended and the page is back: show the result. */
   end(won: boolean, notice: string, stats: Record<string, unknown>): void;
+  /** The HUD owns the phase (skirmish: `fizlet/match`): the shell's pause, resume and end are asked of
+   *  it, and it answers with `HudRun.go` (one owner; the shell keeps the keys and delegates). */
+  ask?(to: ArcadeFlow): void;
 }
 
 const EDIT = 'input,textarea,select,[contenteditable],form,dialog,[role="dialog"]';
@@ -375,7 +384,7 @@ export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): Ar
       Object.assign(keys, preset.keys);
       const input = controls(e, { keys, target: host });
       const sfx = sound(e, { on: options.sound !== false, cues: def.cues });
-      const r: HudRun = { ui, def, engine: e, input, coarse: matchMedia("(pointer: coarse)").matches, game: null!, sfx, signal: life.signal, status: () => status };
+      const r: HudRun = { ui, def, engine: e, input, coarse: matchMedia("(pointer: coarse)").matches, game: null!, sfx, signal: life.signal, status: () => status, go };
       const hud = preset.mount(r);
       drag(ui.querySelector<HTMLElement>(":scope>section")!, life.signal); // every preset's panel drags
       const ctl = new Float64Array(11);
@@ -426,6 +435,10 @@ export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): Ar
       const live = () => status === "running";
       const guarded = (ev: Event) => ev.composedPath().some((n) => n === host || (n instanceof Element && n.matches(`${EDIT},${PROTECTED}`)));
       const on = { signal: e.signal, capture: true } as const;
+      // The page is the board (the host is a full-screen overlay): for the run, no pinch, iOS gesture
+      // or double-tap zooms or pans it; the engine's end gives the page its gestures back.
+      e.signal.addEventListener("abort", lockTouch(doc, null));
+      e.ledger.style(doc.documentElement, "touch-action", "manipulation");
       doc.addEventListener("pointermove", (ev) => {
         if (!live() || ev.pointerType === "touch" || keyboard || guarded(ev)) return;
         p[P_X] = ev.clientX; p[P_Y] = ev.clientY; p[P_ON] = 1; mode = 1;
@@ -465,7 +478,6 @@ export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): Ar
         else if (a === "restart") start();
         else if (a === "gate") live() && (jump = 1);
         else if (a === "auto") auto = !auto;
-        else if (a === "surrender") finish(false);
         hud.key(a, b, auto);
         if (live()) b.blur();
       });
@@ -519,7 +531,7 @@ export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): Ar
           for (let i = 0; i < eng.events.size; i++) game.react?.(eng.events.at(i)!);
           // The run ended (read from the game, never from a ring that may drop events when full).
           const o = game.over();
-          if (o && !ending) (ending = 1), queueMicrotask(() => finish(o === 2));
+          if (o && !ending) (ending = 1), queueMicrotask(() => flow(o === 2 ? "won" : "lost"));
           if (jump) (jump = 0), gate();
           if (def.paint !== false) paint();
           const d = view[DPR]!, W = ctl[VW]!, H = ctl[VH]!;
@@ -626,25 +638,28 @@ export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): Ar
     return getSnapshot();
   }
   function pause() {
-    if (status !== "running" || !run) return;
-    status = "paused";
-    run.engine.stop();
-    run.view.sync();
-    notify();
-    emit("pause");
+    if (status === "running") flow("pause");
   }
   function resume() {
-    if (status !== "paused" || !run || document.hidden) return;
-    status = "running";
-    run.engine.start();
-    run.view.sync();
-    notify();
-    emit("resume");
+    if (status === "paused" && !document.hidden) flow("resume");
   }
-  // A run ends: the page comes back at once (the engine's ledger), the scoreboard stays with the
-  // result and a Restart key.
-  function finish(won: boolean) {
+  // A HUD with its own flow (skirmish on fizlet/match) owns the phase: it is asked, and answers with go().
+  const flow = (to: ArcadeFlow) => run && (run.view.ask ? run.view.ask(to) : go(to));
+  function go(to: ArcadeFlow | "restart" | "exit") {
+    if (to === "restart") return void start();
+    if (to === "exit") return stop();
     if (!run || (status !== "running" && status !== "paused")) return;
+    const p = to === "pause";
+    if (p || to === "resume") {
+      status = p ? "paused" : "running";
+      run.engine[p ? "stop" : "start"]();
+      run.view.sync();
+      notify();
+      return emit(to);
+    }
+    // A run ends: the page comes back at once (the engine's ledger), the scoreboard stays with the
+    // result and a Restart key.
+    const won = to === "won";
     last = run.stats();
     status = won ? "won" : "gameover";
     notice = won ? "Page cleared and restored. Restart for another run." : "Run ended. Page restored. Restart for another run.";

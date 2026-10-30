@@ -12,6 +12,7 @@
  */
 import { STEP, RENDER, IDLE, type Engine, type System } from "./kernel/engine";
 import { Grid } from "./collide";
+import { hypot } from "./steer";
 
 export interface BoardPageOptions {
   /** The part of the page that is the board (default document.body). The board lives in its document
@@ -258,7 +259,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     n[T] = 2;
     qx[0] = x0 + dx / 2;
     qy[0] = y0 + dy / 2;
-    qrad[0] = Math.sqrt(dx * dx + dy * dy) / 2 + 2;
+    qrad[0] = hypot(dx, dy) / 2 + 2; // the exact hypot (K5), as games compute it
     for (let k = 0, c = grid.near(qx, qy, qrad, 0, found); k < c; k++) {
       const j = found[k]!;
       // Slab test against the padded rect.

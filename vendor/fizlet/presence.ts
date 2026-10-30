@@ -42,7 +42,9 @@ const FRAME = 0, STALLS = 1, DROPPED = 2, DESYNC = 3, LOST = 4;
 
 export function presence(e: Engine, o: PresenceOptions) {
   const P = o.players, me = o.slot, D = o.delay ?? 2, C = o.cap ?? 64, every = o.hashEvery ?? 30, t = o.transport;
-  if (C < D * 2 + 2 || me >= P) throw new RangeError("presence: cap < 2 × delay + 2, or slot ≥ players");
+  // A seat outside 0..players-1 (or a fraction) would never store its own input: the sim would stall
+  // for good without a word. Seats are bits in `lost`, so at most 32 players.
+  if (C < D * 2 + 2 || !(me >= 0 && me < P && P < 33) || me % 1) throw new RangeError("presence: cap < 2 × delay + 2, or slot not a seat in 0..players-1 (players ≤ 32)");
   // One ring slot per (player, frame % cap): the frame it holds and the bits; same for hashes.
   const tag = new Int32Array(P * C).fill(-1), bits = new Uint32Array(P * C);
   const htag = new Int32Array(P * C).fill(-1), hval = new Uint32Array(P * C);
@@ -64,9 +66,12 @@ export function presence(e: Engine, o: PresenceOptions) {
   const receive = (d: Uint8Array) => {
     const k = d[0], s = d[1]!, f = d[4]! | (d[5]! << 8) | (d[6]! << 16) | (d[7]! << 24);
     if (d.length < 12 || s >= P || s === me) return;
+    // First write wins: a second INPUT or HASH for a frame a seat already sent is dropped, so a
+    // peer that sends two different inputs for one frame can't split the others' sims.
+    const i = s * C + (f % C);
     if (k === LEAVE) n[LOST]! |= 1 << s;
-    else if (k === INPUT && f >= n[FRAME]! && f < n[FRAME]! + C) put(s, f, d[8]! | (d[9]! << 8) | (d[10]! << 16) | (d[11]! << 24));
-    else if (k === HASH && f > n[FRAME]! - C && f < n[FRAME]! + C) check(s, f, d[8]! | (d[9]! << 8) | (d[10]! << 16) | (d[11]! << 24));
+    else if (k === INPUT && f >= n[FRAME]! && f < n[FRAME]! + C && tag[i] !== f) put(s, f, d[8]! | (d[9]! << 8) | (d[10]! << 16) | (d[11]! << 24));
+    else if (k === HASH && f > n[FRAME]! - C && f < n[FRAME]! + C && htag[i] !== f) check(s, f, d[8]! | (d[9]! << 8) | (d[10]! << 16) | (d[11]! << 24));
     else n[DROPPED]!++;
   };
   const system: System = {
@@ -103,7 +108,7 @@ export function presence(e: Engine, o: PresenceOptions) {
     get stalls() {
       return n[STALLS]!;
     },
-    /** Messages refused (out of the window, bad seat). */
+    /** Messages refused (out of the window, bad seat, a second input or hash for one frame). */
     get dropped() {
       return n[DROPPED]!;
     },
@@ -182,7 +187,8 @@ export function memory(o: { peers: number; latency?: number; jitter?: number; se
   };
 }
 
-/** Wrap an open-or-opening WebSocket as a transport. Messages before `listen` are kept (≤ 256). */
+/** Wrap an open-or-opening WebSocket as a transport. Messages before `listen` are kept (≤ 256).
+ *  `send` takes presence's 12-byte messages (the room refuses any other size). */
 export function websocket(ws: WebSocket): Transport {
   let fn: ((d: Uint8Array) => void) | null = null;
   const early: Uint8Array[] = [];
@@ -194,7 +200,9 @@ export function websocket(ws: WebSocket): Transport {
     else if (early.length < 256) early.push(d);
   });
   return {
-    send: (d) => void (ws.readyState === 1 && ws.send(d.slice(0, 12))),
+    // WebSocket.send copies the bytes before it returns, so the reused buffer goes as is: a copy
+    // here allocated one array per message, from inside presence's step.
+    send: (d) => void (ws.readyState === 1 && ws.send(d as Uint8Array<ArrayBuffer>)),
     listen(f) {
       fn = f;
       while (f && early.length) f(early.shift()!);
@@ -203,10 +211,12 @@ export function websocket(ws: WebSocket): Transport {
   };
 }
 
-/** Join a room (`fizlet-rooms`): resolves when the room is full with your seat and the shared seed. */
-export function join(url: string, signal?: AbortSignal) {
+/** Join a room (`fizlet-rooms`): resolves when the room is full with your seat and the shared seed.
+ *  `protocols` go to the WebSocket handshake: fizlet-rooms reads its invite code there
+ *  (`["fizlet-rooms", "invite." + code]`), so the code stays out of the URL and the logs. */
+export function join(url: string, signal?: AbortSignal, protocols?: string | string[]) {
   return new Promise<{ transport: Transport; slot: number; players: number; seed: number }>((ok, fail) => {
-    const ws = new WebSocket(url), t = websocket(ws);
+    const ws = new WebSocket(url, protocols), t = websocket(ws);
     const bye = () => (t.close(), fail(new Error("presence: room closed")));
     ws.addEventListener("close", bye);
     ws.addEventListener("error", bye);
