@@ -67,12 +67,6 @@ export function applyPalette(root: HTMLElement, palette: Palette): () => void {
   return () => before.forEach((v, name) => (v ? root.style.setProperty(name, v) : root.style.removeProperty(name)));
 }
 
-/**
- * A press that fires once per touch, mouse or keyboard activation, and never loses to a second
- * finger already on the stick. Touch fires on touchstart (no 300ms wait); the click that may
- * follow an uncancellable touch is skipped. Run your state change and repaint synchronously in
- * fn: a frame between release and the new pressed state makes the key bounce.
- */
 /** Readouts (BOARD-UI.md section 18): a `.bui-readouts` group of `[label, tone?]` items, appended to
  *  `parent`. Returns the value elements in order, for fizlet/hud (or your own change-only writes).
  *  Text is set with textContent. The caller owns the group: add it through the engine's ledger. */
@@ -90,6 +84,12 @@ export function readouts(parent: HTMLElement, items: [label: string, tone?: "tea
   return { group, values };
 }
 
+/**
+ * A press that fires once per touch, mouse or keyboard activation, and never loses to a second
+ * finger already on the stick. Touch fires on touchstart (no 300ms wait); the click that may
+ * follow an uncancellable touch is skipped. Run your state change and repaint synchronously in
+ * fn: a frame between release and the new pressed state makes the key bounce.
+ */
 export function press(el: HTMLElement, fn: () => void, signal: AbortSignal) {
   let touched = 0;
   el.addEventListener("touchstart", (e) => {
@@ -198,17 +198,17 @@ export function launch(button: HTMLElement, action: () => void, opts: { reduced?
     Object.assign(layer.style, { position: "fixed", contain: "layout style", zIndex: "2147483000", pointerEvents: "none", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     document.body.append(layer);
     const sink = Number(style.boxShadow.match(/(-?[\d.]+)px\s+(-?[\d.]+)px/)?.[2] || 5);
+    // Freeze the look (the copies live outside the .bui root): read once, before the copies go in,
+    // so seven copies cost one style pass, not one each.
+    const look = [button, ...button.querySelectorAll<HTMLElement>("*")].map((n) => {
+      const s = getComputedStyle(n);
+      return ["color", "background-color", "border", "border-radius", "font", "letter-spacing", "fill", "stroke", "display", "gap", "align-items", "justify-items", "align-content", "padding", "width", "height"].map((p) => [p, s.getPropertyValue(p)]);
+    });
     const copy = () => {
       const c = button.cloneNode(true) as HTMLElement;
       c.removeAttribute("id");
       c.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
-      // Freeze the look: the copy lives outside the .bui root.
-      const from = [button, ...button.querySelectorAll<HTMLElement>("*")], to = [c, ...c.querySelectorAll<HTMLElement>("*")];
-      from.forEach((n, i) => {
-        const s = getComputedStyle(n);
-        for (const p of ["color", "background-color", "border", "border-radius", "font", "letter-spacing", "fill", "stroke", "display", "gap", "align-items", "justify-items", "align-content", "padding", "width", "height"])
-          to[i]!.style.setProperty(p, s.getPropertyValue(p));
-      });
+      [c, ...c.querySelectorAll<HTMLElement>("*")].forEach((n, i) => look[i]!.forEach(([p, v]) => n.style.setProperty(p!, v!)));
       Object.assign(c.style, { position: "absolute", left: "0", top: "0", margin: "0", width: `${r.width}px`, height: `${r.height}px`, boxSizing: "border-box", transition: "none", animation: "none" });
       return c;
     };

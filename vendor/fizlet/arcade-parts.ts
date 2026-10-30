@@ -26,17 +26,28 @@ canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 /** Every preset's panel drags from anywhere that isn't a key (mouse or touch). CSS min() keeps it on
  *  screen when the window shrinks. */
 export function drag(card: HTMLElement, signal: AbortSignal) {
+  // g: the pointer's offset from the card's left/top in the card's containing block (its offset
+  // parent's padding box, not the viewport: the board can sit under a page header or mid-page),
+  // measured once on pointerdown. A move only sets left/top/right/bottom/translate: the card keeps
+  // the rest of its own inline style.
   const g = new Float64Array(2);
   const on = (ev: PointerEvent) => {
-    const k = ev.type[7], r = card.getBoundingClientRect();
+    // Layout is read only on a press and while dragging: a hover or a release over the card reads none.
+    const k = ev.type[7], s = card.style;
     if (k === "d") {
       if (ev.button || (ev.target as Element).closest("button,input,select")) return;
-      (g[0] = ev.clientX - r.left), (g[1] = ev.clientY - r.top);
+      const o = (card.offsetParent ?? card.parentElement)!, q = o.getBoundingClientRect(), b = card.getBoundingClientRect();
+      (g[0] = ev.clientX - b.left + q.left + o.clientLeft), (g[1] = ev.clientY - b.top + q.top + o.clientTop);
       card.setPointerCapture(ev.pointerId);
       card.classList.add("drag");
     } else if (k !== "m") card.classList.remove("drag");
-    else if (card.classList.contains("drag"))
-      card.style.cssText = `left:max(0px,min(${ev.clientX - g[0]!}px,calc(100% - ${r.width}px)));top:max(0px,min(${ev.clientY - g[1]!}px,calc(100% - ${r.height}px)));right:auto;bottom:auto;translate:none`;
+    else if (card.classList.contains("drag")) {
+      const b = card.getBoundingClientRect();
+      (s.left = `max(0px,min(${ev.clientX - g[0]!}px,calc(100% - ${b.width}px)))`),
+        (s.top = `max(0px,min(${ev.clientY - g[1]!}px,calc(100% - ${b.height}px)))`),
+        (s.right = s.bottom = "auto"),
+        (s.translate = "none");
+    }
   };
   for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) card.addEventListener(t, on as EventListener, { signal });
 }

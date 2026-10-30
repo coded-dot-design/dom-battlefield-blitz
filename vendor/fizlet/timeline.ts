@@ -88,7 +88,9 @@ const NUM = /-?\d*\.?\d+(?:e[-+]?\d+)?/g;
  */
 export function timeline(engine: Engine, o: TimelineOptions = {}) {
   const tracks: Track[] = [], props: Prop[] = [], names: string[] = [], marks: number[] = [], waits: (() => void)[] = [];
-  const yoyo = o.yoyo, id = o.id ?? 0, rate = need(o.rate ?? 1, "rate", 1), reps = o.repeat === Infinity ? -1 : need(o.repeat ?? 0, "repeat");
+  // repeat: a whole number ≥ 0, or Infinity (-1 inside). A negative or fractional one used to pass
+  // the check and loop forever or end mid-play.
+  const yoyo = o.yoyo, id = o.id ?? 0, rate = need(o.rate ?? 1, "rate", 1), reps = o.repeat === Infinity ? -1 : need((o.repeat ?? 0) + 1, "repeat + 1", 2) - 1;
   const mq = o.motion == null && typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   const still = () => (mq ? mq.matches : o.motion === false);
   // The playhead (seconds over every play) is written every step: a typed array, so it never boxes.

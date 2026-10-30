@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Fizlet 0.20.0** in `vendor/fizlet/` (tag `v0.20.0`, `bf42a8c`; `node scripts/sync.mjs`, no hand edits; `shared/` unchanged at sherman-bytes 0.5.2). Same matches: `test:replay` plays the 0.8.2 matches value for value; `test:lockstep` 0 desyncs.
+  - The `join(url, signal, protocols)` shim is gone: `src/join.ts` is deleted and `src/net.ts` exports the vendored `join` from `fizlet/presence` (fizlet#113). `tests/multiplayer.mjs` passes on both invite forms (subprotocol and `?invite=`).
+  - Pinch lock: the site's own `site/src/scripts/touch.ts` is gone; `Base.astro` imports `lockTouch` from `vendor/fizlet/touch`. The page's touch CSS is the Board UI kit's now, so `site.css` drops its copy; the hero is `data-touch-lock="y"` (the kit's `pan-y`; a bare `[data-touch-lock]` is `none` in the kit), so the page still scrolls through it.
+  - Blitz draws its own HUD (no `fizlet/arcade` or `skirmishHud` import), so the skirmish preset's move onto `fizlet/match` does not reach it; `test:browser` still runs intro → countdown → play → pause / resume → result and the pad keys, unchanged.
+  - Sizes (gzip, all within budget, none raised): `blitz.js` 40,507 → 40,689, `blitz.mjs` 40,610 → 40,773, `blitz-net.mjs` 42,143 → 42,267. Measured per module: the kit's touch CSS (board-ui.css 8,301 → 8,506 alone; the drop-in carries the kit), `fizlet/input` intents and wake +52, `fizlet/presence` first-input-wins +42 (net build only), `fizlet/sound` +15, kernel +6.
 - **Multiplayer: invite codes out of URLs** (for fizlet-rooms hardening, fizlet#114 / #113).
   - The code is checked by `POST /invite` (code in the body, a simple request: no preflight) and
     joins with the WebSocket subprotocols `["fizlet-rooms", "invite." + code]`, not `?invite=`.

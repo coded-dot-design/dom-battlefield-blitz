@@ -117,10 +117,11 @@ export function card(host: HTMLElement, o: CardOptions = {}) {
     end.addEventListener("click", () => o.onEnd!(), { signal: o.signal } as AddEventListenerOptions);
   }
   host.append(el);
-  let ringed: HTMLElement | null = null;
+  // The ringed control's own inline outline, put back exactly when the ring moves on (Recall).
+  let ringed: HTMLElement | null = null, was = ["", ""];
   const set = (n: HTMLElement, v: string) => { if (n.textContent !== v) n.textContent = v; };
   const unring = () => {
-    if (ringed) (ringed.style.outline = ""), (ringed.style.outlineOffset = "");
+    if (ringed) (ringed.style.outline = was[0]!), (ringed.style.outlineOffset = was[1]!);
     ringed = null;
   };
   const api = {
@@ -130,7 +131,7 @@ export function card(host: HTMLElement, o: CardOptions = {}) {
       set(count, c); set(title, t); set(text, body);
       if (target !== ringed) {
         unring();
-        if (target) (target.style.outline = RING), (target.style.outlineOffset = "6px"), (ringed = target);
+        if (target) (was = [target.style.outline, target.style.outlineOffset]), (target.style.outline = RING), (target.style.outlineOffset = "6px"), (ringed = target);
       }
       el.hidden = false;
     },
@@ -143,6 +144,7 @@ export function card(host: HTMLElement, o: CardOptions = {}) {
       el.remove();
     },
   };
-  o.signal?.addEventListener("abort", api.remove, { once: true });
+  // An already-aborted signal never fires: remove at once, like the End button's listener (never added).
+  o.signal?.aborted ? api.remove() : o.signal?.addEventListener("abort", api.remove, { once: true });
   return api;
 }

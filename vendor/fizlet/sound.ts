@@ -53,7 +53,9 @@ export function sound(e: Engine, o: SoundOptions) {
   if (!o.play) for (const t of ["pointerdown", "pointerup", "keydown"]) addEventListener(t, unlock, { signal: ctl.signal, capture: true });
 
   function play(cue: Cue, intensity = 1) {
-    if (!on || !e.running || ctl.signal.aborted) return;
+    // Known cues only, by own key: an event type or cue such as "constructor" would otherwise
+    // find Object.prototype's (a function, not notes) and throw in render, stopping the game.
+    if (!on || !e.running || ctl.signal.aborted || !Object.hasOwn(NOTES, cue)) return;
     if (o.play) return o.play(cue, intensity);
     if (!ctx || !master || ctx.state !== "running") return;
     const now = ctx.currentTime;

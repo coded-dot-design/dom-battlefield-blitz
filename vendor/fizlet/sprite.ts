@@ -113,6 +113,8 @@ export function sprites<K extends string>(defs: Record<K, SpriteDef>, o: SpriteO
 
   function tile(id: number | K, frame = 0, scale = 1, palette = 0): Tile {
     const i = typeof id == "string" ? ids[id] : id;
+    // Every real sprite has N >= 1; a name or number that isn't one would read another sprite's tile.
+    if (!N[i]) throw new RangeError("fizlet/sprite: no sprite " + id);
     const f = ((frame | 0) % N[i]! + N[i]!) % N[i]!;
     const k = Math.min(8, Math.max(1, Math.ceil(scale))) | 0;
     const p = palette & 31;
@@ -144,6 +146,7 @@ export function sprites<K extends string>(defs: Record<K, SpriteDef>, o: SpriteO
     /**
      * Draw sprite `id` (number from `ids`, or its name) with its pivot at (x, y), turned by `angle`
      * radians, `scale` pixels per sprite pixel. Bakes on the first call; after that, no allocation.
+     * An id that names no sprite throws a RangeError (as `tile` does).
      */
     draw(ctx: CanvasRenderingContext2D, id: number | K, frame: number, x: number, y: number, angle = 0, scale = 1, palette = 0) {
       const i = typeof id == "string" ? ids[id] : id;
