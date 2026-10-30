@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.4
+
+Still on Fizlet 0.15.0. **The step allocates nothing.** `npm test` checks it: 20,000 busy demo steps (free-for-all and platoons) make 0 minor GCs, measured on Chromium 153 (the bar is ≤ 1). 0.8.3 made 10 and 14. Gameplay is unchanged: the pinned digests (seeds 41, 42, 7 platoons) and five more seeds are the same as 0.8.2's, value for value. The one exception is below.
+
+- **The step's numbers live in typed arrays.** The match's running numbers (clock, countdown, tile and crate timers, shake, whiteout, nuke timer, coach counters) moved into `G`, a `Float64Array`: a double stored in a closure variable is a new heap number on every write. The hot helpers (`blockedF`, `turnF`, `drive`, `hyp`, `shellHits`, `callStrike`, spawn's tries) take their numbers through `F`, a register `Float64Array`, because a number passed to or returned from a call V8 doesn't inline is boxed (fizlet-engine lesson K4). `circleRect`, `segCircle` and `inRect` are inlined with the same arithmetic. Rare paths (strikes, blasts, spawns) use index loops and `F` instead of `for…of` and loop locals, because they may stay on Maglev, where both allocate. A respawn assigns fields one by one instead of `Object.assign` with a literal.
+- **Effects are queued by the step and played by render.** `fx.spawn`, `fx.word` and `fx.blast` take up to a dozen numbers each. The step stages them in a typed queue, and render plays the queue in order before it draws. Same particles, words and blasts. A particle now starts at the frame's draw instead of mid-frame, which is the same at one step per frame.
+- **The screen shake no longer draws from `engine.random`** (a determinism fix). `draw()` took the shake offset from the seeded gameplay random, so in a board, platoon or practice match where the screen shook, how often the screen was drawn changed the match. It now has its own LCG, seeded from the match's seed. Demo matches never shake, so their digests are unchanged. Board matches where you get hit now play differently from 0.8.3, and they replay. `test:replay` checks that a board match with you getting hit plays the same whether each step is drawn once or twice (0.8.3 fails that check).
+- Size: `dist/blitz.js` 37,885 → 39,143 B gzip (`dist/blitz.mjs` 37,970 → 39,245). Budget 40,960 B.
+
 ## 0.8.3
 
 E3 acceptance work (`fe port-check`). Gameplay is unchanged, value for value: seeds 41, 42 and 7 (platoons) play the 0.8.2 matches bit for bit (every number of every tank, shell, tile, block, plane, bomb, mark and crate, every frame for 3,600 frames), and `npm run test:replay` now checks that (digests pinned per Chrome major: V8's math differs in the last bit between versions; 145 is CI's, 153 a newer local build).
