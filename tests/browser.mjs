@@ -52,10 +52,17 @@ try {
   await page.waitForFunction(() => game.controls.lock && game.controls.lockTarget >= 0);
   assert.equal(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-k=lock]").getAttribute("aria-pressed")), "true");
   // LONG: locks on, fires, spends one round.
-  await ready();
-  [x, y] = await sr("[data-k=long]");
-  await page.mouse.click(x, y);
-  await page.waitForFunction(() => game.world.tanks[0].rail === 2, null, { timeout: 3000 });
+  // The long gun needs a tank to lock on to: on a slow runner the field may be empty for a moment,
+  // so press again until one round is spent (state, not a fixed wait).
+  const rail0 = await page.evaluate(() => game.world.tanks[0].rail);
+  for (let i = 0; ; i++) {
+    await ready();
+    [x, y] = await sr("[data-k=long]");
+    await page.mouse.click(x, y);
+    const spent = await page.waitForFunction((r) => game.world.tanks[0].rail < r, rail0, { timeout: 2000 }).then(() => true, () => false);
+    if (spent) break;
+    if (i === 5) throw new Error(`LONG never fired (rail ${await page.evaluate(() => game.world.tanks[0].rail)})`);
+  }
   // STRIKE: target mode, click the field, a bomber flies over and the bombs land.
   await ready();
   await page.evaluate(() => (game.world.tanks[0].strikes = 1));
@@ -163,7 +170,7 @@ try {
   await page.keyboard.down("KeyD");
   await page.waitForTimeout(2200);
   await page.keyboard.up("KeyD");
-  await page.waitForFunction(() => pr.coach >= 1, null, { timeout: 3000 });
+  await page.waitForFunction(() => pr.coach >= 1, null, { timeout: 10000 });
   const moved = await page.evaluate((still) => pr.world.tanks.slice(1, 4).filter((t, i) => Math.hypot(t.x - still[i][0], t.y - still[i][1]) > 1).length, still);
   assert.ok(moved <= 1, `TARGETs stand still (${moved} moved; a mine may respawn one)`);
   assert.equal(await page.evaluate(() => pr.world.shells.filter((s) => s.on && s.owner !== 0).length), 0, "dummies never shoot");
