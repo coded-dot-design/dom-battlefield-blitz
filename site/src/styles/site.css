@@ -23,6 +23,17 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: 90px;
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Phones: a tap is a tap, never a double-tap zoom. Content pages keep pinch-zoom (WCAG 1.4.4);
+     game pages turn it off in the viewport (Base.astro). */
+  touch-action: manipulation;
+}
+/* Live surfaces (the hero battle, anything marked data-touch-lock): the page scrolls up and down
+   through them, but a tap or a swipe never pans it sideways or zooms it; Base.astro cancels the
+   pinch on them. */
+[data-touch-lock] {
+  touch-action: pan-y;
+  overscroll-behavior: none;
 }
 @media (prefers-reduced-motion: reduce) {
   html {
