@@ -5,6 +5,11 @@
 // Checks: the board fills the stage behind ONE room card; join → waiting (seats) → match (a row per
 // player in its tank colour, YOU marked, link live, no desync) → a player leaves (everyone told who)
 // → REJOIN. At 1440×900 and 390×844, light and dark; no sideways scroll, card keys ≥ 44 px.
+// Two room servers, alternating runs: "new" (fizlet#114: POST /invite with the code in the body, the
+// invite as a WebSocket subprotocol) and "old" (the deployed one: ?code= / ?invite= in the URL only;
+// it answers a POST with 403 and fails a handshake that offers protocols, as a browser would without
+// the 101 echo). The page must work on both, never keep ?code= in its URL, and on "new" never put the
+// code in a URL or a referrer.
 // Run after `npm run site:build`. SHOTS=<dir> saves screenshots.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -35,11 +40,27 @@ const msg = (kind, slot, players, frame, value) => {
   b.writeUInt32LE(value >>> 0, 8);
   return b;
 };
-const rooms = new Map();
-async function mockServer(context) {
-  await context.route("https://rooms.test/**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: '{"ok":true,"players":4}' }));
+const rooms = new Map(), CODE = "TEST-CODE-1";
+// Where codes travelled on a "new" server (URLs, referrers): must stay empty.
+const leaks = [];
+async function mockServer(context, mode) {
+  await context.route("https://rooms.test/**", (r) => {
+    const req = r.request(), u = new URL(req.url()), inUrl = u.searchParams.get("code");
+    if (mode === "new" && (inUrl || /code|invite/i.test(req.headers().referer ?? ""))) leaks.push(inUrl ?? req.headers().referer);
+    // old: the method is ignored and the code read from the URL; new: the body of a POST (URL still accepted).
+    const code = mode === "new" && req.method() === "POST" ? req.postData() : inUrl;
+    const ok = code === CODE;
+    return r.fulfill({ status: ok ? 200 : 403, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: ok ? '{"ok":true,"players":4}' : '{"ok":false}' });
+  });
+  // The page's subprotocols reach the route through the URL fragment (see the init script in peer()).
   await context.routeWebSocket(/^wss:\/\/rooms\.test\//, (ws) => {
     const u = new URL(ws.url()), players = Number(u.searchParams.get("players"));
+    const protocols = u.hash.startsWith("#p=") ? JSON.parse(decodeURIComponent(u.hash.slice(3))) : [];
+    const viaUrl = u.searchParams.get("invite"), viaProtocol = protocols.find((p) => p.startsWith("invite."))?.slice(7);
+    if (mode === "new" && viaUrl) leaks.push(`ws ?invite=${viaUrl}`);
+    if (mode === "new" && !protocols.includes("fizlet-rooms")) return ws.close({ code: 4003, reason: "expected the fizlet-rooms subprotocol" });
+    if (mode === "old" && protocols.length) return ws.close({ code: 1006, reason: "no subprotocol in the 101: the browser fails the handshake" });
+    if ((mode === "new" ? viaProtocol : viaUrl) !== CODE) return ws.close({ code: 4003, reason: "invite code needed" });
     let r = rooms.get(u.pathname);
     if (!r || !r.seats.some(Boolean)) rooms.set(u.pathname, (r = { players, seats: Array(players).fill(null), started: false, seed: 1234 + rooms.size }));
     if (r.players !== players || r.started) return ws.close({ code: 4000, reason: "room full" });
@@ -64,11 +85,21 @@ async function mockServer(context) {
 const browser = await chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}) });
 const VIEW = { 1440: { viewport: { width: 1440, height: 900 } }, 390: { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true } };
 const contexts = [];
-async function peer(width, theme, url) {
+async function peer(width, theme, url, mode) {
   const context = await browser.newContext(VIEW[width]);
   contexts.push(context);
   await context.addInitScript((t) => localStorage.setItem("dom-virus:theme", t), theme);
-  await mockServer(context);
+  await mockServer(context, mode);
+  // After Playwright's WebSocket mock: carry the subprotocols to the route in the URL fragment
+  // (the mock doesn't hand them over; nothing connects for real).
+  await context.addInitScript(() => {
+    const W = window.WebSocket;
+    window.WebSocket = class extends W {
+      constructor(url, protocols) {
+        super(protocols ? `${url}#p=${encodeURIComponent(JSON.stringify([protocols].flat()))}` : url);
+      }
+    };
+  });
   const page = await context.newPage();
   page.errors = [];
   page.on("pageerror", (e) => page.errors.push(e.message));
@@ -95,14 +126,27 @@ async function layout(p, label) {
 
 let where = "start", runs = 0;
 try {
-  for (const [n, width, theme] of [[2, 1440, "dark"], [2, 390, "light"], [2, 1440, "light"], [2, 390, "dark"], [4, 1440, "dark"], [4, 390, "light"]]) {
-    const tag = `${n}p-${width}-${theme}`, room = runs++;
+  for (const [n, width, theme, mode] of [[2, 1440, "dark", "new"], [2, 390, "light", "old"], [2, 1440, "light", "new"], [2, 390, "dark", "old"], [4, 1440, "dark", "new"], [4, 390, "light", "old"]]) {
+    const tag = `${n}p-${width}-${theme}-${mode}`, room = runs++;
     where = tag;
-    const url = `${base}play/two/?rooms=wss://rooms.test&room=${room}&players=${n}&code=TEST-CODE-1`;
+    const url = `${base}play/two/?rooms=wss://rooms.test&room=${room}&players=${n}&code=${CODE}`;
     // You: the device under test. The others: desktop browsers.
-    const me = await peer(width, theme, url);
+    const me = await peer(width, theme, url, mode);
     await me.waitForFunction(() => !document.querySelector("[data-players-pick]").hidden, null, { timeout: 5000 }).catch(() => {});
     assert.equal(await step(me), "join");
+    // An old ?code= link: the code prefills the form, and the address bar and history lose it.
+    assert.equal(await me.inputValue("input[name=code]"), CODE, `${tag}: ?code= prefills the code`);
+    assert.doesNotMatch(me.url(), /code=|invite=/, `${tag}: no code in the URL`);
+    assert.equal(await me.evaluate(() => document.referrer === "" && document.querySelector('meta[name="referrer"]')?.content), "no-referrer");
+    if (runs === 1) {
+      // A wrong code is refused. On a "new" server it goes once more by ?code= (the old-server
+      // fallback, dropped next release); a right code never does.
+      await me.fill("input[name=code]", "WRONG-CODE-9");
+      await me.click("[data-join]");
+      await me.waitForFunction(() => /isn't on the list/.test(document.querySelector("[data-say]").textContent));
+      assert.deepEqual(leaks.splice(0), ["WRONG-CODE-9"]);
+      await me.fill("input[name=code]", CODE);
+    }
     await shot(me, `${tag}-1-join`);
     await layout(me, `${tag} join`);
     await me.click("[data-join]");
@@ -111,9 +155,18 @@ try {
     assert.match(await me.locator("[data-sub]").textContent(), new RegExp(`WAITING · ${n} PLAYERS`));
     await shot(me, `${tag}-2-wait`);
     await layout(me, `${tag} wait`);
+    // SEND LINK: the room and players, never the code.
+    await me.evaluate(() => {
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+      Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t) => void (window.shared = t) }, configurable: true });
+    });
+    await me.click("[data-share]");
+    const link = await me.waitForFunction(() => window.shared).then((h) => h.jsonValue());
+    assert.match(link, new RegExp(`room=${room}&players=${n}`), `${tag}: the link carries room and players`);
+    assert.doesNotMatch(link, new RegExp(`code=|invite=|${CODE}`, "i"), `${tag}: the link has no code`);
     const others = [];
     for (let i = 1; i < n; i++) {
-      const o = await peer(1440, theme, url);
+      const o = await peer(1440, theme, url, mode);
       await o.click("[data-join]");
       others.push(o);
     }
@@ -150,15 +203,16 @@ try {
     if (n === 2 && width === 1440 && theme === "dark") {
       // REJOIN: the same room, a fresh match, for both.
       await me.click("[data-again]");
-      const back = await peer(1440, theme, url);
+      const back = await peer(1440, theme, url, mode);
       await back.click("[data-join]");
       for (const p of [me, back]) await p.waitForFunction(() => document.querySelector(".room").dataset.step === "play", null, { timeout: 10000 });
       await back.close();
     }
     for (const p of all) assert.deepEqual(p.errors, [], `${tag}: no page errors`);
+    assert.deepEqual(leaks, [], `${tag}: no code in a URL or referrer on the new server`);
     for (const c of contexts.splice(0)) await c.close();
   }
-  console.log(`Multiplayer: 2 and 4 players through a mock room, ${runs} runs at 1440 and 390 in light and dark: join, waiting seats, live match with a row per player in its tank colour, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
+  console.log(`Multiplayer: 2 and 4 players through a mock room (old and new invite forms), ${runs} runs at 1440 and 390 in light and dark: join, waiting seats, live match with a row per player in its tank colour, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
 } catch (e) {
   console.error(`multiplayer test failed at ${where}`);
   throw e;

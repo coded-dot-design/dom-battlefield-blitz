@@ -5,4 +5,6 @@ import { useLockstep } from "./game";
 useLockstep(presence);
 export * from "./index";
 // Join a fizlet-rooms room (WebSocket), or link peers in memory (tests, one-page demos).
-export { join, memory } from "../vendor/fizlet/presence";
+export { memory } from "../vendor/fizlet/presence";
+// join(url, signal, protocols): a local shim until the next vendor sync (src/join.ts).
+export { join } from "./join";
