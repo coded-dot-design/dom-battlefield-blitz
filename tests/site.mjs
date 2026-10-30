@@ -6,6 +6,7 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, extname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { checkKeys, checkTaps } from "./keys.mjs";
+import { checkHeroScrim } from "./hero-scrim.mjs";
 
 const root = resolve("artifacts/pages");
 const PREFIX = "/dom-battlefield-blitz";
@@ -55,6 +56,10 @@ try {
   assert.ok(await lp.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "the landing never scrolls sideways on a phone");
   assert.deepEqual(lerr, []);
   await lp.close();
+
+  // The hero scrim and its copy follow the theme (light: --surface, dark: --bg), AA in both.
+  where = "hero scrim";
+  await checkHeroScrim(browser, base, "landing");
 
   where = "board";
   const bp = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -130,7 +135,7 @@ try {
     keys += await check(kp, where);
     await kc.close();
   }
-  console.log(`Site: landing + live demo, board match, phone app mode, drop-in, ${keys} page keys passed.`);
+  console.log(`Site: landing + live demo, hero scrim in both themes, board match, phone app mode, drop-in, ${keys} page keys passed.`);
 } catch (e) {
   console.error(`site test failed at ${where}`);
   throw e;

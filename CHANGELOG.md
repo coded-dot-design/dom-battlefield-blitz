@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Site: the hero scrim follows the theme.** In light mode the gradient behind the hero copy was
+  still the dark one (near-black over the light grid). It now fades from the theme's token
+  (dark `--bg`, light `--surface`), and the hero copy is on tokens too: headline and eyebrow `--ink`,
+  lead and "The original" link `--muted`, the pink line `--k-attack` and BLITZ VERSION `--k-sys-ink`
+  (both mixed 25% toward `--ink` in light mode, for AA on white). The hero background is `--bg`.
+  Dark mode barely moves (the lead and link are a shade dimmer on `--muted`). `tests/hero-scrim.mjs` in `test:site` checks both themes (stored theme
+  with the OS set the other way, the theme key, 1440 and 390): the scrim's first stop is the token
+  and every hero text colour passes WCAG AA on the scrim and on the bare page. No game change.
+
 ## 0.8.3
 
 E3 acceptance work (`fe port-check`). Gameplay is unchanged, value for value: seeds 41, 42 and 7 (platoons) play the 0.8.2 matches bit for bit (every number of every tank, shell, tile, block, plane, bomb, mark and crate, every frame for 3,600 frames), and `npm run test:replay` now checks that (digests pinned per Chrome major: V8's math differs in the last bit between versions; 145 is CI's, 153 a newer local build).
