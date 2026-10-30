@@ -43,6 +43,23 @@ try {
   await page.evaluate(() => document.getElementById("board").scrollIntoView({ block: "end" }));
   const sr = (sel) => page.evaluate((sel) => { const r = document.getElementById("board").shadowRoot.querySelector(sel).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }, sel);
   const ready = () => page.waitForFunction(() => game.world.tanks[0].alive && game.world.tanks[0].drop >= 1 && game.world.tanks.filter((t) => t.alive && t.drop >= 1).length >= 4, null, { timeout: 8000 });
+  // The scoreboard drags from any part of it, stays on the board, is remembered, and a double-click puts it back.
+  {
+    const box = () => page.evaluate(() => { const r = document.getElementById("board").shadowRoot.querySelector(".hud").getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; });
+    const [hx, hy, hw, hh] = await box();
+    await page.mouse.move(hx + hw / 2, hy + hh / 2);
+    await page.mouse.down();
+    await page.mouse.move(hx + hw / 2 + 120, hy + hh / 2 + 90, { steps: 6 });
+    await page.mouse.up();
+    const [mx, my] = await box();
+    assert.ok(Math.abs(mx - hx - 120) < 2 && Math.abs(my - hy - 90) < 2, `scoreboard moved by the drag (${mx - hx}, ${my - hy})`);
+    assert.deepEqual(JSON.parse(await page.evaluate(() => localStorage.getItem("blitz:hud"))).map(Math.round), [120, 90], "remembered");
+    await page.mouse.move(mx + 10, my + 400, { steps: 4 }); // a plain move doesn't drag it
+    assert.deepEqual((await box()).slice(0, 2).map(Math.round), [mx, my].map(Math.round));
+    await page.mouse.dblclick(mx + hw / 2, my + hh / 2);
+    const [bx, by] = await box();
+    assert.ok(Math.abs(bx - hx) < 2 && Math.abs(by - hy) < 2, "double-click puts it back");
+  }
   // AUTO and LOCK toggle (keys and round buttons).
   let [x, y] = await sr("[data-k=auto]");
   const auto0 = await page.evaluate(() => game.controls.auto);

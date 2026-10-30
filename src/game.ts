@@ -129,7 +129,7 @@ const CSS = `:host{all:initial;display:block}*{box-sizing:border-box}
 .bz.embed{position:fixed;z-index:2147483000}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
 .aiming canvas{cursor:none}
-.hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim);pointer-events:none;white-space:nowrap}
+.hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim);pointer-events:auto;cursor:grab;touch-action:none;white-space:nowrap}.hud.on{cursor:grabbing}
 .hud b{font-size:17px;font-weight:900}.hud small{display:block;font-size:8px;letter-spacing:.16em;color:var(--muted)}
 .hud :is(.k,.tm) b{color:var(--team)}.hud .t b{color:var(--k-sys-ink)}.hud .lead b{color:var(--k-cmd-ink);font-size:13px}.hud .st b{color:var(--k-fire-ink)}
 .bui[data-theme=light] .hud :is(.k,.tm) b{color:#0a8a55}
@@ -2113,39 +2113,50 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     fireQ = true;
   }, { signal: e.signal });
   for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) keys.fire.addEventListener(t, fireUp, { signal: e.signal });
-  // The grab bar moves the keys; where you put them is remembered. Double-click puts them back.
-  const pad = $<HTMLElement>("[data-pad]"), grab = $<HTMLButtonElement>("[data-grab]"), padAt = new Float64Array(4);
-  const placePad = () => {
-    const r = wrap.getBoundingClientRect(), pw = pad.offsetWidth * 0.9, ph = pad.offsetHeight * 0.9;
-    padAt[0] = Math.max(-(r.width - pw - 8), Math.min(8, padAt[0]!));
-    padAt[1] = Math.max(-(r.height - ph - 8), Math.min(8, padAt[1]!));
-    pad.style.translate = padAt[0] || padAt[1] ? `${padAt[0]}px ${padAt[1]}px` : "";
-  };
-  try {
-    const v = JSON.parse(localStorage.getItem("blitz:pad") ?? "null");
-    if (Array.isArray(v)) (padAt[0] = +v[0] || 0), (padAt[1] = +v[1] || 0), requestAnimationFrame(placePad);
-  } catch {}
-  const savePad = () => {
+  // Drag to move, remembered on this device; double-click puts it back. The keys move by their grab
+  // bar; the scoreboard by any part of it (in-page scoreboards always drag: Board UI).
+  const movable = (el: HTMLElement, handle: HTMLElement, id: string, clamp: (at: Float64Array, w: DOMRect) => void, css: (x: number, y: number) => string, moved?: () => void) => {
+    const at = new Float64Array(4);
+    const place = () => (clamp(at, wrap.getBoundingClientRect()), (el.style.translate = at[0] || at[1] ? css(at[0]!, at[1]!) : ""));
     try {
-      localStorage.setItem("blitz:pad", JSON.stringify([padAt[0], padAt[1]]));
+      const v = JSON.parse(localStorage.getItem(id) ?? "null");
+      if (Array.isArray(v)) (at[0] = +v[0] || 0), (at[1] = +v[1] || 0), requestAnimationFrame(place);
     } catch {}
+    const save = () => {
+      try {
+        localStorage.setItem(id, JSON.stringify([at[0], at[1]]));
+      } catch {}
+    };
+    handle.addEventListener("pointerdown", (ev) => {
+      if (ev.button) return;
+      ev.stopPropagation();
+      handle.setPointerCapture?.(ev.pointerId);
+      handle.classList.add("on");
+      at[2] = ev.clientX - at[0]!;
+      at[3] = ev.clientY - at[1]!;
+    }, { signal: e.signal });
+    handle.addEventListener("pointermove", (ev) => {
+      if (!handle.classList.contains("on")) return;
+      at[0] = ev.clientX - at[2]!;
+      at[1] = ev.clientY - at[3]!;
+      place();
+      moved?.();
+    }, { signal: e.signal });
+    for (const t of ["pointerup", "pointercancel"]) handle.addEventListener(t, () => handle.classList.contains("on") && (handle.classList.remove("on"), save()), { signal: e.signal });
+    handle.addEventListener("dblclick", () => ((at[0] = at[1] = 0), place(), save()), { signal: e.signal });
   };
-  grab.addEventListener("pointerdown", (ev) => {
-    ev.stopPropagation();
-    grab.setPointerCapture?.(ev.pointerId);
-    grab.classList.add("on");
-    padAt[2] = ev.clientX - padAt[0]!;
-    padAt[3] = ev.clientY - padAt[1]!;
-  }, { signal: e.signal });
-  grab.addEventListener("pointermove", (ev) => {
-    if (!grab.classList.contains("on")) return;
-    padAt[0] = ev.clientX - padAt[2]!;
-    padAt[1] = ev.clientY - padAt[3]!;
-    placePad();
-    cDrag++;
-  }, { signal: e.signal });
-  for (const t of ["pointerup", "pointercancel"]) grab.addEventListener(t, () => grab.classList.contains("on") && (grab.classList.remove("on"), savePad()), { signal: e.signal });
-  grab.addEventListener("dblclick", () => ((padAt[0] = padAt[1] = 0), placePad(), savePad()), { signal: e.signal });
+  const pad = $<HTMLElement>("[data-pad]"), bar = $<HTMLElement>(".hud");
+  movable(pad, $<HTMLButtonElement>("[data-grab]"), "blitz:pad", (at, r) => {
+    const pw = pad.offsetWidth * 0.9, ph = pad.offsetHeight * 0.9;
+    at[0] = Math.max(-(r.width - pw - 8), Math.min(8, at[0]!));
+    at[1] = Math.max(-(r.height - ph - 8), Math.min(8, at[1]!));
+  }, (x, y) => `${x}px ${y}px`, () => cDrag++);
+  // The scoreboard starts centred at the top; it stays whole on the board.
+  movable(bar, bar, "blitz:hud", (at, r) => {
+    const sx = Math.max(0, (r.width - bar.offsetWidth) / 2 - 8);
+    at[0] = Math.max(-sx, Math.min(sx, at[0]!));
+    at[1] = Math.max(-bar.offsetTop + 4, Math.min(r.height - bar.offsetTop - bar.offsetHeight - 8, at[1]!));
+  }, (x, y) => `calc(-50% + ${x}px) ${y}px`);
   $<HTMLButtonElement>("[data-pause]").addEventListener("click", () => state === "play" && togglePause(), { signal: e.signal });
   // Full screen: the real thing where the browser allows it, else the board fills the window.
   const fsKey = $<HTMLButtonElement>("[data-fs]");
