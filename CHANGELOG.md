@@ -9,8 +9,9 @@
   `test:lockstep` 0 desyncs, zero-alloc step green. What came with it: the Board UI kit's key shadows follow
   a page's `--shadow-x/-y/-color` (defaults unchanged: straight below, on the rim), and the kit hides a
   `[hidden]` coach card itself. Sizes (gzip): `blitz.js` 45,784 → 46,009, `blitz.mjs` 45,885 → 46,115,
-  `blitz-net.mjs` 47,763 → 47,987; most of it is the kit CSS (4,974 → 5,139 B gzip). `blitz.mjs` is 99 B
-  over its 46,016 budget: the budget is the owner's call, not raised here.
+  `blitz-net.mjs` 47,763 → 47,987; most of it is the kit CSS (4,974 → 5,139 B gzip). Budgets: `blitz.js` and
+  `blitz.mjs` 46,016 → 46,208 (the kit CSS above, measured; `blitz.mjs` was 99 B over, `blitz.js` had 7 B
+  left); `blitz-net.mjs` unchanged. Size-ledger row in fizlet-engine.
 - **Multiplayer moves to `/play/multi/`** (owner: it's 2 to 4 players now, so "two" was the wrong name).
   `/play/two/` stays as a redirect that keeps the room, mode, code and hash, so shared links and
   invites still work; it is `noindex` with a canonical to the new page. The footer site map, the play-pass
