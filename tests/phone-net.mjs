@@ -1,4 +1,4 @@
-// Multiplayer on a phone (/play/two/, game mode), through the mock room server of tests/multiplayer.mjs
+// Multiplayer on a phone (/play/multi/, game mode), through the mock room server of tests/multiplayer.mjs
 // (its "new" wire: fizlet-rooms subprotocol, LOBBY, WELCOME when full). A 1V1 match between two phones,
 // the device under test at 390×844 and 375×667 (portrait) and 844×390 (landscape), the other phone
 // in the other orientation, so a portrait and a landscape screen play one match. Once LIVE:
@@ -126,7 +126,7 @@ const said = [];
 try {
   for (const [name, w, h, [ow, oh]] of SIZES) {
     where = name;
-    const url = `${base}play/two/?rooms=wss://rooms.test&room=${room++}&mode=1v1&code=${CODE}`;
+    const url = `${base}play/multi/?rooms=wss://rooms.test&room=${room++}&mode=1v1&code=${CODE}`;
     const me = await phone(w, h, url), other = await phone(ow, oh, url);
     await me.page.click("[data-join]");
     await me.page.waitForFunction(() => document.querySelector(".room").dataset.step === "wait");

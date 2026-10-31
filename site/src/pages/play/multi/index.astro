@@ -1,0 +1,922 @@
+---
+// Battlefield Blitz for two to four players over a fizlet-rooms room server (demo). Same match on
+// every screen: only inputs travel. The invite code is the demo gate, not a login.
+// The board is the whole stage, like /play/ (an attract match runs behind until yours starts).
+// Everything about the room lives in ONE Board UI card over the board: join → waiting → the match
+// (players, their colours and scores, the link state, LEAVE) → someone left. The card drags by its
+// grip or header (remembered on this device, double-click puts it back) and folds to its header.
+import Base from '../../../layouts/Base.astro';
+import Icon from '../../../components/Icon.astro';
+import { base, REPO, ROOMS } from '../../../site';
+const title = 'Battlefield Blitz · multiplayer';
+const description = 'Two to four players, one Blitz match, over the internet. Enter an invite code and pick a room.';
+---
+<Base title={title} description={description} page="play" app>
+  <Fragment slot="head">
+    <!-- The invite code never stays in the address bar, history or a referrer: a link with ?code= (or
+         ?invite=) prefills the form from memory, and the URL loses it before anything else loads. -->
+    <meta name="referrer" content="no-referrer" />
+    <script is:inline>
+      (function () {
+        var u = new URL(location.href), p = u.searchParams, c = p.get("code") || p.get("invite");
+        if (!p.has("code") && !p.has("invite")) return;
+        p.delete("code");
+        p.delete("invite");
+        history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+        if (c) window.__blitzInvite = c;
+      })();
+    </script>
+  </Fragment>
+  <section class="blitz-stage two" aria-labelledby="two-title" data-rooms={ROOMS}>
+    <h1 id="two-title" class="vh">Battlefield Blitz · multiplayer</h1>
+    <div id="arena" class="blitz-host"></div>
+
+    <aside class="room bui-card" data-step="join" data-conn="off" aria-labelledby="room-title">
+      <button class="bui-grip" type="button" data-grip aria-label="Move the room card: drag (double-click puts it back)" title="Drag to move · double-click to reset"></button>
+      <header class="head">
+        <i class="dot" aria-hidden="true"></i>
+        <b id="room-title" data-title>MULTIPLAYER</b>
+        <small data-sub role="status">NOT CONNECTED</small>
+        <span class="chip" data-chip></span>
+        <button class="bui-key bui-icon-key fold" type="button" data-fold aria-expanded="true" aria-controls="room-body" aria-label="Fold the room card"><Icon name="down" size={18} /></button>
+      </header>
+
+      <div class="body" id="room-body">
+        <!-- 1. Join: code, players, room -->
+        <form class="step" data-for="join" id="gate" novalidate>
+          <label data-invite>INVITE CODE
+            <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required minlength="6" maxlength="64" placeholder="BLITZ-XXXX-XXXX" />
+          </label>
+          <!-- Play passes: shown only when the room server requires one (POST /invite says pass:true).
+               Kept in this tab's session storage, never in a URL. docs/play-pass.md -->
+          <label data-pass hidden>PASS
+            <input name="pass" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="600" placeholder="Paste your pass" />
+          </label>
+          <!-- The mode: P1's pick is the match's (the game agrees it in the countdown). 1V1 and PLATOONS are
+               rooms of two; FFA and 2V2 are rooms of four that P1 can start with two or three humans in,
+               the computer taking the empty seats (at most two). -->
+          <div class="pick wide" role="group" aria-labelledby="mode-label" data-mode-pick>
+            <span><b id="mode-label">MODE</b> <small data-mode-say></small></span>
+            <div class="bui-seg modes">
+              <button class="bui-key" type="button" data-mode="1v1" aria-pressed="true" aria-label="1 v 1: two players, one tank each">1V1</button>
+              <button class="bui-key" type="button" data-mode="ffa" aria-pressed="false" aria-label="FFA, free for all: 4 seats, the computer fills up to 2">FFA</button>
+              <button class="bui-key" type="button" data-mode="2v2" aria-pressed="false" aria-label="2 v 2: 4 seats, the computer fills a side that's short">2V2</button>
+              <button class="bui-key" type="button" data-mode="platoon" aria-pressed="false" aria-label="Platoon: two players, each leading AI wingmen">PLATOON</button>
+            </div>
+          </div>
+          <!-- Platoons: tanks a side (you + AI wingmen). -->
+          <div class="pick wide" role="group" aria-label="Platoon size" data-squad-pick hidden>
+            <span>PLATOON <small data-squad-say></small></span>
+            <div class="bui-seg sizes">
+              <button class="bui-key" type="button" data-squad="2" aria-pressed="true" aria-label="2 v 2: you and 1 AI wingman each">2V2</button>
+              <button class="bui-key" type="button" data-squad="3" aria-pressed="false" aria-label="3 v 3: you and 2 AI wingmen each">3V3</button>
+              <button class="bui-key" type="button" data-squad="4" aria-pressed="false" aria-label="4 v 4: you and 3 AI wingmen each">4V4</button>
+            </div>
+          </div>
+          <div class="pick" role="group" aria-label="Room">
+            <span>ROOM</span>
+            <div class="rooms">
+              <button class="bui-key" type="button" data-room="-1" aria-label="Previous room">−</button>
+              <output name="roomShow" aria-live="polite">0</output>
+              <button class="bui-key" type="button" data-room="1" aria-label="Next room">+</button>
+            </div>
+            <input type="hidden" name="room" value="0" />
+          </div>
+          <button class="bui-key bui-sticker-key go" type="submit" data-join><Icon name="play" size={22} /><b>JOIN</b></button>
+          <p class="say" role="alert" data-say></p>
+          <p class="fine">Everyone: the same code, the same room. The match starts when the room is full, or when P1 starts it. P1's mode is the match's.</p>
+        </form>
+
+        <!-- 2. Waiting for the room to fill -->
+        <div class="step" data-for="wait">
+          <ol class="seats" data-wait-seats aria-label="Seats"></ol>
+          <p class="big" data-wait-say>Waiting for player 2.</p>
+          <p class="fine">Send your friends the link: it has the code, so they just press JOIN.</p>
+          <!-- P1, in a 4-seat room with 2 or 3 in: start now, the computer takes the empty seats. -->
+          <button class="bui-key bui-sticker-key" type="button" data-start hidden><Icon name="play" size={22} /><b data-start-say>START NOW</b></button>
+          <div class="keys">
+            <button class="bui-key bui-sticker-key" type="button" data-share><b data-share-say>SEND LINK</b></button>
+            <button class="bui-key bui-sticker-key bui-second" type="button" data-cancel><b>CANCEL</b></button>
+          </div>
+        </div>
+
+        <!-- 3. The match: who is who, live scores, the link state -->
+        <div class="step" data-for="play">
+          <table class="score" aria-label="Players">
+            <thead><tr><th scope="col">PLAYER</th><th scope="col">K</th><th scope="col">D</th></tr></thead>
+            <tbody data-rows></tbody>
+          </table>
+          <p class="fine">Same match on every screen: only moves travel.</p>
+          <button class="bui-key bui-sticker-key bui-second" type="button" data-leave><b>LEAVE</b></button>
+        </div>
+
+        <!-- 4. Someone left, the link dropped, or the room was busy -->
+        <div class="step" data-for="gone">
+          <p class="word" data-gone-word>PLAYER LEFT</p>
+          <p class="big" data-gone-say>The other player left the match.</p>
+          <div class="keys">
+            <button class="bui-key bui-sticker-key" type="button" data-again><Icon name="play" size={22} /><b>REJOIN</b></button>
+            <button class="bui-key bui-sticker-key bui-second" type="button" data-new><b>NEW ROOM</b></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </section>
+  <div class="wrap blitz-bar">
+    <p><b>BLITZ · MULTIPLAYER</b> · same code, same room · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · phones: drag left to drive</p>
+    <p><a href={base('play/')}>Play solo</a> · <a href={base()}>About Blitz</a> · <a href={`${REPO}/issues/new?template=play-pass.yml`}>Request a pass</a></p>
+  </div>
+</Base>
+
+<script>
+  import { createBlitz, join } from "../../../../../dist/blitz-net.mjs";
+  import { match, shared } from "../../../lib/analytics/play";
+  const online = match("online"); // analytics: no-ops until the visitor accepts
+  type Game = ReturnType<typeof createBlitz>;
+  type Tank = { kills: number; deaths: number; alive: boolean; team: number; color: string; name: string };
+  const stage = document.querySelector<HTMLElement>(".two")!;
+  const card = stage.querySelector<HTMLElement>(".room")!;
+  const arena = document.getElementById("arena")!;
+  const gate = document.getElementById("gate") as HTMLFormElement;
+  const field = (n: string) => gate.elements.namedItem(n) as HTMLInputElement;
+  const $ = <T extends HTMLElement>(s: string) => stage.querySelector<T>(s)!;
+  const q = new URLSearchParams(location.search);
+  const ws = q.get("rooms") ?? stage.dataset.rooms!;
+  const http = ws.replace(/^ws/, "http");
+  const ROOMS = 16;
+  // Who is who: the game's colours for seats 0..3 (src/game.ts COLORS), so the card matches the tanks.
+  const SEAT = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"];
+  const seconds = Number(q.get("seconds")) || 0;
+  const narrow = matchMedia("(pointer: coarse), (max-width: 760px)");
+
+  // Per-viewer conveniences only: the last code (this tab), the card's place (this device).
+  const keep = {
+    get: (k: string, s: () => Storage) => { try { return s().getItem(k) ?? ""; } catch { return ""; } },
+    set: (k: string, v: string, s: () => Storage) => { try { s().setItem(k, v); } catch {} },
+  };
+  const tab = () => sessionStorage, device = () => localStorage;
+  let room = Math.min(ROOMS - 1, Math.max(0, Number(q.get("room")) | 0));
+  let maxPlayers = 4; // what the server allows: /invite says (an older server doesn't: two). Until asked: 4.
+  // The mode (P1's is the match's). 1v1 and platoons: rooms of two. FFA and 2v2: rooms of four that P1
+  // can start with 2 or 3 in (the computer takes the empty seats). A share link carries it; remembered here.
+  type Mode = "1v1" | "ffa" | "2v2" | "platoon";
+  const MODES: Mode[] = ["1v1", "ffa", "2v2", "platoon"];
+  const MODE_SAY: Record<Mode, string> = {
+    "1v1": "two of you, one tank each",
+    ffa: "4 seats, every tank for itself; the computer fills up to 2",
+    "2v2": "2 a side; the computer fills a side that's short",
+    platoon: "two of you, each leading AI wingmen",
+  };
+  const SQUAD_SAY = ["", "", "you + 1 AI wingman each", "you + 2 AI wingmen each", "you + 3 AI wingmen each"];
+  // Old links: ?players=3|4 was free-for-all, ?teams=1 1v1, ?teams=2-4 platoons.
+  const oldTeams = Number(q.get("teams")) | 0;
+  let mode: Mode = ((m) => (MODES.includes(m as Mode) ? (m as Mode) : null))(q.get("mode")) ?? (Number(q.get("players")) > 2 ? "ffa" : oldTeams === 1 ? "1v1" : oldTeams > 1 ? "platoon" : null) ?? ((m) => (MODES.includes(m as Mode) ? (m as Mode) : "1v1"))(keep.get("blitz:mode2", () => localStorage));
+  let squad = Math.min(4, Math.max(2, oldTeams || Number(keep.get("blitz:teams", () => localStorage)) || 2));
+  const four = (m: Mode) => m === "ffa" || m === "2v2";
+  const size = () => (four(mode) ? Math.min(4, maxPlayers) : 2); // the room size we ask for
+  /** This peer's pick as net options (only P1's counts: src/seats.ts). */
+  const pick = (m: Mode) => (m === "1v1" ? { squad: 1 } : m === "platoon" ? { squad } : m === "2v2" ? { fill: true, squad: 2 } : { fill: true });
+  // A ?code= link: the head script took it out of the URL and left it here (memory only).
+  const w = window as unknown as { __blitzInvite?: string };
+  field("code").value = w.__blitzInvite || keep.get("blitz-code", tab);
+  delete w.__blitzInvite;
+  const showRoom = () => ((field("room").value = String(room)), ((gate.elements.namedItem("roomShow") as HTMLOutputElement).value = String(room)));
+  const showMode = () => {
+    stage.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+      b.disabled = four(b.dataset.mode as Mode) && maxPlayers < 3;
+    });
+    $("[data-mode-say]").textContent = MODE_SAY[mode];
+    stage.querySelectorAll<HTMLButtonElement>("[data-squad]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.squad) === squad)));
+    $("[data-squad-say]").textContent = SQUAD_SAY[squad]!;
+    $("[data-squad-pick]").hidden = mode !== "platoon";
+  };
+  showRoom();
+  showMode();
+  stage.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => ((mode = b.dataset.mode as Mode), keep.set("blitz:mode2", mode, device), showMode())));
+  stage.querySelectorAll<HTMLButtonElement>("[data-squad]").forEach((b) => b.addEventListener("click", () => ((squad = Number(b.dataset.squad)), keep.set("blitz:teams", String(squad), device), showMode())));
+  stage.querySelectorAll<HTMLButtonElement>("[data-room]").forEach((b) => b.addEventListener("click", () => ((room = (room + Number(b.dataset.room) + ROOMS) % ROOMS), showRoom())));
+
+  // ---------- The card: steps, header, fold, drag ----------
+  const head = (title: string, sub: string, conn: "off" | "wait" | "live" | "slow" | "lost") => {
+    $("[data-title]").textContent = title;
+    $("[data-sub]").textContent = sub;
+    card.dataset.conn = conn;
+  };
+  const idle = () => head("MULTIPLAYER", "NOT CONNECTED", "off");
+  const fold = (on: boolean) => {
+    card.classList.toggle("folded", on);
+    const k = $<HTMLButtonElement>("[data-fold]");
+    k.setAttribute("aria-expanded", String(!on));
+    k.setAttribute("aria-label", on ? "Open the room card" : "Fold the room card");
+    clamp();
+  };
+  $("[data-fold]").addEventListener("click", () => fold(!card.classList.contains("folded")));
+  const step = (s: "join" | "wait" | "gone" | "play") => {
+    card.dataset.step = s;
+    // In a match the card folds out of the way on phones (open it any time); every other step needs it open.
+    fold(s === "play" && narrow.matches);
+    if (s !== "play") stage.querySelector<HTMLElement>(`[data-for="${s}"] :is(input:not([type=hidden]), button:not(:disabled))`)?.focus({ preventScroll: true });
+  };
+  const say = (text: string) => ($("[data-say]").textContent = text);
+
+  // Drag by the grip or the header, kept whole on the stage; remembered on this device.
+  const at = [0, 0];
+  try {
+    const v = JSON.parse(keep.get("blitz:room", device) || "null");
+    if (Array.isArray(v)) (at[0] = +v[0] || 0), (at[1] = +v[1] || 0);
+  } catch {}
+  function clamp() {
+    const r = stage.getBoundingClientRect(), x = card.offsetLeft, y = card.offsetTop;
+    at[0] = Math.max(8 - x, Math.min(r.width - x - card.offsetWidth - 8, at[0]!));
+    at[1] = Math.max(14 - y, Math.min(r.height - y - card.offsetHeight - 8, at[1]!));
+    card.style.translate = at[0] || at[1] ? `${at[0]}px ${at[1]}px` : "";
+  }
+  let grab: number[] | null = null;
+  for (const h of [$("[data-grip]"), $(".head")]) {
+    h.addEventListener("pointerdown", (ev) => {
+      if (ev.button || (ev.target as Element).closest("[data-fold]")) return;
+      h.setPointerCapture?.(ev.pointerId);
+      grab = [ev.clientX - at[0]!, ev.clientY - at[1]!];
+      card.classList.add("drag");
+    });
+    h.addEventListener("pointermove", (ev) => grab && ((at[0] = ev.clientX - grab[0]!), (at[1] = ev.clientY - grab[1]!), clamp()));
+    for (const t of ["pointerup", "pointercancel"]) h.addEventListener(t, () => grab && ((grab = null), card.classList.remove("drag"), keep.set("blitz:room", JSON.stringify(at), device)));
+    h.addEventListener("dblclick", (ev) => !(ev.target as Element).closest("[data-fold]") && ((at[0] = at[1] = 0), clamp(), keep.set("blitz:room", "[0,0]", device)));
+  }
+  new ResizeObserver(() => clamp()).observe(stage);
+
+  // ---------- Seats: who is who ----------
+  const swatch = (c: number | string) => `<i class="sw" style="--c:${typeof c === "number" ? SEAT[c] : c}"></i>`;
+  // `me` and `joined` come from the room's LOBBY (a server without it: you in seat 1, the rest open).
+  const waitSeats = (n: number, me = 0, joined = 1) =>
+    ($("[data-wait-seats]").innerHTML = Array.from({ length: n }, (_, i) => `<li class="${i === me ? "me" : i < joined ? "in" : "open"}">${swatch(i)}<span>${i === me ? "YOU" : i < joined ? `P${i + 1}` : "OPEN SEAT"}</span></li>`).join(""));
+
+  // ---------- Play passes (docs/play-pass.md) ----------
+  // When the room server requires a pass, it replaces the invite. The pass stays in this tab's
+  // session storage; the device key (random, made once) on this device, so a pass locked to it
+  // rejoins. Both travel only as WebSocket subprotocols and in a POST body, never in a URL.
+  let needPass = false, pass = keep.get("blitz-pass", tab), memDevice = "";
+  field("pass").value = pass;
+  const deviceKey = () => {
+    let k = keep.get("blitz:device", device) || memDevice;
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(k)) {
+      const b = crypto.getRandomValues(new Uint8Array(18));
+      k = btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_");
+      keep.set("blitz:device", k, device);
+    }
+    return (memDevice = k);
+  };
+  const showPass = (on: boolean) => {
+    needPass = on;
+    $("[data-pass]").hidden = !on;
+    $("[data-invite]").hidden = on;
+  };
+
+  // ---------- The match ----------
+  let game: Game | null = null, abort: AbortController | null = null, watch = 0, code = "";
+  let link: { close(): void } | null = null, ended = false, freeAt = 0, slot = 0, seats = 2;
+  const stop = () => {
+    clearInterval(watch);
+    clearTimeout(freeAt);
+    abort?.abort();
+    link?.close();
+    link = null;
+    game?.destroy();
+    game = null;
+  };
+  // Behind the card when no match is on: an attract match on the same board, so the page is the game.
+  const attract = () => {
+    stop();
+    game = createBlitz(arena, { demo: true });
+  };
+
+  async function enter() {
+    attract();
+    const players = size();
+    head(`ROOM ${room}`, `WAITING · ${players} PLAYERS`, "wait");
+    waitSeats(players);
+    $("[data-wait-say]").textContent = players === 2 ? "Waiting for player 2." : `Waiting for ${players - 1} more players.`;
+    $("[data-share-say]").textContent = "SEND LINK";
+    $("[data-start]").hidden = true;
+    step("wait");
+    // The room's LOBBY (fizlet#210: every join and leave before the start): your seat, who is in, and
+    // for the host (seat 0) of a 4-seat room with 2 or 3 in, START NOW: the computer takes the empty seats.
+    let asked = false;
+    const lobby = (go: (seats?: number, mode?: number) => void, seat: number, seated: number, size: number) => {
+      const open = size - seated, k = $<HTMLButtonElement>("[data-start]");
+      waitSeats(size, seat, seated);
+      head(`ROOM ${room} · P${seat + 1}`, `WAITING · ${seated} OF ${size}`, "wait");
+      k.hidden = !four(mode) || seat > 0 || seated < 2 || !open;
+      $("[data-wait-say]").textContent = !open || asked ? "Starting…" : seat ? `Waiting for P1 to start, or for ${open} more.` : seated < 2 ? `Waiting for ${open === 1 ? "player 2" : `${open} more players`}.` : !four(mode) ? `Waiting for ${open} more.` : `${seated} in. Start now: the computer takes ${open === 1 ? "the empty seat" : `the ${open} empty seats`}.`;
+      $("[data-start-say]").textContent = asked ? "STARTING…" : `START NOW · ${open} CPU`;
+      k.disabled = asked;
+      k.onclick = () => ((asked = k.disabled = true), ($("[data-start-say]").textContent = "STARTING…"), go(0, mode === "2v2" ? 2 : 1));
+    };
+    abort = new AbortController();
+    const signal = abort.signal;
+    // A rematch can arrive a beat before the last match's sockets are gone: try again for a few seconds.
+    for (let tries = 0; ; tries++) {
+      try {
+        const at = `${ws}/room/${room}?players=${players}`;
+        // The invite rides in the WebSocket subprotocols, never the URL (only the old server needs ?invite=).
+        const seat = needPass
+          ? await join(at, signal, ["fizlet-rooms", `pass.${pass}`, `device.${deviceKey()}`], { lobby })
+          : via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal, undefined, { lobby }) : await join(at, signal, ["fizlet-rooms", `invite.${code}`], { lobby });
+        return start(seat);
+      } catch {
+        if (signal.aborted) return;
+        if (tries >= 4) return gone("ROOM BUSY", `Room ${room} is full, mid-match, or set for a different number of players. Try another room.`);
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+    }
+  }
+
+  function start(seat: Awaited<ReturnType<typeof join>>) {
+    stop();
+    ({ slot, players: seats } = seat);
+    link = seat.transport;
+    ended = false;
+    head(`ROOM ${room} · P${slot + 1}`, `LIVE · ${seats} PLAYERS`, "live");
+    step("play");
+    const leave = () => (attract(), idle(), step("join"));
+    game = createBlitz(arena, {
+      seed: seat.seed,
+      // Match length is part of the match: every player needs the same one (the share link carries it).
+      ...(seconds ? { seconds } : {}),
+      // Teams: P1's pick is the match's (every peer reads it from P1's moves in the countdown).
+      net: { transport: seat.transport, slot, players: seats, again: enter, leave, ...pick(mode) },
+      // Match over: free the room, so REMATCH can open it fresh for everyone. Wait a moment first:
+      // another player may be a few frames behind and still needs our last inputs.
+      onEnd: (st) => {
+        online.end(st);
+        ended = true;
+        head(`ROOM ${room} · P${slot + 1}`, "MATCH OVER", "off");
+        freeAt = window.setTimeout(() => (link?.close(), (link = null)), 2000);
+      },
+    });
+    (window as unknown as { blitz: Game }).blitz = game;
+    online.start();
+    let last = -1, still = 0;
+    const tick = () => {
+      if (!game || ended) return;
+      const n = game.net!;
+      // Someone left: the lockstep would wait for them forever, so say who.
+      if (n.lost) {
+        const who = Array.from({ length: seats }, (_, i) => i).filter((i) => n.lost & (1 << i)).map((i) => `P${i + 1}`);
+        return gone("PLAYER LEFT", seats === 2 ? "The other player left the match." : `${who.join(" and ")} left, so this match can't go on. Rejoin to play again.`);
+      }
+      // Frames not moving: the link is slow; for 8 s, it's gone (our socket or the room).
+      still = n.frame === last ? still + 1 : 0;
+      last = n.frame;
+      if (still >= 16) return gone("CONNECTION LOST", "No moves have arrived for 8 seconds. Check your connection, then rejoin.");
+      card.dataset.conn = still >= 3 ? "slow" : "live";
+      $("[data-chip]").textContent = `P${slot + 1} · ${seats === 2 && game.squad === 1 ? "1V1" : game.squad ? `${game.squad}V${game.squad}` : "FFA"}`;
+      // What the match agreed (P1's mode): 4 tanks with bots in empty seats, or sides.
+      const tanks = game.world.tanks as Tank[], cpu = tanks.length === 4 ? 4 - seats : 0;
+      $("[data-sub]").textContent = still >= 3 ? "WAITING FOR THE OTHERS…" : `LIVE · ${game.squad ? `${game.squad}V${game.squad}` : "FFA"} · ${seats} PLAYERS${cpu ? ` + ${cpu} CPU` : ""}`;
+      // A row per human, and per bot in a seat; with sides, each side's total (bots' kills count).
+      const rows = tanks.slice(0, seats + cpu).map((t, i) => `<tr class="${i === slot ? "you" : ""}${t.alive ? "" : " down"}"><th scope="row">${swatch(t.color)}${i < seats ? `P${i + 1}${i === slot ? " · YOU" : ""}` : `${t.name} · CPU`}</th><td>${t.kills}</td><td>${t.deaths}</td></tr>`);
+      if (game.squad > 1)
+        for (const side of [tanks[slot]!.team, ...new Set(tanks.map((t) => t.team))].filter((v, i, a) => a.indexOf(v) === i)) {
+          const on = tanks.filter((t) => t.team === side);
+          rows.push(`<tr class="side${side === tanks[slot]!.team ? " you" : ""}"><th scope="row">${swatch(on[0]!.color)}${side === tanks[slot]!.team ? "YOUR SIDE" : `P${tanks.findIndex((t) => t.team === side) + 1} SIDE`}</th><td>${on.reduce((a, t) => a + t.kills, 0)}</td><td>${on.reduce((a, t) => a + t.deaths, 0)}</td></tr>`);
+        }
+      $("[data-rows]").innerHTML = rows.join("");
+    };
+    tick();
+    watch = window.setInterval(tick, 500);
+  }
+
+  function gone(word: string, text: string) {
+    attract();
+    head(`ROOM ${room}`, word, "lost");
+    $("[data-gone-word]").textContent = word;
+    $("[data-gone-say]").textContent = text;
+    step("gone");
+  }
+
+  // How the room server takes the code. "body": POST /invite, then a WebSocket subprotocol (fizlet-rooms
+  // from fizlet#114: the code stays out of URLs and logs). "url": the server deployed before it, which
+  // reads ?code= / ?invite= only (it answers a POST with 403). Next release: drop "url" and the fallback.
+  let via: "body" | "url" = "body", why = "";
+  /** Is the code on the list? Also learns how many players a room may hold. null: no server; "slow": rate capped. */
+  async function check(c: string, old = true) {
+    const ask = (url: string, init?: RequestInit) => fetch(url, { referrerPolicy: "no-referrer", ...init }).catch(() => null);
+    via = "body";
+    let r = await ask(`${http}/invite`, { method: "POST", body: c }); // text/plain: no CORS preflight
+    // A pass never goes by URL: no old-server fallback for it.
+    if (old && r && !r.ok && [403, 404, 405].includes(r.status)) {
+      const old = await ask(`${http}/invite?code=${encodeURIComponent(c)}`);
+      if (old?.ok) (r = old), (via = "url");
+    }
+    if (!r) return null;
+    if (r.status === 429) return "slow";
+    const body = await r.json().catch(() => ({}));
+    if (body.pass === true) showPass(true);
+    why = typeof body.why === "string" ? body.why : "";
+    if (r.ok) (maxPlayers = Number.isInteger(body.players) ? Math.min(4, Math.max(2, body.players)) : 2), showMode();
+    return r.ok;
+  }
+  gate.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (needPass) {
+      pass = field("pass").value.trim();
+      if (pass.length < 20) return say("Paste the pass you were sent.");
+      say("Checking the pass…");
+      const ok = await check(`${pass}\n${deviceKey()}`, false);
+      if (ok === null) return say("Can't reach the game server. Check your connection and try again.");
+      if (ok === "slow") return say("Too many tries. Wait a minute, then try again.");
+      if (!ok) return say(why === "pass in use on another device" ? "That pass is already locked to another device." : why === "pass expired" ? "That pass has expired. Request a new one." : why === "pass revoked" ? "That pass was revoked." : "That pass isn't valid.");
+      say("");
+      keep.set("blitz-pass", pass, tab);
+      return enter();
+    }
+    code = field("code").value.trim().toUpperCase();
+    if (code.length < 6) return say("Enter the invite code you were sent.");
+    say("Checking the code…");
+    const ok = await check(code);
+    if (ok === null) return say("Can't reach the game server. Check your connection and try again.");
+    if (ok === "slow") return say("Too many tries. Wait a minute, then try again.");
+    if (!ok) return say("That invite code isn't on the list.");
+    if (four(mode) && maxPlayers < 3) return say("This server takes two players: pick 1V1 or PLATOON.");
+    say("");
+    keep.set("blitz-code", code, tab);
+    enter();
+  });
+  $("[data-cancel]").addEventListener("click", () => (attract(), idle(), step("join")));
+  $("[data-leave]").addEventListener("click", () => (attract(), idle(), step("join")));
+  $("[data-again]").addEventListener("click", () => enter());
+  $("[data-new]").addEventListener("click", () => (idle(), step("join")));
+  // The link carries the code too (owner: friends shouldn't have to type it). The head script takes it
+  // out of the address bar on arrival, so it doesn't stay in their history.
+  $("[data-share]").addEventListener("click", async () => {
+    const url = `${location.origin}${location.pathname}?room=${room}&mode=${mode}${mode === "platoon" ? `&teams=${squad}` : ""}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}${code ? `&code=${encodeURIComponent(code)}` : ""}`;
+    const label = $("[data-share-say]");
+    try {
+      if (navigator.share) await navigator.share({ title: "Battlefield Blitz · multiplayer", text: `Join me in Blitz, room ${room}.`, url }), shared("share");
+      else (await navigator.clipboard.writeText(url), (label.textContent = "LINK COPIED"), shared("copy"));
+    } catch {
+      label.textContent = "COPY FAILED";
+    }
+  });
+  attract();
+  step("join");
+  // Does the room server require a pass? An empty POST /invite answers pass:true when it does.
+  fetch(`${http}/invite`, { method: "POST", body: "", referrerPolicy: "no-referrer" })
+    .then((r) => r.json())
+    .then((b) => b?.pass === true && (showPass(true), step("join")))
+    .catch(() => {});
+  // A share link for a 4-seat mode: ask the server what it allows, so the mode pick is right straight away.
+  if (four(mode) && field("code").value) check(field("code").value.trim().toUpperCase()).then(() => showMode());
+</script>
+
+<style>
+  .vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .blitz-stage {
+    position: relative;
+    height: calc(100svh - 78px);
+    min-height: 420px;
+    border-bottom: 2px solid var(--line);
+    background: #090818;
+    overflow: hidden;
+  }
+  .blitz-host {
+    position: absolute;
+    inset: 0;
+  }
+  /* The room card: the kit's card and grip, over the board, under the game's full-screen key. */
+  .room.bui-card {
+    --u: 1px;
+    position: absolute;
+    z-index: 40;
+    left: max(12px, env(safe-area-inset-left));
+    top: max(64px, calc(env(safe-area-inset-top) + 56px));
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+    width: min(calc(100% - 24px), 340px);
+    max-height: calc(100% - 80px);
+    padding: 12px 14px 14px;
+  }
+  .head {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "dot title fold" "dot sub fold";
+    align-items: center;
+    column-gap: 10px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .room.drag .head {
+    cursor: grabbing;
+  }
+  .head b {
+    grid-area: title;
+    font: 900 15px/1.1 var(--mono);
+    letter-spacing: 0.12em;
+    color: var(--ink);
+  }
+  .head small {
+    grid-area: sub;
+    font: 800 10px/1.3 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  /* The link state: off (grey), waiting (blinking system), live (team), slow (fire), lost (attack). */
+  .dot {
+    grid-area: dot;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--rim);
+    border-radius: 50%;
+    background: var(--line);
+  }
+  .room[data-conn="wait"] .dot {
+    background: var(--k-sys);
+    animation: blink 1s steps(2) infinite;
+  }
+  .room[data-conn="live"] .dot {
+    background: var(--team);
+  }
+  .room[data-conn="slow"] .dot {
+    background: var(--k-fire);
+    animation: blink 0.5s steps(2) infinite;
+  }
+  .room[data-conn="lost"] .dot {
+    background: var(--k-attack);
+  }
+  @keyframes blink {
+    50% {
+      opacity: 0.35;
+    }
+  }
+  .room .fold {
+    grid-area: fold;
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  /* The arrow points up to fold, down to open (the Icon's svg is its own component: :global). */
+  .room .fold :global(svg) {
+    rotate: 180deg;
+    transition: rotate 0.2s;
+  }
+  .room.folded .fold :global(svg) {
+    rotate: 0deg;
+  }
+  .room.folded .body {
+    display: none;
+  }
+  .body {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+  .step {
+    display: none;
+    gap: 12px;
+  }
+  .room[data-step="join"] [data-for="join"],
+  .room[data-step="wait"] [data-for="wait"],
+  .room[data-step="play"] [data-for="play"],
+  .room[data-step="gone"] [data-for="gone"] {
+    display: grid;
+  }
+  .step label,
+  .pick > span {
+    display: grid;
+    gap: 6px;
+    font: 800 11px/1 var(--mono);
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .step input:not([type="hidden"]) {
+    min-height: 48px;
+    padding: 0 14px;
+    font: 800 17px/1 var(--mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    background: var(--surface);
+    border: 2.5px solid var(--line);
+    border-radius: 8px;
+  }
+  .step label[hidden] {
+    display: none;
+  }
+  .step input[name="pass"] {
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+  .step input::placeholder {
+    color: color-mix(in srgb, var(--muted) 55%, transparent);
+  }
+  .step input:focus-visible {
+    outline: 3px solid var(--k-sys);
+    outline-offset: 2px;
+  }
+  .pick {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .pick[hidden] {
+    display: none;
+  }
+  /* Mode and platoon size: the label over a full-width row of keys. */
+  .pick.wide {
+    display: grid;
+    gap: 8px;
+  }
+  .pick.wide > span {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .pick.wide small {
+    font: 700 10px/1.2 var(--mono);
+    letter-spacing: 0.04em;
+    text-transform: none;
+  }
+  .pick.wide .bui-seg {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(44px, 1fr);
+    gap: 6px;
+    width: 100%;
+  }
+  .room .pick.wide .bui-key {
+    width: auto;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  .rooms {
+    display: grid;
+    grid-template-columns: 48px 52px 48px;
+    align-items: center;
+    gap: 8px;
+  }
+  .room .pick .bui-key {
+    width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0;
+    font: 900 20px/1 var(--mono);
+  }
+  .rooms output {
+    font: 900 26px/1 var(--mono);
+    text-align: center;
+    color: var(--ink);
+  }
+  /* The kit's sticker key, laid out as a wide row key (icon + word) for the card. */
+  .room .step .bui-sticker-key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 52px;
+    padding: 8px 14px;
+  }
+  .room .step .bui-sticker-key[hidden] {
+    display: none;
+  }
+  .room .step .bui-sticker-key svg {
+    width: 22px;
+    height: 22px;
+  }
+  .room .step .bui-sticker-key b {
+    font-size: 14px;
+    letter-spacing: 0.16em;
+  }
+  .step .keys {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .say {
+    margin: 0;
+    font: 700 13px/1.3 var(--mono);
+    color: var(--k-attack);
+  }
+  .say:empty {
+    display: none;
+  }
+  .big {
+    margin: 0;
+    font: 800 15px/1.4 var(--mono);
+  }
+  .word {
+    margin: 0;
+    font: 900 22px/1 var(--mono);
+    letter-spacing: 0.08em;
+    color: var(--k-attack);
+  }
+  .fine {
+    margin: 0;
+    font: 12px/1.45 var(--mono);
+    color: var(--muted);
+  }
+  /* Seats and the per-player scoreboard: each seat's swatch is its tank's colour. */
+  /* Swatches, seats and rows are written by the script: :global, so the scoped styles reach them. */
+  :global(.room .sw) {
+    display: inline-block;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    vertical-align: -2px;
+    background: var(--c);
+    border: 2px solid var(--rim);
+    border-radius: 4px;
+  }
+  .seats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .seats :global(li) {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 10px;
+    font: 800 11px/1 var(--mono);
+    letter-spacing: 0.1em;
+    color: var(--ink);
+    background: var(--surface);
+    border: 2px solid var(--line);
+    border-radius: 8px;
+  }
+  .seats :global(li.me) {
+    border-color: var(--team);
+  }
+  .seats :global(li.open) {
+    color: var(--muted);
+    border-style: dashed;
+  }
+  .seats :global(li.open .sw) {
+    animation: blink 1s steps(2) infinite;
+  }
+  .score {
+    width: 100%;
+    border-collapse: collapse;
+    font: 800 13px/1 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .score th,
+  .score :global(:is(th, td)) {
+    padding: 7px 4px;
+    text-align: right;
+    border-bottom: 1px solid var(--line);
+  }
+  .score thead th:first-child,
+  .score :global(tbody th) {
+    text-align: left;
+  }
+  .score thead th {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .score :global(tbody th) {
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .score :global(tr.you th) {
+    color: var(--team-ink);
+  }
+  /* Light mode: the team green mixed toward ink, for AA on the white card (like the game's table). */
+  :global(html[data-theme="light"]) .score :global(tr.you th) {
+    color: color-mix(in srgb, var(--team-ink) 35%, var(--ink));
+  }
+  /* With sides: each side's total under the players. */
+  .score :global(tr.side :is(th, td)) {
+    border-top: 2px solid var(--line);
+    color: var(--muted);
+  }
+  .score :global(tr.down) {
+    opacity: 0.55;
+  }
+  .blitz-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px 24px;
+    padding-top: 18px;
+    padding-bottom: 6px;
+    font: 12px var(--mono);
+    color: var(--muted);
+  }
+  .blitz-bar p {
+    margin: 0;
+  }
+  .blitz-bar b {
+    color: var(--k-attack);
+  }
+  .blitz-bar a {
+    display: inline-block;
+    padding: 12px 0;
+    color: var(--k-sys-ink);
+  }
+  /* Short landscape phones: a wider two-column join card, so it fits without scrolling. */
+  @media (max-height: 500px) and (orientation: landscape) {
+    .room.bui-card {
+      top: max(58px, calc(env(safe-area-inset-top) + 50px));
+      width: min(calc(100% - 24px), 560px);
+      max-height: calc(100% - 66px);
+      gap: 8px;
+    }
+    .room:not([data-step="join"]) {
+      width: min(calc(100% - 24px), 340px);
+    }
+    [data-for="join"] {
+      grid-template-columns: 1fr 1fr;
+      align-items: end;
+      gap: 8px 16px;
+    }
+    [data-for="join"] :is(label, .go, .say) {
+      grid-column: 1 / -1;
+    }
+    [data-for="join"] .fine {
+      display: none;
+    }
+  }
+  .chip {
+    display: none;
+  }
+  /* Phones in a match: the folded card is a status chip (dot, seat, mode) at the top right of the key
+     row, clear of the scoreboard, the keys and the board's centre. A tap opens the card; no grip. */
+  @media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
+    .room .bui-grip {
+      display: none;
+    }
+    .room.folded[data-step="play"] {
+      left: auto;
+      right: max(12px, env(safe-area-inset-right));
+      top: calc(max(10px, env(safe-area-inset-top)) + 6px);
+      display: block;
+      width: auto;
+      height: 32px;
+      padding: 0 12px;
+      border-width: 2px;
+      border-radius: 16px;
+      box-shadow: none;
+      background: color-mix(in srgb, var(--surface) 80%, transparent);
+      translate: none !important;
+    }
+    .room.folded[data-step="play"] .head {
+      display: flex;
+      height: 100%;
+      gap: 8px;
+    }
+    .room.folded[data-step="play"] :is(.head b, .head small, .body) {
+      display: none;
+    }
+    .room.folded[data-step="play"] .dot {
+      width: 10px;
+      height: 10px;
+    }
+    .room.folded[data-step="play"] .chip {
+      display: block;
+      font: 900 11px/1 var(--mono);
+      letter-spacing: 0.12em;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    /* The whole chip is the open key: 44 px to tap, 32 px to see. */
+    .room.folded[data-step="play"] .fold {
+      position: absolute;
+      inset: -8px -2px;
+      width: auto;
+      height: auto;
+      opacity: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot,
+    .seats :global(li.open .sw),
+    .room .fold :global(svg) {
+      animation: none !important;
+      transition: none;
+    }
+  }
+</style>

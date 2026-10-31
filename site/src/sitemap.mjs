@@ -26,7 +26,7 @@ export const SELF = "https://battlefieldblitz.domvirus.com/";
 // headings on that page worth a link of their own (id on the page), in the page's group unless set.
 export const PAGES = [
   { path: "play/", label: "Play Blitz", group: "play" },
-  { path: "play/two/", label: "Multiplayer", group: "play" },
+  { path: "play/multi/", label: "Multiplayer", group: "play" },
   {
     path: "",
     label: "Overview",
@@ -40,5 +40,8 @@ export const PAGES = [
 ];
 
 // Built pages that stay out of the site map (and the footer), and why. None today.
-export const HIDDEN = [];
+export const HIDDEN = [
+  // The old multiplayer address: a redirect to play/multi/ (kept for shared links).
+  { match: /^play\/two\/$/, why: "redirect to play/multi/" },
+];
 export const hidden = (path) => HIDDEN.some((h) => h.match.test(path));

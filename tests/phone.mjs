@@ -1,4 +1,4 @@
-// Game mode on a phone, and the pause key everywhere (the built site, /play/ and /play/two/).
+// Game mode on a phone, and the pause key everywhere (the built site, /play/ and /play/multi/).
 // Phone = a coarse pointer on a small screen (site.css "Game mode"), at 390×844 and 844×390: no
 // header, footer or bar on screen (still in the HTML: one h1, the footer and its byline), the board
 // fills the viewport, the page never scrolls or shifts, a 44 px exit key goes home. The pause key is
@@ -124,9 +124,9 @@ try {
       await page.waitForURL(base);
     }
 
-    where = `${name} /play/two/`;
+    where = `${name} /play/multi/`;
     const two = await ctx.newPage();
-    await two.goto(base + "play/two/");
+    await two.goto(base + "play/multi/");
     const t = await two.evaluate(() => {
       const r = (s) => { const b = document.querySelector(s).getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
       scrollBy({ top: 400, behavior: "instant" });
@@ -139,7 +139,7 @@ try {
     } else assert.deepEqual([t.head, t.foot, t.exit], ["block", "block", "none"], "desktop two: as it was");
     await ctx.close();
   }
-  console.log("Blitz phone game mode: 390×844 and 844×390 (coarse pointer): no header, footer or bar on screen (h1 and footer byline in the HTML), the board fills the viewport, no scroll, no layout shift, a 44 px exit key home (/play/ and /play/two/); the pause key ≥ 44 px, on top, clear of the HUD, pad and keys; tap / Escape / P pause, RESUME counts down, RESTART and QUIT TO MENU on screen, a hidden tab pauses; 1440×900 keeps the header, board, bar and footer.");
+  console.log("Blitz phone game mode: 390×844 and 844×390 (coarse pointer): no header, footer or bar on screen (h1 and footer byline in the HTML), the board fills the viewport, no scroll, no layout shift, a 44 px exit key home (/play/ and /play/multi/); the pause key ≥ 44 px, on top, clear of the HUD, pad and keys; tap / Escape / P pause, RESUME counts down, RESTART and QUIT TO MENU on screen, a hidden tab pauses; 1440×900 keeps the header, board, bar and footer.");
 } catch (err) {
   console.error(`Blitz phone test failed at: ${where}`);
   throw err;

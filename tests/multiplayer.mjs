@@ -1,4 +1,4 @@
-// Multiplayer page (/play/two/) with 2 and 4 players, through a mock room server: Playwright
+// Multiplayer page (/play/multi/) with 2 and 4 players, through a mock room server: Playwright
 // routes the page's WebSocket to an in-test relay with the fizlet-rooms wire format (seats in
 // arrival order, WELCOME when full, inputs relayed with the sender's seat stamped, LEAVE when a
 // socket closes). Each peer is its own browser context, like separate devices.
@@ -179,7 +179,7 @@ try {
     const tag = `${game}${squad ? squad : ""}-${n}p-${width}-${theme}-${mode}`, room = runs++, seats = game === "ffa" || game === "2v2" ? 4 : 2;
     where = tag;
     // Old links (?players=, ?teams=) still land on a mode; the share link writes ?mode=.
-    const url = `${base}play/two/?rooms=wss://rooms.test&room=${room}&${runs % 2 ? `mode=${game}${squad ? `&teams=${squad}` : ""}` : game === "platoon" ? `teams=${squad}` : game === "1v1" ? "teams=1" : `mode=${game}`}&code=${CODE}`;
+    const url = `${base}play/multi/?rooms=wss://rooms.test&room=${room}&${runs % 2 ? `mode=${game}${squad ? `&teams=${squad}` : ""}` : game === "platoon" ? `teams=${squad}` : game === "1v1" ? "teams=1" : `mode=${game}`}&code=${CODE}`;
     // You: the device under test (P1, the host). The others: desktop browsers.
     const me = await peer(width, theme, url, mode);
     await me.waitForFunction(() => !document.querySelector('[data-mode="ffa"]').disabled, null, { timeout: 5000 }).catch(() => {});
@@ -211,7 +211,7 @@ try {
     await me.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), mode === "new" ? `WAITING · 1 OF ${seats}` : `WAITING · ${seats} PLAYERS`);
     await shot(me, `${tag}-2-wait`);
     await layout(me, `${tag} wait`);
-    // SEND LINK: the room and mode, never the code.
+    // SEND LINK: the room, the mode and the code (a friend joins without typing it).
     await me.evaluate(() => {
       Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
       Object.defineProperty(navigator, "clipboard", { value: { writeText: async (t) => void (window.shared = t) }, configurable: true });
@@ -219,11 +219,11 @@ try {
     await me.click("[data-share]");
     const link = await me.waitForFunction(() => window.shared).then((h) => h.jsonValue());
     assert.match(link, new RegExp(`room=${room}&mode=${game}${squad ? `&teams=${squad}` : ""}`), `${tag}: the link carries room and mode`);
-    assert.doesNotMatch(link, new RegExp(`code=|invite=|${CODE}`, "i"), `${tag}: the link has no code`);
+    assert.equal(new URL(link).searchParams.get("code"), CODE, `${tag}: the link carries the code`);
     // The others join from the link with a different mode of their own: P1's is the match's.
     const others = [];
     for (let i = 1; i < n; i++) {
-      const o = await peer(1440, theme, `${base}play/two/?rooms=wss://rooms.test&room=${room}&mode=${game}&code=${CODE}`, mode);
+      const o = await peer(1440, theme, `${base}play/multi/?rooms=wss://rooms.test&room=${room}&mode=${game}&code=${CODE}`, mode);
       if (seats === 2) await o.click(`[data-mode="${game === "1v1" ? "platoon" : "1v1"}"]`);
       else await o.waitForFunction(() => !document.querySelector('[data-mode="2v2"]').disabled), await o.click(`[data-mode="${game === "ffa" ? "2v2" : "ffa"}"]`);
       await o.click("[data-join]");
@@ -245,7 +245,7 @@ try {
     if (cpu) {
       // The count follows joins and leaves: one more comes and goes (when that doesn't fill the room).
       if (n + 1 < seats) {
-        const extra = await peer(1440, theme, `${base}play/two/?rooms=wss://rooms.test&room=${room}&mode=${game}&code=${CODE}`, mode);
+        const extra = await peer(1440, theme, `${base}play/multi/?rooms=wss://rooms.test&room=${room}&mode=${game}&code=${CODE}`, mode);
         await extra.click("[data-join]");
         await me.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), `${n + 1} OF ${seats}`);
         await extra.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), `${n + 1} OF ${seats}`);
@@ -328,7 +328,7 @@ try {
   }
   // Passes on: the PASS field replaces the invite; each device joins with its own pass.
   for (const [width, theme] of [[390, "light"], [1440, "dark"]]) {
-    const tag = `pass-${width}-${theme}`, room = runs++, url = `${base}play/two/?rooms=wss://rooms.test&room=${room}&players=2`;
+    const tag = `pass-${width}-${theme}`, room = runs++, url = `${base}play/multi/?rooms=wss://rooms.test&room=${room}&players=2`;
     where = tag;
     locked.clear();
     const me = await peer(width, theme, url, "pass");
