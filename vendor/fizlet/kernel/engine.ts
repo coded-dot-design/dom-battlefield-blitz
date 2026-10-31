@@ -19,6 +19,7 @@ export interface System {
   pause?(e: Engine): void;
 }
 
+/** Options for `createEngine()`. Every field is optional. */
 export interface EngineOptions {
   /** The element the engine lives in; it pauses while this is off screen. */
   root?: Element | null;
@@ -36,7 +37,9 @@ export interface EngineOptions {
    *  other engines and the shared clock keep running. Default: `console.error(error)`. */
   onError?: (error: unknown, engine: Engine) => void;
   /** Settle (page interactions): after this many seconds in which no system called `busy()`, the
-   *  engine sleeps (paused: "settled", no frames at all) until `wake()`, input or `start()`. Off by default. */
+   *  engine sleeps (paused: "settled", no frames at all) until `wake()`, input or `start()`. Off by default.
+   *  Counted in engine time (steps). Something scheduled for later (an intro delay, a beat, an
+   *  autoplay timer) holds it awake with `busy(sec)`. */
   settle?: number;
   /** Frame-rate cap (e.g. 30 for an ambient hero): between frames the engine is off the shared clock
    *  and a timer brings it back, so it asks for ~fps requestAnimationFrame calls a second. */
@@ -45,6 +48,8 @@ export interface EngineOptions {
   pause?: { hidden?: boolean; offscreen?: boolean; editable?: boolean; reducedMotion?: boolean };
 }
 
+/** What `engine.stats()` reports: frame and step counts, frame time, the event ring and pool
+ *  fill, the ledger's size and the auto-pause rules holding the engine right now. */
 export interface EngineStats {
   frames: number;
   steps: number;
@@ -57,6 +62,7 @@ export interface EngineStats {
   paused: string[];
 }
 
+/** The engine `createEngine()` returns: what every system and brick takes. */
 export type Engine = ReturnType<typeof createEngine>;
 
 // ---------- The shared scheduler: one requestAnimationFrame for every engine on the page ----------
@@ -105,16 +111,21 @@ const STOPPED = 1, HIDDEN = 2, OFFSCREEN = 4, EDITABLE = 8, MOTION = 16, SETTLED
 /** Systems removed mid-frame are swapped for this until the frame ends. */
 const GONE: System = {};
 
+/** Make an engine: a fixed-step loop on the page's shared clock, with its own pools, event ring,
+ *  seeded random and ledger. Add systems with `add()`, then `start()`; `destroy()` (or aborting
+ *  `o.signal`) stops it and gives the page back. */
 export function createEngine(o: EngineOptions = {}) {
   const dt = need(o.step ?? 1 / 60, "step", 1), maxSteps = need(o.maxSteps ?? 4, "maxSteps", 2), root = o.root ?? null;
   const settle = o.settle == null ? 0 : need(o.settle, "settle", 1), gap = o.fps == null ? 0 : 1000 / need(o.fps, "fps", 1) - 4;
   const ctl = new AbortController(), signal = ctl.signal;
   const systems: System[] = [], pools: [string, Pool<unknown>][] = [];
   const events = new EventRing(o.events ?? 64), ledger = new Ledger(), random: Random = seeded(need(o.seed ?? 1, "seed"));
-  let held = STOPPED, phase = IDLE, dead = false, gone = false, moved = false;
+  let held = STOPPED, phase = IDLE, dead = false, gone = false;
   let napT: ReturnType<typeof setTimeout> | undefined; // the fps cap's timer
   // Running numbers live in one typed array: updating it never allocates (a captured `let` holding
-  // a double would box a new number on every write).
+  // a double would box a new number on every write). QUIET is the engine time settle counts from (the
+  // last busy(), pushed later by busy(sec)): engine time, counted in steps, so a slow frame that drops
+  // steps can't make a settling engine sleep before its own time has run.
   const n = new Float64Array(11);
   const ACC = 0, LAST = 1, TIME = 2, FRAMES = 3, STEPS = 4, DROPPED = 5, MS = 6, MAX = 7, QUIET = 8, DELTA = 9, WORK = 10;
   n[LAST] = -1;
@@ -182,16 +193,23 @@ export function createEngine(o: EngineOptions = {}) {
       pools.push([name, p as Pool<unknown>]);
       return p;
     },
+    /** Run (again). On a settled engine this is wake() too: the quiet time starts over, so it runs a
+     *  full settle window instead of going back to sleep on its first frame. Inert once destroyed. */
     start() {
-      if (!dead) (set(SETTLED, false), set(STOPPED, false));
+      engine.wake(), dead || set(STOPPED, false);
     },
-    /** Something moved this frame: keeps a settling engine awake (no-op without `settle`). */
-    busy() {
-      moved = true;
+    /**
+     * Something moved this frame: keeps a settling engine awake (no-op without `settle`). With
+     * `sec`, something is scheduled that far ahead (an intro delay, a pause between beats): the
+     * engine stays awake for `sec` of its own time (steps, so a slow frame can't outrun it), and
+     * settle counts from then. A later, shorter hold never cuts a longer one; 0 or NaN is busy().
+     */
+    busy(sec?: number) {
+      n[QUIET] = Math.max(n[QUIET]!, n[TIME]! + (sec || 0));
     },
     /** Wake a settled engine (input does this for you); the quiet time starts again. */
     wake() {
-      n[QUIET] = 0;
+      engine.busy(); // the quiet time starts again; a hold still ahead stays
       if (held & SETTLED) set(SETTLED, false);
     },
     stop() {
@@ -247,11 +265,7 @@ export function createEngine(o: EngineOptions = {}) {
         gone = false;
         for (let i = systems.length; i--; ) if (systems[i] === GONE) systems.splice(i, 1);
       }
-      if (settle) {
-        if (moved) n[QUIET] = 0;
-        else if ((n[QUIET]! += sec) >= settle) set(SETTLED, true);
-        moved = false;
-      }
+      if (settle && n[TIME]! - n[QUIET]! >= settle) set(SETTLED, true);
       const ms = (n[WORK] = performance.now() - t0);
       n[FRAMES]!++;
       n[MS]! += ms;

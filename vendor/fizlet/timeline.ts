@@ -1,5 +1,5 @@
 /**
- * fizlet/timeline: scripted DOM choreography on the kernel clock. Keyframe tracks animate CSS
+ * @fzlt/core/timeline: scripted DOM choreography on the kernel clock. Keyframe tracks animate CSS
  * properties (transform, translate, scale, rotate, opacity, clip-path, filter, custom properties:
  * any value whose numbers change and whose words stay) or plain numbers, with easings, delays,
  * staggers, sequencing and overlap, labels, repeats and yoyo. Time moves in the fixed step (no
@@ -30,6 +30,7 @@ const table = (key: unknown, f: Ease) => TABLES.get(key) ?? (TABLES.set(key, Flo
  *  Keyframes share one shape: the same words, only the numbers change. A single value starts where
  *  the property's last track ended (or is set at once if it has none). */
 export type Value = number | string | readonly (number | string)[];
+/** Options for one track: where it starts (`at`), its duration, delay, easing and stagger. */
 export interface TrackOptions {
   /** Seconds (default 0.4). */
   dur?: number;
@@ -42,6 +43,7 @@ export interface TrackOptions {
   /** Where it starts: seconds, "<" (with the track before) or a label (default: the end so far). */
   at?: number | string;
 }
+/** Options for `timeline()`: repeats, yoyo, speed and reduced-motion handling. */
 export interface TimelineOptions {
   /** Extra plays after the first (default 0; Infinity loops). */
   repeat?: number;
@@ -58,13 +60,14 @@ export interface TimelineOptions {
 // Short field names: property names survive minification.
 interface Prop {
   /** Target, key, words (around the numbers), numbers now, kind (0 a style, 1 a typed array slot, 2 an
-   *  object's property), owes a write. */
+   *  object's property), owes a write, and a plain number's value before the timeline (for revert). */
   el: any;
   k: string | number;
   w: string[];
   o: Float64Array;
   h: number;
   y: number;
+  b: unknown;
 }
 interface Track {
   p: Prop;
@@ -98,6 +101,12 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
   // track's start; direction (1, -1, 0 paused), and what the next step or render owes.
   const s = new Float64Array(1);
   let end = 0, prev = 0, dir = 0, owe = 0, jump = 0, start = 0, undo = 0;
+  // Wake everyone waiting on done(): at the end, and when the engine goes first (or already has).
+  const ok = () => {
+    for (let i = 0; i < waits.length; i++) waits[i]!();
+    waits.length = 0;
+  };
+  engine.signal.addEventListener("abort", ok);
   const total = () => (reps < 0 ? Infinity : end * (reps + 1));
   // Where play stops: the end, or one play's end when it loops forever (reduced motion, finish()).
   const top = () => (reps < 0 ? end : total());
@@ -158,7 +167,7 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
           const key = isNaN(+name) ? name : +name, kf = ([] as unknown[]).concat(values[name]).map(String), shape = (x: string) => x.replace(NUM, "\0");
           let p = props.find((x) => x.el === el && x.k === key), last: Track | undefined;
           const first = !p, w = kf[0]!.match(NUM)?.length ?? 0;
-          if (!p) props.push((p = { el, k: key, w: shape(kf[0]!).split("\0"), o: new Float64Array(w).fill(NaN), h: el.style ? 0 : ArrayBuffer.isView(el) ? 1 : 2, y: 0 }));
+          if (!p) props.push((p = { el, k: key, w: shape(kf[0]!).split("\0"), o: new Float64Array(w).fill(NaN), h: el.style ? 0 : ArrayBuffer.isView(el) ? 1 : 2, y: 0, b: el[key] }));
           for (const k of tracks) if (k.p === p) last = k;
           const v: (string | number)[][] = kf.map((x) => {
             if (shape(x) !== p.w.join("\0")) throw new RangeError("timeline: " + name + " " + x);
@@ -183,8 +192,10 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
     play: () => go(1),
     /** Play backward (from the end if it is at the start). */
     reverse: () => go(-1),
-    pause() {
-      dir = 0;
+    /** Stop where it is. The engine calls this as its System pause hook (off screen, hidden tab,
+     *  stop()): then it only suspends, and plays on when the engine resumes unless you paused it. */
+    pause(by?: unknown) {
+      if (by !== engine) dir = 0;
       return tl;
     },
     /** Move the playhead to `t` seconds; it keeps playing or stays paused. */
@@ -196,15 +207,16 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
     },
     /** Land on the end in the next step ("timeline:end" fires). */
     finish: () => go(1, true),
-    /** Pause and give every property back as it was before the timeline wrote it. */
+    /** Pause and give every property back as it was before the timeline wrote it: styles through
+     *  the ledger (a newer host edit wins), plain numbers to their value when the track was added. */
     revert() {
       dir = 0;
       undo = 1;
       engine.wake();
       return tl;
     },
-    /** Resolves the next time the timeline ends. */
-    done: () => new Promise<void>((r) => waits.push(r)),
+    /** Resolves the next time the timeline ends, or when its engine is destroyed (at once if it was). */
+    done: () => new Promise<void>((r) => (waits.push(r), engine.signal.aborted && ok())),
     /** The playhead in seconds (over every play). */
     get time() {
       return s[0]!;
@@ -230,8 +242,7 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
           b = Math.min(Math.max(b, 0), top());
           dir = 0;
           e.events.emit("timeline:end", id);
-          for (let i = 0; i < waits.length; i++) waits[i]!();
-          waits.length = 0;
+          ok();
         }
         s[0] = b;
         e.busy();
@@ -244,6 +255,7 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
         const p = props[i]!, w = p.w, out = p.o;
         if (undo) {
           if (!p.h) engine.ledger.unstyle(p.el, p.k as string);
+          else p.el[p.k] = p.b;
           out.fill(NaN);
         } else if (p.h) {
           if (p.y) p.el[p.k] = out[0];
@@ -260,4 +272,5 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
   engine.add(tl);
   return tl;
 }
+/** The timeline `timeline()` returns: add tracks with `to()`, then play it. */
 export type Timeline = ReturnType<typeof timeline>;

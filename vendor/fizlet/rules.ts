@@ -1,5 +1,5 @@
 /**
- * fizlet/rules: the rules every arcade game repeats, as three small systems on the kernel:
+ * @fzlt/core/rules: the rules every arcade game repeats, as three small systems on the kernel:
  * - `waves`: a wave clock, prepare → assault → rebuild, with a spawn budget per wave;
  * - `drops`: pickups that fall, wait to be collected and expire;
  * - `score`: points, a combo that decays, and levels from XP thresholds.
@@ -13,10 +13,13 @@
  */
 import type { Engine, System } from "./kernel/engine";
 
+/** Where the wave clock is: prepare (before a wave), assault (spawning) or rebuild (between waves). */
 export type WavePhase = "prepare" | "assault" | "rebuild";
 const PHASES: readonly WavePhase[] = ["prepare", "assault", "rebuild"];
 const PREPARE = 0, ASSAULT = 1, REBUILD = 2;
 
+/** Options for `waves()`: how many are alive now, the cap, the phase lengths and each wave's size,
+ *  limit and spawn gap. */
 export interface WaveOptions {
   /** Alive now. A wave clears when it has spawned everything and this reaches 0. */
   alive(): number;
@@ -33,6 +36,8 @@ export interface WaveOptions {
   gap?(wave: number): number;
 }
 
+/** A wave clock on engine `e`, prepare → assault → rebuild, with a spawn budget per wave. It says when
+ *  to spawn; the game decides where and what. Events: `wave:start`, `wave:clear`. */
 export function waves(e: Engine, o: WaveOptions) {
   const cap = Math.max(1, Math.floor(o.cap ?? 32)), prep = o.prepare ?? 4, rest = o.rebuild ?? 8;
   const size = o.size ?? ((w: number) => Math.min(40, 5 + w * 5));
@@ -83,6 +88,7 @@ export function waves(e: Engine, o: WaveOptions) {
   };
 }
 
+/** Options for `drops()`: the pickup kinds, the cap, the timer for timed drops, their life and fall. */
 export interface DropOptions<K extends string> {
   kinds: readonly K[];
   /** Most on the board at once (default 6). */
@@ -99,6 +105,8 @@ export interface DropOptions<K extends string> {
   speed?: number;
 }
 
+/** Pickups on engine `e` that fall, wait to be collected and expire, from typed arrays. Call
+ *  `collect()` from a step. Events: `drop:spawn`, `drop:land`, `drop:collect`, `drop:expire`. */
 export function drops<K extends string>(e: Engine, o: DropOptions<K>) {
   const cap = Math.max(1, Math.floor(o.cap ?? 6)), every = o.every ?? 0, life = o.life ?? 14;
   const fall = o.fall ?? 60, speed = o.speed ?? 90, kinds = o.kinds;
@@ -172,6 +180,7 @@ export function drops<K extends string>(e: Engine, o: DropOptions<K>) {
   };
 }
 
+/** Options for `score()`: the combo window and steps (or no combo) and the XP for each level. */
 export interface ScoreOptions {
   /** A streak lasts `window` seconds after each hit (default 3); the multiplier is
    *  min(max, 1 + floor(streak / step)) (defaults 3 and 5). false: no combo. */
@@ -180,6 +189,8 @@ export interface ScoreOptions {
   levels?: readonly number[];
 }
 
+/** Points, a combo that decays and levels from XP thresholds, on engine `e`. Call `add()` and `miss()`
+ *  from a step. Events: `score`, `combo:end`, `level`. */
 export function score(e: Engine, o: ScoreOptions = {}) {
   const c = o.combo === false ? null : o.combo ?? {}, win = c?.window ?? 3, step = c?.step ?? 3, max = c?.max ?? 5;
   const levels = o.levels ?? [];

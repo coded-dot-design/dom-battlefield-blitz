@@ -5,6 +5,8 @@ export interface Random {
   (): number;
   state: number;
 }
+/** A seeded random number generator: `r()` returns [0, 1). The same seed gives the same sequence;
+ *  read or set `r.state` to snapshot and restore it. */
 export function seeded(seed = 1): Random {
   const s = new Uint32Array(1);
   s[0] = seed;

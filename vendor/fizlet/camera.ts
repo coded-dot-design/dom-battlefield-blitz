@@ -1,5 +1,5 @@
 /**
- * fizlet/camera: the page is the camera. Pan and zoom a DOM stage (any element) with one
+ * @fzlt/core/camera: the page is the camera. Pan and zoom a DOM stage (any element) with one
  * `transform` written through the engine's ledger, so Recall gives it back exactly. Moves ease and
  * settle (the engine sleeps when they end); with reduced motion they jump. `contain` (default on)
  * keeps the stage covering its own box, so no edge shows and the page never scrolls sideways.
@@ -10,6 +10,7 @@
 import type { Engine } from "./kernel/engine";
 import { need } from "./kernel/need";
 
+/** Options for `camera()`: easing rate, zoom limits, containment and reduced-motion handling. */
 export interface CameraOptions {
   /** Easing rate per second (default 7; higher is snappier). A move settles in about 6 / ease s. */
   ease?: number;
@@ -22,12 +23,15 @@ export interface CameraOptions {
   motion?: boolean;
 }
 
+/** A camera on stage `el`: pan and zoom it with one `transform` written through the engine's ledger
+ *  (so Recall gives it back). Moves ease and settle; `to()`, `pan()` and `home()` drive it. */
 export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOptions = {}) {
   const rate = need(o.ease ?? 7, "ease", 1), lo = need(o.min ?? 1, "min", 1), hi = need(o.max ?? 4, "max", 1), box = o.contain !== false;
   // The focus (world point) shows at the pin (screen point): translate = pin - focus * zoom.
-  // FX FY Z current; GX GY GZ target; PX PY pin; W H stage size; RX RY RZ last written; flags.
-  const s = new Float64Array(16);
-  const FX = 0, FY = 1, Z = 2, GX = 3, GY = 4, GZ = 5, PX = 6, PY = 7, W = 8, H = 9, RX = 10, RY = 11, RZ = 12, MOVE = 13, MEASURE = 14, CLIP = 15;
+  // FX FY Z current; GX GY GZ target; PX PY pin; W H stage size; RX RY RZ last written; flags; JUMP:
+  // reduced motion, latched in read while moving (a step never calls into the DOM).
+  const s = new Float64Array(17);
+  const FX = 0, FY = 1, Z = 2, GX = 3, GY = 4, GZ = 5, PX = 6, PY = 7, W = 8, H = 9, RX = 10, RY = 11, RZ = 12, MOVE = 13, MEASURE = 14, CLIP = 15, JUMP = 16;
   s[Z] = s[GZ] = s[RZ] = 1;
   s[MEASURE] = 1;
   const mq = o.motion == null && typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
@@ -55,11 +59,15 @@ export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOp
   const go = () => {
     s[GX] = fit(s[GX]!, s[PX]!, s[GZ]!, s[W]!);
     s[GY] = fit(s[GY]!, s[PY]!, s[GZ]!, s[H]!);
-    s[MOVE] = s[MEASURE] = 1;
+    s[MOVE] = 1;
+    // Size unknown (hidden at setup): measure in the next read. A known size is kept until the
+    // stage resizes, so a drag pan reads no layout per frame.
+    if (!s[W]) s[MEASURE] = 1;
     engine.wake();
   };
 
-  // Layout reads happen here only: at setup and in the read phase after a move was asked for.
+  // Layout reads happen here only: at setup, and in the read phase once the stage resized (or its
+  // size is still unknown). A ResizeObserver says so; transforms never change a layout size.
   const measure = () => {
     s[MEASURE] = 0;
     const r = el.getBoundingClientRect();
@@ -70,6 +78,11 @@ export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOp
     if (box && parent && !s[CLIP]) s[CLIP] = getComputedStyle(parent).overflowX === "visible" ? 1 : 2;
   };
   measure();
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(() => (s[MEASURE] = 1));
+    ro.observe(el);
+    engine.signal.addEventListener("abort", () => ro.disconnect());
+  }
 
   const cam = {
     /** Show world point (x, y) at screen point (px, py) (default: the same point, a zoom about it). */
@@ -119,10 +132,11 @@ export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOp
     },
     read() {
       if (s[MEASURE]) measure();
+      if (s[MOVE]) s[JUMP] = +still();
     },
     step(e: Engine, dt: number) {
       if (!s[MOVE]) return;
-      const a = still() ? 1 : 1 - Math.exp(-rate * dt);
+      const a = s[JUMP] ? 1 : 1 - Math.exp(-rate * dt);
       s[Z] = s[Z]! + (s[GZ]! - s[Z]!) * a;
       s[FX] = fit(s[FX]! + (s[GX]! - s[FX]!) * a, s[PX]!, s[Z]!, s[W]!);
       s[FY] = fit(s[FY]! + (s[GY]! - s[FY]!) * a, s[PY]!, s[Z]!, s[H]!);
@@ -147,6 +161,7 @@ export function camera(engine: Engine, el: HTMLElement | SVGElement, o: CameraOp
   engine.add(cam);
   return cam;
 }
+/** The camera `camera()` returns. */
 export type Camera = ReturnType<typeof camera>;
 
 // Helpers stand alone, so a hero that only zooms never ships them.

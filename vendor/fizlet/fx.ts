@@ -1,5 +1,5 @@
 /**
- * fizlet/fx: explosions that land. One fixed pool of particles (struct-of-arrays, no allocation),
+ * @fzlt/core/fx: explosions that land. One fixed pool of particles (struct-of-arrays, no allocation),
  * drawn on a canvas: square debris, flashes, shock rings, spinning square rings, smoke, scorch marks
  * and pop words, plus screen shake. `blast()` is the DOM VIRUS / Battlefield hero recipe.
  * Gravity (`gravity`, px/s²) pulls each kind by its own share. Particle kinds are data (shape, drag,
@@ -28,15 +28,20 @@ export interface Kind {
 }
 // The built-in kinds, one const each so a page that takes one ships only that one. Angles are
 // literals (not Math.PI) so these stay pure and tree-shake.
+/** Built-in particle kind: small squares that drift up and fade. */
 export const BUBBLE: Kind = { shape: "square", drag: 1.4, gravity: -0.3, angle: -1.5708, spread: 0.7, speed: [25, 75], size: [1, 1.5], life: [0.7, 1.6] };
+/** Built-in particle kind: fast streaks thrown in every direction, falling a little. */
 export const SPARK: Kind = { shape: "streak", drag: 3, gravity: 0.6, angle: 0, spread: 6.2832, speed: [160, 420], size: [1, 2], life: [0.2, 0.5] };
+/** Built-in particle kind: streaks that fall straight down. */
 export const DRIP: Kind = { shape: "streak", drag: 0, gravity: 1, angle: 1.5708, spread: 0.2, speed: [0, 20], size: [1, 2], life: [0.6, 1.2] };
+/** Built-in particle kind: square debris thrown in every direction, falling under full gravity. */
 export const DEBRIS_KIND: Kind = { shape: "square", drag: 2.6, gravity: 1, angle: 0, spread: 6.2832, speed: [120, 300], size: [4, 9], life: [0.5, 0.9] };
 /** All four by name: `emitter(fx, KINDS)`, or pick some (`emitter(fx, { bubble: BUBBLE })`). */
 export const KINDS = { bubble: BUBBLE, spark: SPARK, drip: DRIP, debris: DEBRIS_KIND };
 // blast()'s five hero parts: flash, fireball, core, shock ring, spinning square ring.
 const HERO_KIND = [DISC, DISC, DISC, RING, SQUARE], HERO_SIZE = [26, 20, 14, 18, 24], HERO_LIFE = [0.28, 0.5, 0.42, 0.5, 0.6], HERO_COL = [0, 1, 2, 0, 3];
 
+/** Options for `effects()`: the particle cap, the colour and word tables, scorch marks and gravity. */
 export interface FxOptions {
   /** Max live particles (default 420). New ones are refused (and counted in `dropped`) when full. */
   cap?: number;
@@ -298,6 +303,7 @@ export function effects(o: FxOptions = {}) {
   fx.gravity = o.gravity ?? 0; // the setter ignores a non-finite value
   return fx;
 }
+/** The particle pool `effects()` returns. */
 export type Effects = ReturnType<typeof effects>;
 
 /**
