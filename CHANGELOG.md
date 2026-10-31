@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Footer: the family line.** The "DOM VIRUS family" column opens with the same four sites, in the same order, as every family footer: DOM VIRUS (domvirus.com), DOM Battlefield, Battlefield Blitz and Built with Fizlet (fizlet.com, the engine; it was the Fizlet GitHub repo, under About). One source: `FAMILY_LINE` in `site/src/sitemap.mjs`; the other games follow. No cross-domain URL goes into sitemap.xml. `test:site` checks the line on every page.
 - **Reduced motion: no screen shake.** Under `prefers-reduced-motion: reduce` the arena no longer shakes for blasts, hits and the nuke (up to 18 px before; the stickers and launch effects already calmed down). Drawing only: the shake has its own render-side random, so the match is the same (`test:replay` value for value, `test:lockstep` 0 desyncs). `test:browser` steps one seeded match both ways: it shakes without the setting, never with it, same hash. Sizes (gzip, on 0.11.0): `blitz.js` 43,752 → 43,769, `blitz.mjs` 43,864 → 43,886, `blitz-net.mjs` 45,331 → 45,361.
 
 ## 0.11.0
