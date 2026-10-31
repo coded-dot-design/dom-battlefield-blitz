@@ -1,10 +1,12 @@
 /**
- * fizlet/grid: the game board. A cols × rows tile grid in typed arrays (terrain id, move cost,
+ * @fzlt/core/grid: the game board. A cols × rows tile grid in typed arrays (terrain id, move cost,
  * flags), A* paths, line of sight, movement range and seeded terrain. Every search reuses buffers
  * made once by `board()`, so no call allocates. Cell ids are `row * cols + col`.
  *
- * Not collision: fizlet/collide's `Grid` re-buckets moving bodies every step; a `Board` holds the
+ * Not collision: @fzlt/core/collide's `Grid` re-buckets moving bodies every step; a `Board` holds the
  * ground they move over. Use the same cell size for both and a body's collide bucket is its cell.
+ * The size is checked at setup: `cols` and `rows` are positive integers, `cell` a finite number > 0
+ * (a RangeError names all three).
  */
 
 /** Flags: BLOCKED stops movement and sight, COVER stops sight (pass it in a mask), OCCUPIED marks
@@ -14,6 +16,7 @@ export const BLOCKED = 1, COVER = 2, OCCUPIED = 4;
 // Orthogonal steps first, then diagonals (k > 3).
 const DX = [1, -1, 0, 0, 1, -1, 1, -1], DY = [0, 0, 1, -1, 1, 1, -1, -1];
 
+/** Options for `board()`: the cell size in world units and whether moves go 8-way. */
 export interface BoardOptions {
   /** World units per cell (default 1: world = grid units). */
   cell?: number;
@@ -21,6 +24,8 @@ export interface BoardOptions {
   diagonal?: boolean;
 }
 
+/** The board `board()` makes: typed-array terrain, cost and flags per cell, plus the searches (A*
+ *  paths, line of sight, movement range) on buffers made once. Make one with `board()`. */
 export class Board {
   declare readonly cols: number;
   declare readonly rows: number;
@@ -37,31 +42,35 @@ export class Board {
   // Search buffers: cost so far (tenths: an orthogonal step into a cost-1 cell is 10, a diagonal 14),
   // priority, parent, a binary heap with positions (decrease-key, so it never holds more than n),
   // and one stamp per cell (mark: queued, mark + 1: settled) so nothing is cleared between calls.
+  // Private names are one letter on purpose (esbuild keeps property names): v via (parent), q heap,
+  // p heap positions, s seen stamps, k mark, z heap size, b best, x/y target col/row; r run, u push,
+  // o pop, w sift up.
   declare private readonly g: Int32Array;
   declare private readonly f: Int32Array;
-  declare private readonly via: Int32Array;
-  declare private readonly heap: Int32Array;
-  declare private readonly pos: Int32Array;
-  declare private readonly seen: Int32Array;
-  private mark = 0;
-  private size = 0;
-  private best = 0;
-  private tc = 0;
-  private tr = 0;
+  declare private readonly v: Int32Array;
+  declare private readonly q: Int32Array;
+  declare private readonly p: Int32Array;
+  declare private readonly s: Int32Array;
+  private k = 0;
+  private z = 0;
+  private b = 0;
+  private x = 0;
+  private y = 0;
 
   constructor(cols: number, rows: number, opts: BoardOptions = {}) {
-    const n = (this.cols = cols) * (this.rows = rows);
-    this.cell = opts.cell ?? 1;
+    const n = (this.cols = cols) * (this.rows = rows), cell = (this.cell = opts.cell ?? 1);
+    if (!(cols >= 1 && rows >= 1 && cols % 1 === 0 && rows % 1 === 0 && cell > 0 && cell - cell === 0 && typeof cols + typeof rows + typeof cell == "numbernumbernumber"))
+      throw new RangeError(`fizlet/grid: cols ${cols}, rows ${rows}, cell ${cell}`);
     this.diagonal = !!opts.diagonal;
     this.terrain = new Uint8Array(n);
     this.cost = new Uint8Array(n).fill(1);
     this.flags = new Uint8Array(n);
     this.g = new Int32Array(n);
     this.f = new Int32Array(n);
-    this.via = new Int32Array(n);
-    this.heap = new Int32Array(n);
-    this.pos = new Int32Array(n);
-    this.seen = new Int32Array(n);
+    this.v = new Int32Array(n);
+    this.q = new Int32Array(n);
+    this.p = new Int32Array(n);
+    this.s = new Int32Array(n);
   }
 
   /** The cell under a world point, clamped to the board (so always a valid id). */
@@ -119,10 +128,10 @@ export class Board {
     this.partial = false;
     if (from === to) return 0;
     if (this.flags[to]! & BLOCKED) return -1;
-    let end = this.run(from, to, avoid, 0x7fffffff, budget, out);
+    let end = this.r(from, to, avoid, 0x7fffffff, budget, out);
     if (end === -1) return -1;
-    if (end === -2) (this.partial = true), (end = this.best);
-    const via = this.via;
+    if (end === -2) (this.partial = true), (end = this.b);
+    const via = this.v;
     let n = 0;
     for (let i = end; i !== from; i = via[i]!) n++;
     for (let i = end, k = n; i !== from; i = via[i]!) if (--k < out.length) out[k] = i;
@@ -135,12 +144,12 @@ export class Board {
    * (capped at out.length). `dist(i)` then reads each cell's cost.
    */
   flood(from: number, max: number, out: Int32Array, avoid = BLOCKED | OCCUPIED) {
-    this.run(from, -1, avoid, max * 10, 0, out);
-    return this.best;
+    this.r(from, -1, avoid, max * 10, 0, out);
+    return this.b;
   }
   /** Cost from the last search's start to cell i (exact after flood), or -1 if it was not reached. */
   dist(i: number) {
-    return this.seen[i]! >= this.mark ? this.g[i]! / 10 : -1;
+    return this.s[i]! >= this.k ? this.g[i]! / 10 : -1;
   }
 
   /** Line of sight between two cells: no cell strictly between them has a `mask` flag.
@@ -166,25 +175,25 @@ export class Board {
 
   // The search: A* toward `to`, or Dijkstra over everything within `limit` when to < 0 (flood).
   // Returns `to` when found, -1 when exhausted, -2 when the budget ran out. Integers only.
-  private run(from: number, to: number, avoid: number, limit: number, budget: number, out: Int32Array) {
-    const { cols, rows, g, f, via, seen, flags, cost } = this, m = (this.mark += 2), ways = this.diagonal ? 8 : 4, flood = to < 0;
-    this.tc = to % cols;
-    this.tr = (to - this.tc) / cols;
-    this.size = this.expanded = 0;
+  private r(from: number, to: number, avoid: number, limit: number, budget: number, out: Int32Array) {
+    const { cols, rows, g, f, v: via, s: seen, flags, cost } = this, m = (this.k += 2), ways = this.diagonal ? 8 : 4, flood = to < 0;
+    this.x = to % cols;
+    this.y = (to - this.x) / cols;
+    this.z = this.expanded = 0;
     g[from] = 0;
     f[from] = this.h(from % cols, (from - (from % cols)) / cols);
     via[from] = from;
     seen[from] = m;
-    this.push(from);
+    this.u(from);
     let best = from, found = 0;
-    while (this.size) {
-      const i = this.pop();
+    while (this.z) {
+      const i = this.o();
       seen[i] = m + 1;
       if (i === to) return i;
       if (flood) {
         if (found < out.length) out[found++] = i;
       } else if (f[i]! - g[i]! < f[best]! - g[best]!) best = i;
-      if (++this.expanded > budget && budget) return (this.best = best), -2;
+      if (++this.expanded > budget && budget) return (this.b = best), -2;
       const c = i % cols, r = (i - c) / cols;
       for (let k = 0; k < ways; k++) {
         const nc = c + DX[k]!, nr = r + DY[k]!, j = nr * cols + nc;
@@ -195,25 +204,25 @@ export class Board {
         g[j] = ng;
         f[j] = ng + this.h(nc, nr);
         via[j] = i;
-        if (seen[j] === m) this.up(this.pos[j]!);
-        else (seen[j] = m), this.push(j);
+        if (seen[j] === m) this.w(this.p[j]!);
+        else (seen[j] = m), this.u(j);
       }
     }
-    this.best = flood ? found : best;
+    this.b = flood ? found : best;
     return -1;
   }
   // Octile (8-way) or Manhattan (4-way) distance in tenths: admissible while every cost is >= 1.
   private h(c: number, r: number) {
-    if (this.tc < 0) return 0; // flood: no target
-    const dx = Math.abs(c - this.tc), dy = Math.abs(r - this.tr);
+    if (this.x < 0) return 0; // flood: no target
+    const dx = Math.abs(c - this.x), dy = Math.abs(r - this.y);
     return this.diagonal ? 10 * (dx + dy) - 6 * (dx < dy ? dx : dy) : 10 * (dx + dy);
   }
-  private push(i: number) {
-    this.heap[this.size] = i;
-    this.up(this.size++);
+  private u(i: number) {
+    this.q[this.z] = i;
+    this.w(this.z++);
   }
-  private up(p: number) {
-    const h = this.heap, f = this.f, pos = this.pos, i = h[p]!;
+  private w(p: number) {
+    const h = this.q, f = this.f, pos = this.p, i = h[p]!;
     while (p > 0) {
       const q = (p - 1) >> 1, j = h[q]!;
       if (f[j]! <= f[i]!) break;
@@ -224,8 +233,8 @@ export class Board {
     h[p] = i;
     pos[i] = p;
   }
-  private pop() {
-    const h = this.heap, f = this.f, pos = this.pos, top = h[0]!, n = --this.size, last = h[n]!;
+  private o() {
+    const h = this.q, f = this.f, pos = this.p, top = h[0]!, n = --this.z, last = h[n]!;
     let p = 0;
     for (let c = 1; c < n; c = 2 * p + 1) {
       if (c + 1 < n && f[h[c + 1]!]! < f[h[c]!]!) c++;

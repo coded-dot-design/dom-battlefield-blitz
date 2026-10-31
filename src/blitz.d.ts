@@ -31,7 +31,7 @@ export interface BlitzOptions {
 /** The levers: speed (×, 1), tank (px/s, 150), turn (turret ×, 1), fire (×, 1), shell (px/s, 600),
  *  respawn (s, 2.2), bots (SOLO rivals, 7), air (bot airstrike calls ×, 1). Defaults = the game as it was. */
 export type TuneKey = "speed" | "tank" | "turn" | "fire" | "shell" | "respawn" | "bots" | "air";
-/** fizlet/presence transport: moves 12-byte messages. */
+/** @fzlt/core/presence transport: moves 12-byte messages. */
 export interface Transport {
   send(data: Uint8Array): void;
   listen(fn: ((data: Uint8Array) => void) | null): void;

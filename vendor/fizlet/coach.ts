@@ -1,5 +1,5 @@
 /**
- * fizlet/coach: the hints and tutorial layer the board games share, in three small parts:
+ * @fzlt/core/coach: the hints and tutorial layer the board games share, in three small parts:
  * - `flag`: a once-only switch kept in localStorage ("tips off", "seen the tour"). Every read and
  *   write is wrapped in try/catch, so a page with storage blocked (private mode, sandboxed iframe,
  *   quota) just reads "not set" and plays on;
@@ -37,6 +37,7 @@ export function flag(key: string, value = "1") {
   };
 }
 
+/** Options for `tour()`: how many tutorial steps, then how many tips and how often. */
 export interface TourOptions {
   /** Tutorial steps (default 10). */
   steps?: number;
@@ -45,6 +46,8 @@ export interface TourOptions {
   every?: number;
 }
 
+/** DOM-free tutorial steps on engine `e`: it counts time on the current step, moves on when the game
+ *  says the step is done (`coach:step` on the event ring), then cycles tips every `every` seconds. */
 export function tour(e: Engine, o: TourOptions = {}) {
   const steps = Math.max(0, (o.steps ?? 10) | 0), tips = Math.max(1, (o.tips ?? 7) | 0), every = o.every ?? 6;
   // step, card shown (-1: none yet); seconds on this step. Ints in an Int32Array so reading them never boxes.
@@ -82,8 +85,10 @@ export function tour(e: Engine, o: TourOptions = {}) {
     },
   };
 }
+/** The tutorial `tour()` returns. */
 export type Tour = ReturnType<typeof tour>;
 
+/** Options for `card()`: the End button's label and action, and an abort signal. */
 export interface CardOptions {
   /** The End button's label (default "END PRACTICE") and what it does (hidden if none). */
   end?: string;

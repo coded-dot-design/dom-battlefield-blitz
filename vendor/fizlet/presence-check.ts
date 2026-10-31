@@ -1,9 +1,11 @@
-// fizlet/presence/check: the determinism check as one function any game can call from a test.
+// @fzlt/core/presence/check: the determinism check as one function any game can call from a test.
 // It runs `players` copies of your sim as lockstep clients over the in-memory link (each with only
 // its own input), hashes the state after every frame, and reports the first frame that differs.
 import { createEngine, type Engine } from "./kernel/engine";
 import { presence, memory, hash32 } from "./presence";
 
+/** Your sim as `syncCheck()` runs it: its input for the next frame, one step from every player's
+ *  inputs, and a byte view of its whole state. */
 export interface SyncGame {
   /** This player's input bits for the next scheduled frame (only this client knows them). */
   input(): number;
@@ -13,6 +15,7 @@ export interface SyncGame {
   state: Uint8Array;
 }
 
+/** Options for `syncCheck()`: players, frames, seed, input delay and the simulated link. */
 export interface SyncOptions {
   players?: number; // default 2
   frames?: number; // default 600
@@ -22,6 +25,8 @@ export interface SyncOptions {
   jitter?: number; // extra random latency in ticks, reorders messages (default 0)
 }
 
+/** What `syncCheck()` found: whether every client agreed, how far they got and the first frame that
+ *  differed. */
 export interface SyncResult {
   /** Every client reached `frames` with the same state hash on every frame. */
   ok: boolean;
@@ -33,6 +38,8 @@ export interface SyncResult {
   stalls: number;
 }
 
+/** Check a sim is deterministic: run `players` copies as lockstep clients over the in-memory link,
+ *  hash the state every frame and report the first frame that differs (`diverged`, -1 if none). */
 export function syncCheck(setup: (e: Engine, slot: number, players: number) => SyncGame, o: SyncOptions = {}): SyncResult {
   const P = o.players ?? 2, N = o.frames ?? 600, lat = o.latency ?? 0, jit = o.jitter ?? 0;
   const hub = memory({ peers: P, latency: lat, jitter: jit, seed: o.seed ?? 1 });

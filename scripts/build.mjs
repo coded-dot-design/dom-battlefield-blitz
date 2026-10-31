@@ -2,7 +2,7 @@
 //   dist/blitz.js   - the drop-in: one self-contained script for any website (IIFE)
 //   dist/blitz.mjs  - the module: createBlitz + install, for the Battlefield site's Blitz pages
 //   dist/blitz.d.ts - its types
-//   dist/blitz-net.mjs - the module with net play (fizlet/presence, join, memory) + blitz-net.d.ts
+//   dist/blitz-net.mjs - the module with net play (@fzlt/core/presence, join, memory) + blitz-net.d.ts
 //   dist/build.json - version and SHA-256 per file (provenance for the sync into dom-battlefield)
 import { build, transform } from "esbuild";
 import { createHash } from "node:crypto";

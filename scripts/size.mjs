@@ -2,7 +2,7 @@
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 let failed = false;
-// blitz-net.mjs is the module plus net play (fizlet/presence, join, memory): its own budget, 2 KB over.
+// blitz-net.mjs is the module plus net play (@fzlt/core/presence, join, memory): its own budget, 2 KB over.
 // 0.11.0: +3 KB each for the TUNE card (measured +3,063 / +3,091 / +3,064 B).
 // Phone game mode + easy pause: +1.25 KB each (pause menu, resume countdown, net pause; measured +1,318 / +1,297 / +1,299 B).
 // Phones in net play: +704 B each (the drive stick, the arena covering the screen and turned in portrait, the camera; measured +689 / +696 / +686 B).

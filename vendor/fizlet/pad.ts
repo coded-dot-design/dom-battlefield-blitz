@@ -1,5 +1,5 @@
 /**
- * fizlet/pad: swappable on-screen controls for touch (and mouse). One move control (an analog
+ * @fzlt/core/pad: swappable on-screen controls for touch (and mouse). One move control (an analog
  * stick, a d-pad or move keys) under one thumb and round arcade action keys under the other, all
  * driving `controls` intents through `press()` / `steer()`: game code reads `down`, `hit` and
  * `axis` and never knows which scheme is on screen. Swap with `setScheme()` at any time.
@@ -12,9 +12,12 @@ import type { Engine } from "./kernel/engine";
 import type { Controls } from "./input";
 import { hypot } from "./steer";
 
+/** The move control on screen: an analog stick, a one-finger d-pad, or a key per move intent. */
 export type Scheme = "stick" | "dpad" | "buttons";
+/** A Board UI kit key role: it sets an action key's colour. */
 export type PadRole = "fire" | "aim" | "attack" | "advance" | "fallin" | "sys" | "cmd" | "go" | "flag";
 
+/** One round action key: the intent it drives, its caption and accessible name, its role colour. */
 export interface PadAction {
   /** The `controls` intent this key drives. */
   intent: string;
@@ -34,6 +37,7 @@ export interface PadAction {
   toggle?: boolean;
 }
 
+/** Options for `pad()`: the move scheme, the action keys, which thumb gets them and where the pad goes. */
 export interface PadOptions {
   /** "stick" (analog, drives the stick axes), "dpad" (one finger, 8-way) or "buttons" (a key per move intent). */
   scheme?: Scheme;
@@ -53,7 +57,7 @@ const DIRS = ["Up", "Down", "Left", "Right"];
 
 /** Stick vector from a drag offset in radii: clamped to the unit circle, dead zone rescaled so a
  *  light push still creeps (Battlefield's feel). Writes out[0], out[1]; never allocates
- *  (the exact `hypot` from fizlet/steer: `Math.hypot` boxes its arguments, K5). */
+ *  (the exact `hypot` from @fzlt/core/steer: `Math.hypot` boxes its arguments, K5). */
 export function stickAt(dx: number, dy: number, out: Float64Array) {
   const d = hypot(dx, dy), k = d < DEAD ? 0 : (Math.min(1, d) - DEAD) / (1 - DEAD) / d;
   out[0] = dx * k;
@@ -74,6 +78,9 @@ const arrows = (move: string[]) =>
 // Labels, names and keys are text (escaped); `icon` is trusted SVG markup supplied by the game.
 const esc = (t: string) => t.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
+/** On-screen controls for touch (and mouse) that drive the intents of `c` (a `controls()` controller):
+ *  a move control and action keys, in the Board UI kit's look. Swap the move control with
+ *  `setScheme()`; `destroy()` (or the engine's) removes the pad. */
 export function pad(e: Engine, c: Controls, o: PadOptions = {}) {
   const acts = o.actions ?? [], move = o.move ?? ["up", "down", "left", "right"];
   const ctl = new AbortController(), on = { signal: ctl.signal };
@@ -209,4 +216,5 @@ export function pad(e: Engine, c: Controls, o: PadOptions = {}) {
     },
   };
 }
+/** The pad `pad()` returns. */
 export type Pad = ReturnType<typeof pad>;

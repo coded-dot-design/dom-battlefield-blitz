@@ -23,7 +23,7 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: 90px;
   /* Phones: the Board UI kit (.bui) sets touch-action: manipulation and text-size-adjust on the
-     page, and pan-y on [data-touch-lock="y"] surfaces (the hero battle); fizlet/touch's lockTouch
+     page, and pan-y on [data-touch-lock="y"] surfaces (the hero battle); @fzlt/core/touch's lockTouch
      (Base.astro) cancels the pinch on them. Content pages keep pinch-zoom (WCAG 1.4.4). */
 }
 @media (prefers-reduced-motion: reduce) {

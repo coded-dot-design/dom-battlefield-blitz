@@ -1,5 +1,5 @@
 /**
- * fizlet/slot: mount a Fizlet scene into an astro-base-engine slot: the element carrying
+ * @fzlt/core/slot: mount a Fizlet scene into an astro-base-engine slot: the element carrying
  *   class="ae-slot" data-slot-target="<page>#<slot>" role="img" aria-label="…". Both shapes the engine
  *   has rendered are found: the figure itself (`<figure class="ae-slot">`), or a box inside one
  *   (`<figure class="ae-slot-figure"><div class="ae-slot">…</div><figcaption class="ae-slot__fallback">`,
@@ -20,6 +20,7 @@
  */
 import { Ledger } from "./kernel/ledger";
 
+/** What a slot's mount function returns: the scene, with `destroy()` to remove it. */
 export interface SlotScene {
   /** Remove the scene (its engine's destroy() restores what it changed). */
   destroy(): void;
@@ -36,6 +37,7 @@ export interface SlotTap {
 /** Build the scene inside `stage` (sized to the slot). `slot` is the figure, read-only. `first` is
  *  the tap that started the load, if one did: act on it as an intent (aim, fire), not as an event. */
 export type SlotMount = (stage: HTMLElement, slot: HTMLElement, first: SlotTap | null) => SlotScene;
+/** Options for `slot()`: how near the viewport the slot must come before loading, and the idle wait. */
 export interface SlotOptions {
   /** How close to the viewport the slot must come before the scene loads (default "200px"). */
   margin?: string;
@@ -49,6 +51,9 @@ const REDUCE = "(prefers-reduced-motion: reduce)";
 export const findSlot = (target: string, doc: Document = document) =>
   [...doc.querySelectorAll<HTMLElement>(".ae-slot[data-slot-target]")].find((f) => f.dataset.slotTarget === target) ?? null;
 
+/** Mount a scene into an astro-base-engine slot (`target`: its `data-slot-target` or the element).
+ *  `load` runs once the slot nears the viewport and the main thread is idle (or on the first tap);
+ *  with reduced motion it never loads. Returns `el`, `mounted` and `destroy()`. */
 export function slot(target: string | HTMLElement, load: () => Promise<SlotMount> | SlotMount, opts: SlotOptions = {}) {
   const el = typeof target === "string" ? findSlot(target) : target;
   const ctl = new AbortController(), ledger = new Ledger();
@@ -86,7 +91,7 @@ export function slot(target: string | HTMLElement, load: () => Promise<SlotMount
     const make = await load();
     if (id !== run || !el || ctl.signal.aborted || motion.matches) return;
     if (getComputedStyle(el).position === "static") ledger.style(el, "position", "relative");
-    for (const c of el.querySelectorAll<HTMLElement>(":scope > .ae-slot__placeholder, :scope > .ae-slot__fallback")) ledger.style(c, "display", "none");
+    for (const c of el.querySelectorAll<HTMLElement>(":scope>.ae-slot__placeholder,:scope>.ae-slot__fallback")) ledger.style(c, "display", "none");
     const stage = ledger.add(document.createElement("div"));
     stage.setAttribute("data-fizlet-slot", el.dataset.slotTarget ?? "");
     stage.style.cssText = "position:absolute;inset:0;contain:strict;overflow:hidden;content-visibility:auto";

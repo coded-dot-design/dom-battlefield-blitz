@@ -32,22 +32,31 @@ let probe: HTMLElement | undefined;
 /** How the browser normalises a style attribute's text (to check a restore is a no-op change). The
  *  probe comes from the element's own document (an iframe's page has no global `document` of its own). */
 const withStyle = (text: string, el: El) => ((probe ??= el.ownerDocument.createElement("i")).setAttribute("style", text), probe.style.cssText);
+/** The host changed this property since our last write (or did before): hands off. */
+const lost = (r: StyleRec, s: CSSStyleDeclaration, prop: string) => r.x || s.getPropertyValue(prop) !== r.l || s.getPropertyPriority(prop) !== r.lp;
+/** Put a property's original value back (removed if it had none). */
+const back = (r: StyleRec, s: CSSStyleDeclaration, prop: string) => (r.o ? s.setProperty(prop, r.o, r.op) : s.removeProperty(prop));
 
+/** Records every change the engine makes to the page (styles, attributes, classes, text, added
+ *  nodes) so `restore()` puts it back exactly. Writes that change nothing touch nothing, and an
+ *  edit the host page made after ours always wins. Each engine has one: `engine.ledger`. */
 export class Ledger {
-  private readonly texts = new Map<CharacterData, Rec<string | null>>();
-  private readonly els = new Map<El, Entry>();
-  private readonly added: Node[] = [];
+  // Private names are short on purpose: esbuild keeps property names, and every byte here ships in
+  // every page build. t: text nodes, m: elements, a: nodes we added, e(): an element's entry.
+  private readonly t = new Map<CharacterData, Rec<string | null>>();
+  private readonly m = new Map<El, Entry>();
+  private readonly a: Node[] = [];
 
-  private entry(el: El) {
-    let e = this.els.get(el);
-    if (!e) this.els.set(el, (e = { hadStyle: el.hasAttribute("style"), os: el.getAttribute("style"), hadClass: el.hasAttribute("class") }));
+  private e(el: El) {
+    let e = this.m.get(el);
+    if (!e) this.m.set(el, (e = { hadStyle: el.hasAttribute("style"), os: el.getAttribute("style"), hadClass: el.hasAttribute("class") }));
     return e;
   }
 
   /** Replace a text node's value. False if the host changed it since our last write. */
   text(node: CharacterData, value: string): boolean {
-    let r = this.texts.get(node);
-    if (!r) this.texts.set(node, (r = { o: node.nodeValue, l: node.nodeValue, x: false }));
+    let r = this.t.get(node);
+    if (!r) this.t.set(node, (r = { o: node.nodeValue, l: node.nodeValue, x: false }));
     if (r.x || node.nodeValue !== r.l) return !(r.x = true);
     if (r.l !== value) node.nodeValue = r.l = value;
     return true;
@@ -55,13 +64,13 @@ export class Ledger {
 
   /** Set one inline style property (e.g. "transform", "--hp"). */
   style(el: El, prop: string, value: string, priority = ""): boolean {
-    const e = this.entry(el), map = (e.style ??= new Map()), s = el.style;
+    const e = this.e(el), map = (e.style ??= new Map()), s = el.style;
     let r = map.get(prop);
     if (!r) {
       const v = s.getPropertyValue(prop), p = s.getPropertyPriority(prop);
       map.set(prop, (r = { o: v, l: v, op: p, lp: p, x: false }));
     }
-    if (r.x || s.getPropertyValue(prop) !== r.l || s.getPropertyPriority(prop) !== r.lp) return !(r.x = true);
+    if (lost(r, s, prop)) return !(r.x = true);
     if (r.l === value && r.lp === priority) return true;
     s.setProperty(prop, value, priority);
     r.l = s.getPropertyValue(prop);
@@ -72,18 +81,17 @@ export class Ledger {
   /** Put one style property back now (as Recall would) and forget it: a later `style` records the
    *  value then in place as the new original. Hands off if the host changed it since our last write. */
   unstyle(el: El, prop: string): boolean {
-    const r = this.els.get(el)?.style?.get(prop), s = el.style;
+    const r = this.m.get(el)?.style?.get(prop), s = el.style;
     if (!r) return true;
-    if (r.x || s.getPropertyValue(prop) !== r.l || s.getPropertyPriority(prop) !== r.lp) return !(r.x = true);
-    if (r.o) s.setProperty(prop, r.o, r.op);
-    else s.removeProperty(prop);
-    this.els.get(el)!.style!.delete(prop);
+    if (lost(r, s, prop)) return !(r.x = true);
+    back(r, s, prop);
+    this.m.get(el)!.style!.delete(prop);
     return true;
   }
 
   /** Set (string) or remove (null) an attribute. */
   attr(el: El, name: string, value: string | null): boolean {
-    const map = (this.entry(el).attr ??= new Map());
+    const map = (this.e(el).attr ??= new Map());
     let r = map.get(name);
     if (!r) {
       const v = el.getAttribute(name);
@@ -99,7 +107,7 @@ export class Ledger {
 
   /** Add or remove one class. */
   cls(el: El, name: string, on: boolean): boolean {
-    const map = (this.entry(el).cls ??= new Map());
+    const map = (this.e(el).cls ??= new Map());
     let r = map.get(name);
     if (!r) {
       const v = el.classList.contains(name);
@@ -112,42 +120,37 @@ export class Ledger {
 
   /** A node the engine put on the page (canvas, overlay, debris): removed on restore. */
   add<N extends Node>(node: N): N {
-    this.added.push(node);
+    this.a.push(node);
     return node;
   }
 
   /** Recall: put back everything we still own, newest first. Host edits win. */
   restore() {
-    for (let i = this.added.length; i--; ) (this.added[i] as ChildNode).remove?.();
-    for (const [node, r] of this.texts) if (!r.x && node.nodeValue === r.l) node.nodeValue = r.o;
-    for (const [el, e] of this.els) {
+    for (let i = this.a.length; i--; ) (this.a[i] as ChildNode).remove?.();
+    for (const [node, r] of this.t) if (!r.x && node.nodeValue === r.l) node.nodeValue = r.o;
+    for (const [el, e] of this.m) {
       e.cls?.forEach((r, name) => !r.x && el.classList.contains(name) === r.l && el.classList.toggle(name, r.o));
-      e.attr?.forEach((r, name) => {
-        if (r.x || el.getAttribute(name) !== r.l) return;
-        if (r.o === null) el.removeAttribute(name);
-        else el.setAttribute(name, r.o);
-      });
+      e.attr?.forEach((r, name) => !r.x && el.getAttribute(name) === r.l && (r.o === null ? el.removeAttribute(name) : el.setAttribute(name, r.o)));
       let all = true;
       e.style?.forEach((r, prop) => {
         const s = el.style;
-        if (r.x || s.getPropertyValue(prop) !== r.l || s.getPropertyPriority(prop) !== r.lp) return void (all = false);
-        if (r.o) s.setProperty(prop, r.o, r.op);
-        else s.removeProperty(prop);
+        if (lost(r, s, prop)) return void (all = false);
+        back(r, s, prop);
       });
       // Still ours end to end: put the original attribute text back byte for byte.
       if (e.style && all && e.os !== null && el.style.cssText === withStyle(e.os, el)) el.setAttribute("style", e.os);
       if (e.style && !e.hadStyle && !el.getAttribute("style")) el.removeAttribute("style");
       if (e.cls && !e.hadClass && el.getAttribute("class") === "") el.removeAttribute("class");
     }
-    this.added.length = 0;
-    this.texts.clear();
-    this.els.clear();
+    this.a.length = 0;
+    this.t.clear();
+    this.m.clear();
   }
 
   /** How many things the ledger holds (for stats). */
   get size() {
-    let n = this.texts.size + this.added.length;
-    this.els.forEach((e) => (n += (e.style?.size ?? 0) + (e.attr?.size ?? 0) + (e.cls?.size ?? 0)));
+    let n = this.t.size + this.a.length;
+    this.m.forEach((e) => (n += (e.style?.size ?? 0) + (e.attr?.size ?? 0) + (e.cls?.size ?? 0)));
     return n;
   }
 }

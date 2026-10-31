@@ -1,4 +1,4 @@
-// Battlefield Blitz with net play (dist/blitz-net.mjs): the module plus fizlet/presence, so
+// Battlefield Blitz with net play (dist/blitz-net.mjs): the module plus @fzlt/core/presence, so
 // createBlitz(host, { seed, net }) runs a lockstep match. The drop-in and blitz.mjs stay solo.
 import { presence, websocket, WELCOME } from "../vendor/fizlet/presence";
 import { useLockstep } from "./game";
@@ -16,7 +16,7 @@ export const START = 7, LOBBY = 8;
 
 /** Join a fizlet-rooms room (WebSocket): resolves when it starts with your seat, the humans in, the
  *  room's seed and the host's START mode byte. `o.lobby(start, seat, seated, size)` runs on each LOBBY:
- *  the host's START key calls `start(seats, mode)`. The same call as fizlet/presence's `join` from fizlet#210 (until
+ *  the host's START key calls `start(seats, mode)`. The same call as @fzlt/core/presence's `join` from fizlet#210 (until
  *  that snapshot lands here: no resume after a drop). */
 export function join(url: string, signal?: AbortSignal, protocols?: string | string[], o: { lobby?(start: (seats?: number, mode?: number) => void, seat: number, seated: number, size: number): void } = {}) {
   return new Promise<{ transport: ReturnType<typeof websocket>; slot: number; players: number; seed: number; mode: number }>((ok, fail) => {

@@ -1,19 +1,26 @@
 /**
- * fizlet/steer: how things move toward, away from and around a point, as DOM-free steering on
+ * @fzlt/core/steer: how things move toward, away from and around a point, as DOM-free steering on
  * typed arrays. Every mover has a position (`x`, `y`), a heading (`a`, radians) that turns at most
  * `turn` rad/s, and moves `speed × scale` px/s along it. Behaviours:
  * - `seek`: drive at a point, stop inside `stop`;
  * - `flee`: drive straight away from a point until `far`;
  * - `arrive`: seek with an arrival band: full pace far off, slower inside `slow`, stop inside `near`;
+ *   `arriveGoal` is the same toward the goal the game wrote in `gx[i]`, `gy[i]` (a target that moves
+ *   every frame: no double crosses a call, so nothing is boxed);
  * - `wander`: pick a random goal in `area` every `every + random × jitter` s and seek it;
  * - `patrol`: seek waypoints in turn, looping.
  * Each writes the distance moved this call to `moved[i]` (0 when standing). The heading turn and the per-axis
  * wall check (`blocked`, so a mover slides along walls) are DOM Battlefield Blitz's `drive`, and the
  * defaults are its tank numbers, so a port keeps its feel. Nothing allocates: call them from a step,
- * one mover at a time. Pass `engine.random` as `random` so seeded runs replay.
+ * one mover at a time. Pass `engine.random` as `random` so seeded runs replay. Options are checked
+ * at setup: a bad number throws a RangeError with its name instead of turning into NaN mid-game.
  */
+import { need } from "./kernel/need";
+
+/** Options for `steer()`: how many movers, their pace, turn rate and arrival bands, the wander area
+ *  and timing, the wall check and the random source. */
 export interface SteerOptions {
-  /** Movers (fixed: the arrays never grow). */
+  /** Movers, a positive integer (fixed: the arrays never grow). */
   cap: number;
   /** Pixels per second at full pace (default 150) and a multiplier for the board's scale (default 1). */
   speed?: number;
@@ -57,10 +64,16 @@ export const hypot = (dx: number, dy: number) => {
   return ax === Infinity || ay === Infinity ? Infinity : Math.sqrt(p * p + q * q) * max;
 };
 
+/** Steering for `o.cap` movers on typed arrays: `seek`, `flee`, `arrive`, `wander` and `patrol`, each
+ *  with a turn-limited heading and a per-axis wall check. DOM-free and allocation-free: call them
+ *  from a step, one mover at a time. */
 export function steer(o: SteerOptions) {
-  const n = Math.max(1, o.cap | 0), speed = o.speed ?? 150, scale = o.scale ?? 1, rate = o.turn ?? 7, stop = o.stop ?? 16;
-  const near = o.near ?? 14, slow = o.slow ?? 140, fast = o.fast ?? 1.05, calm = o.calm ?? 0.8, far = o.far ?? 240;
-  const every = o.every ?? 2, jitter = o.jitter ?? 2, area = o.area ?? [0, 0, 640, 480];
+  // Each number option, checked by name (one helper: the names are the only cost).
+  const num = (k: keyof SteerOptions, d: number) => need(o[k] ?? d, k);
+  const n = need(o.cap, "cap", 2), speed = num("speed", 150), scale = num("scale", 1), rate = num("turn", 7), stop = num("stop", 16);
+  const near = num("near", 14), slow = num("slow", 140), fast = num("fast", 1.05), calm = num("calm", 0.8), far = num("far", 240);
+  const every = num("every", 2), jitter = num("jitter", 2), area = o.area ?? [0, 0, 640, 480];
+  for (let i = 0; i < 4; i++) need(area[i], "area[" + i + "]");
   const blocked = o.blocked, random = o.random ?? Math.random;
   const x = new Float64Array(n), y = new Float64Array(n), a = new Float64Array(n);
   const gx = new Float64Array(n), gy = new Float64Array(n), think = new Float64Array(n), leg = new Uint32Array(n);
@@ -80,16 +93,17 @@ export function steer(o: SteerOptions) {
     if (!blocked?.(i, at)) y[i] = ny;
     moved[i] = sp;
   }
-  /** Toward goal (v[0], v[1]) for v[2] seconds at `pace`, until inside `within`. */
+  /** Toward goal (v[0], v[1]) for v[2] seconds at `pace`, until inside `within`. A pace below 0 is
+   *  arrive's band (`fast` outside `slow`, `calm` inside): one distance, and no extra call to inline. */
   function toward(i: number, pace: number, within: number) {
     const dx = v[0]! - x[i]!, dy = v[1]! - y[i]!, d = hypot(dx, dy);
     if (d <= within) return void (moved[i] = 0);
-    v[0] = dx / d; v[1] = dy / d; v[2] = v[2]! * pace;
+    v[0] = dx / d; v[1] = dy / d; v[2] = v[2]! * (pace < 0 ? (d > slow ? fast : calm) : pace);
     go(i);
   }
   return {
     x, y, a,
-    /** Wander's current goal, and seconds until it picks the next. */
+    /** The goal: wander's current one (and seconds until it picks the next), or one the game writes for `arriveGoal`. */
     gx, gy, think,
     /** Patrol: the waypoint each mover is heading for. */
     leg,
@@ -118,8 +132,16 @@ export function steer(o: SteerOptions) {
     },
     arrive(i: number, tx: number, ty: number, dt: number) {
       v[0] = tx; v[1] = ty; v[2] = dt;
-      const d = hypot(tx - x[i]!, ty - y[i]!);
-      toward(i, d > slow ? fast : calm, near);
+      toward(i, -1, near);
+    },
+    /**
+     * `arrive` toward (gx[i], gy[i]): write the goal there, then call it. For a goal computed every
+     * frame (a slot behind a leader): passed as two numbers, V8 boxes each one whenever it doesn't
+     * inline the call (3 young GCs per 20k steps in Blitz's platoons); a typed array never boxes.
+     */
+    arriveGoal(i: number, dt: number) {
+      v[0] = gx[i]!; v[1] = gy[i]!; v[2] = dt;
+      toward(i, -1, near);
     },
     wander(i: number, dt: number, pace = 1) {
       if ((think[i]! -= dt) <= 0) {
@@ -130,8 +152,10 @@ export function steer(o: SteerOptions) {
       v[0] = gx[i]!; v[1] = gy[i]!; v[2] = dt;
       toward(i, pace, stop);
     },
-    /** Waypoints as [x0, y0, x1, y1, …] (a typed array is best); the next one once inside `stop`. */
+    /** Waypoints as [x0, y0, x1, y1, …] (a typed array is best); the next one once inside `stop`.
+     *  No waypoint (fewer than two numbers): it stands still. */
     patrol(i: number, points: ArrayLike<number>, dt: number, pace = 1) {
+      if (points.length < 2) return void (moved[i] = 0);
       const k = (leg[i]! % (points.length >> 1)) << 1, px = points[k]!, py = points[k + 1]!;
       if (hypot(px - x[i]!, py - y[i]!) <= stop) leg[i] = (leg[i]! + 1) % (points.length >> 1);
       const j = leg[i]! << 1;
@@ -140,4 +164,5 @@ export function steer(o: SteerOptions) {
     },
   };
 }
+/** The movers `steer()` returns. */
 export type Steer = ReturnType<typeof steer>;

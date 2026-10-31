@@ -1,5 +1,5 @@
 /**
- * fizlet/sprite: the character layer's drawing primitive. Pixel-art sprites written as data (rows of
+ * @fzlt/core/sprite: the character layer's drawing primitive. Pixel-art sprites written as data (rows of
  * characters + a colour map whose values can be palette roles), baked once per (sprite, frame,
  * scale, palette) into a bounded cache, then blitted with one drawImage. `spriteSVG()` / `spriteURL()`
  * give the same pixels as an SVG for characters that live in the page instead of on a canvas; they
@@ -9,6 +9,8 @@
 /** A colour for a character: a hex, or a role name (`team`, `enemy`, `hazard`…) a palette fills. */
 export type Paint = string;
 
+/** One sprite as data: its frames as rows of characters, the colour or role of each character, its
+ *  pivot and an optional outline. */
 export interface SpriteDef {
   /** Rows of characters, one per pixel (one frame), or a list of those (an animation). */
   frames?: string[] | string[][];
@@ -26,6 +28,7 @@ export interface SpriteDef {
   paint?: (c: CanvasRenderingContext2D, frame: number, color: (p: Paint) => string) => void;
 }
 
+/** Options for `sprites()`: the palettes and the size of the baked-tile cache. */
 export interface SpriteOptions {
   /**
    * Palettes: role → hex. Index 0 is the default and fills roles the others leave out. The key `*`
@@ -175,4 +178,5 @@ export function sprites<K extends string>(defs: Record<K, SpriteDef>, o: SpriteO
     },
   };
 }
+/** The sprite set `sprites()` returns: `draw()` blits a baked frame. */
 export type Sprites = ReturnType<typeof sprites>;
