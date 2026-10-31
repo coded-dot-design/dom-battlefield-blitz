@@ -1,6 +1,6 @@
 # Multiplayer passes
 
-Online Blitz (`/play/two/`) runs on a small room server. When passes are switched on, every player
+Online Blitz (`/play/multi/`) runs on a small room server. When passes are switched on, every player
 joins with a **pass**: a signed token that is good for a set time and locks to the device that first
 uses it.
 
@@ -10,7 +10,7 @@ uses it.
    form (preferred time, mode, the house rules). It gets the `play-pass` label: the open `play-pass`
    issues are the queue.
 2. A maintainer adds the `approved` label. Only a label added by someone with write access counts.
-3. A bot comments with your pass. Open `/play/two/`, paste it into **PASS**, pick the room you agreed
+3. A bot comments with your pass. Open `/play/multi/`, paste it into **PASS**, pick the room you agreed
    on with your friends, and press **JOIN**. Everyone in the match needs their own pass.
 
 What to know:

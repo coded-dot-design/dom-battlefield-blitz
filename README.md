@@ -40,7 +40,7 @@ same reach), RESPAWN (2.2 s), SOLO BOTS (7) and BOT AIRSTRIKES (1.0×); the defa
 numbers. Practice plays them live, SOLO and PLATOON at the next match, on this device only. RESET puts
 them back; COPY SETTINGS copies them as JSON. Online matches always play the defaults.
 
-**Two players** (`/play/two/`, online rooms in lockstep): the TEAMS pick is FFA (both players + 4 bots,
+**Two players** (`/play/multi/`, online rooms in lockstep): the TEAMS pick is FFA (both players + 4 bots,
 the default), 1V1, or 2V2 to 4V4, where each player leads AI wingmen in their colour. P1's pick is the match's.
 Want to play online? [Request a multiplayer pass](docs/play-pass.md) with your GitHub account.
 

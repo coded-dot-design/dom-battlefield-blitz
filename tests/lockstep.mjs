@@ -126,7 +126,7 @@ try {
   assert.deepEqual(ffa.squad, [0, 0]);
   assert.equal(ffa.rosters[0], "0H 1H 2A 3A 4A 5A", "free-for-all: 2 players + 4 bots, every tank its own side");
 
-  // The four multiplayer modes (/play/two/), 2 to 4 humans on the in-memory link. P1's pick is the
+  // The four multiplayer modes (/play/multi/), 2 to 4 humans on the in-memory link. P1's pick is the
   // match's (the others ask for something else); every peer builds the same seat map; the computer
   // takes the seats no human took (at most 2); no desync; the same state hash after N frames.
   const MODES = [

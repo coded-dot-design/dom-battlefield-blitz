@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Multiplayer play passes for /play/two/ (docs/play-pass.md). No dependencies (Node 20+).
+// Multiplayer play passes for /play/multi/ (docs/play-pass.md). No dependencies (Node 20+).
 //
 // A pass is base64url(payload).base64url(HMAC-SHA256(payload, PASS_SECRET)), payload
 // { v: 1, id (96 random bits), exp (Unix s), kind?, dev?, gh?, issue?, name? }. The room server
@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const ROOMS_URL = "https://fizlet-rooms.fizlet.workers.dev";
-export const PLAY_URL = "https://battlefieldblitz.domvirus.com/play/two/";
+export const PLAY_URL = "https://battlefieldblitz.domvirus.com/play/multi/";
 export const MARK = "<!-- play-pass -->";
 const LABEL = "play-pass", APPROVED = "approved", BOT = "github-actions[bot]";
 const WRITERS = new Set(["admin", "maintain", "write"]);

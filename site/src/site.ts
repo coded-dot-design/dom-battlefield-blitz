@@ -16,5 +16,5 @@ export const FAMILY = [
 ];
 export const FIZLET = "https://github.com/coded-dot-design/fizlet";
 export const base = (path = "") => `${import.meta.env.BASE_URL.replace(/\/$/, "")}/${path}`;
-// The fizlet-rooms server for two-player games at /play/two/ (owner-deployed; ?rooms= overrides it).
+// The fizlet-rooms server for multiplayer games at /play/multi/ (owner-deployed; ?rooms= overrides it).
 export const ROOMS = import.meta.env.PUBLIC_ROOMS_URL || "wss://fizlet-rooms.fizlet.workers.dev";

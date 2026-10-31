@@ -1,5 +1,5 @@
 name: Request a multiplayer pass
-description: Ask for a 1-hour pass to play Battlefield Blitz online (/play/two/).
+description: Ask for a 1-hour pass to play Battlefield Blitz online (/play/multi/).
 title: "Play pass: "
 labels: ["play-pass"]
 body:

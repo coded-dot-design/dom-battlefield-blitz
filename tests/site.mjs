@@ -168,7 +168,16 @@ try {
     keys += await check(kp, where);
     await kc.close();
   }
-  // Two players (/play/two/): the join card fits a phone in both orientations and the desktop,
+  // The old address (/play/two/) still works: it lands on /play/multi/ with the room it was given.
+  where = "old multiplayer link";
+  {
+    const rp = await browser.newPage();
+    await rp.goto(`${base}play/two/?rooms=wss://rooms.test&room=5`);
+    await rp.waitForURL(/\/play\/multi\/\?/);
+    assert.equal(await rp.locator("output[name=roomShow]").textContent(), "5", "the room survives the redirect");
+    await rp.close();
+  }
+  // Multiplayer (/play/multi/): the join card fits a phone in both orientations and the desktop,
   // with no sideways scroll, every lobby key at least 44 px, and a bad code refused before any room.
   where = "two players";
   for (const [w, h, touch] of [[390, 844, true], [844, 390, true], [1440, 900, false]]) {
@@ -177,7 +186,7 @@ try {
     const terr = [];
     tp.on("pageerror", (e) => terr.push(e.message));
     await tp.route("https://rooms.test/**", (r) => r.fulfill({ status: 403, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: '{"ok":false}' }));
-    await tp.goto(`${base}play/two/?rooms=wss://rooms.test&room=3`);
+    await tp.goto(`${base}play/multi/?rooms=wss://rooms.test&room=3`);
     assert.equal(await tp.locator(".room").getAttribute("data-step"), "join");
     assert.equal(await tp.locator("output[name=roomShow]").textContent(), "3", "?room= picks the room");
     const fit = await tp.evaluate(() => {
