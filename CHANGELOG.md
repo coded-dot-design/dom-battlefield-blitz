@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.0.0: on @fzlt/core 0.21.2
+
+What's in it (details below): the engine on `@fzlt/core` 0.21.2 (Fizlet v0.21.2); net play with room
+to hide, enemy edge lights and an AUTO-AIM switch (phones: the page never moves); multiplayer at
+`/play/multi/` (`/play/two/` redirects) with SEND LINK carrying the invite code; multiplayer passes
+(request with GitHub, approve with a label); multiplayer on a phone (board covers the screen, drive stick,
+status chip); one MODE picker (1V1, FFA, 2V2, PLATOON); phone game mode and an easy PAUSE (net pause on
+every screen); the footer's family line; no screen shake under reduced motion; site analytics behind a
+consent banner (off until the owner sets the ids).
 
 - **On `@fzlt/core` 0.21.2** (pending owner review). `vendor/fizlet` re-synced from fizlet tag v0.21.2
   (`2922cbd`, the commit npm's `@fzlt/core@0.21.2` was published from), was 0.20.0 (`bf42a8c`). Fizlet's
