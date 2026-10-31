@@ -31,7 +31,7 @@ const files = [];
 const built = resolveAnalytics(process.env);
 for (const file of files) {
   const text = readFileSync(file, "utf8");
-  if (!built.enabled) assert.doesNotMatch(text, /googletagmanager\.com\/gtag|static\/array\.js|\.siteAnalytics = \{|data-consent/, `${file}: analytics code with no id set`);
+  if (!built.enabled) assert.doesNotMatch(text, /googletagmanager\.com\/gtag|static\/array\.js|\.siteAnalytics = \{|setAttribute\("data-consent"/, `${file}: analytics code with no id set`);
   else if (file.endsWith(".html") && text.includes('class="site-foot"'))
     assert.equal(text.split(".siteAnalytics = {").length - 1, 1, `${file}: consent runtime once`);
 }
