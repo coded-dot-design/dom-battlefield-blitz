@@ -73,6 +73,15 @@ const description = 'Two to four players, one Blitz match, over the internet. En
               <button class="bui-key" type="button" data-squad="4" aria-pressed="false" aria-label="4 v 4: you and 3 AI wingmen each">4V4</button>
             </div>
           </div>
+          <!-- Auto-aim: P1's pick is the match's (agreed in the countdown, like the mode). OFF: no AUTO or
+               LOCK for anyone, every turret aims where its player points or taps. -->
+          <div class="pick wide" role="group" aria-labelledby="aim-label" data-aim-pick>
+            <span><b id="aim-label">AUTO-AIM</b> <small data-aim-say></small></span>
+            <div class="bui-seg aims">
+              <button class="bui-key" type="button" data-aim="on" aria-pressed="true" aria-label="Auto-aim on: AUTO and LOCK keys for everyone">ON</button>
+              <button class="bui-key" type="button" data-aim="off" aria-pressed="false" aria-label="Auto-aim off: everyone aims by hand">OFF</button>
+            </div>
+          </div>
           <div class="pick" role="group" aria-label="Room">
             <span>ROOM</span>
             <div class="rooms">
@@ -181,6 +190,12 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   field("code").value = w.__blitzInvite || keep.get("blitz-code", tab);
   delete w.__blitzInvite;
   const showRoom = () => ((field("room").value = String(room)), ((gate.elements.namedItem("roomShow") as HTMLOutputElement).value = String(room)));
+  // Auto-aim (P1's pick counts): a share link carries it; remembered on this device.
+  let noAuto = (q.get("aim") ?? keep.get("blitz:aim", () => localStorage)) === "off";
+  const showAim = () => {
+    stage.querySelectorAll<HTMLButtonElement>("[data-aim]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.aim === "off") === noAuto)));
+    $("[data-aim-say]").textContent = noAuto ? "everyone aims by hand" : "AUTO and LOCK keys for everyone";
+  };
   const showMode = () => {
     stage.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => {
       b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
@@ -193,6 +208,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   };
   showRoom();
   showMode();
+  showAim();
+  stage.querySelectorAll<HTMLButtonElement>("[data-aim]").forEach((b) => b.addEventListener("click", () => ((noAuto = b.dataset.aim === "off"), keep.set("blitz:aim", noAuto ? "off" : "on", device), showAim())));
   stage.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => ((mode = b.dataset.mode as Mode), keep.set("blitz:mode2", mode, device), showMode())));
   stage.querySelectorAll<HTMLButtonElement>("[data-squad]").forEach((b) => b.addEventListener("click", () => ((squad = Number(b.dataset.squad)), keep.set("blitz:teams", String(squad), device), showMode())));
   stage.querySelectorAll<HTMLButtonElement>("[data-room]").forEach((b) => b.addEventListener("click", () => ((room = (room + Number(b.dataset.room) + ROOMS) % ROOMS), showRoom())));
@@ -345,7 +362,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       // Match length is part of the match: every player needs the same one (the share link carries it).
       ...(seconds ? { seconds } : {}),
       // Teams: P1's pick is the match's (every peer reads it from P1's moves in the countdown).
-      net: { transport: seat.transport, slot, players: seats, again: enter, leave, ...pick(mode) },
+      net: { transport: seat.transport, slot, players: seats, again: enter, leave, noAuto, ...pick(mode) },
       // Match over: free the room, so REMATCH can open it fresh for everyone. Wait a moment first:
       // another player may be a few frames behind and still needs our last inputs.
       onEnd: (st) => {
@@ -451,7 +468,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   // The link carries the code too (owner: friends shouldn't have to type it). The head script takes it
   // out of the address bar on arrival, so it doesn't stay in their history.
   $("[data-share]").addEventListener("click", async () => {
-    const url = `${location.origin}${location.pathname}?room=${room}&mode=${mode}${mode === "platoon" ? `&teams=${squad}` : ""}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}${code ? `&code=${encodeURIComponent(code)}` : ""}`;
+    const url = `${location.origin}${location.pathname}?room=${room}&mode=${mode}${mode === "platoon" ? `&teams=${squad}` : ""}${noAuto ? "&aim=off" : ""}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}${code ? `&code=${encodeURIComponent(code)}` : ""}`;
     const label = $("[data-share-say]");
     try {
       if (navigator.share) await navigator.share({ title: "Battlefield Blitz · multiplayer", text: `Join me in Blitz, room ${room}.`, url }), shared("share");

@@ -51,7 +51,7 @@ export interface BlitzOptions {
   /** Lockstep multiplayer (@fzlt/core/presence): every peer runs the same match from the same seed and
    *  only inputs cross the wire. A fixed 1100 × 640 arena (scaled to fit), humans in seats
    *  0..players-1, bots after them, no pause. `input` replaces this peer's controls (tests). */
-  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void; squad?: number; fill?: boolean; sides?: number };
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void; squad?: number; fill?: boolean; sides?: number; noAuto?: boolean };
   /** Intensity levers (see TUNE). A board match on this device reads the ones saved by Practice →
    *  TUNE; these override them in any mode. Net play: every peer must pass the same values. */
   tune?: Partial<Record<TuneKey, number>>;
@@ -103,6 +103,8 @@ function dist(x: number, y: number) {
   return m === 0 ? 0 : m * Math.sqrt(1 + r * r);
 }
 const MAXHP = 5, RAIL_MAX = 9, STRIKE_MAX = 5, RAIL_START = 3;
+// Net play: squares of the arena kept off screen on each axis (at least), so a tank can hide.
+const HIDE = 2;
 // Platoon mode: one colour per platoon; your wingmen have names, the others are numbered.
 const TEAM_COLORS = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"];
 const PLATOON = ["YOUR", "VIPER", "NOVA", "BRICK"];
@@ -267,9 +269,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 @media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}
 .stk{display:none}
 @media ${PHONE}{.stk{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));display:block;width:116px;height:116px;border:2.5px solid var(--line);border-radius:50%;background:color-mix(in srgb,var(--surface) 55%,transparent);touch-action:none}
+.stk::before{content:"";position:absolute;inset:-28px;border-radius:50%}
 .stk i{position:absolute;left:31px;top:31px;width:50px;height:50px;background:var(--team);border:2.5px solid var(--rim);border-radius:50%;box-shadow:0 4px 0 var(--rim)}
 .pre .stk,.demo .stk,.bui .pad .grab{display:none}.bui :is(.auto,.lock){bottom:106px;width:56px;height:56px}.bui :is(.long,.strike){bottom:166px}.hud{translate:-50% 0!important;cursor:default;background:color-mix(in srgb,var(--surface) 80%,transparent)}.pad{translate:none!important}
-.feed{left:50%;right:auto;translate:-50% 0;justify-items:center}.feed li:nth-child(n+3){display:none}}`;
+.feed{left:50%;right:auto;translate:-50% 0;justify-items:center}.feed li:nth-child(n+3){display:none}}
+.noauto .bui :is(.auto,.lock),.bui.noauto :is(.auto,.lock){display:none}`;
 
 export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const net = o.net ?? null, P = net ? net.players : 0;
@@ -390,7 +394,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // Net play: the mode (tanks a side, a 4-seat room the computer backfills, the 2v2 sides). P1's
   // pick rides in bits 9-11 and 13-15 of P1's input word through the countdown, so every peer builds the same
   // roster (src/seats.ts) on the same lockstep frame; nobody's seat changes.
-  let squad = 0, agreed = 0;
+  let squad = 0, agreed = 0, noAuto = 0; // noAuto: P1 turned auto-aim off for the match (lockstep-agreed)
 
   // ---------- World ----------
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
@@ -479,9 +483,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       dpr = Math.min(devicePixelRatio || 1, cw < 760 ? 1.5 : 2);
       canvas.width = Math.round(cw * dpr);
       canvas.height = Math.round(ch * dpr);
-      // A phone (game mode) covers the screen, turned when portrait; elsewhere the arena fits whole.
+      // The arena is a little bigger than the screen on every device (owner: room to hide): scaled so
+      // at least HIDE squares stay off screen on each axis, and the camera follows your tank (draw).
+      // A phone (game mode) turns it when portrait, so its long side runs down the tall screen.
       const turn = (view[3] = +(phone.matches && ch > cw)), aw = turn ? H : W, ah = turn ? W : H;
-      view[0] = (phone.matches ? Math.max : Math.min)(cw / aw, ch / ah);
+      view[0] = Math.max(cw / (aw - HIDE * T), ch / (ah - HIDE * T));
       view[1] = (cw - aw * view[0]) / 2;
       view[2] = (ch - ah * view[0]) / 2;
       return;
@@ -1160,7 +1166,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // at the pointer, 7-8 aim (0 pointer, 1 auto, 2 along the hull), 16-23 / 24-31 pointer x / y in
   // 256ths of the arena. Every peer runs the same human() on the same words.
   function human(t: Tank, b: number, dt: number) {
-    const mx = b & 3, my = (b >>> 2) & 3, aimMode = (b >>> 7) & 3;
+    const mx = b & 3, my = (b >>> 2) & 3, am = (b >>> 7) & 3, aimMode = noAuto && am === 1 ? 0 : am;
     const px = (((b >>> 16) & 255) + 0.5) * (W / 256), py = (((b >>> 24) & 255) + 0.5) * (H / 256);
     (F[DX] = mx === 1 ? -1 : mx === 2 ? 1 : 0), (F[DY] = my === 1 ? -1 : my === 2 ? 1 : 0), (F[DT] = dt), drive(t);
     const aim = aimMode === 1 ? nearestEnemy(t, 520) : -1;
@@ -1185,7 +1191,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     let x = wx(input.pointer.x), y = wy(input.pointer.y);
     if (strikeQ) (strikeQ = false), (targeting = false), (b |= 64), (x = wx(strikeX, strikeY)), (y = wy(strikeY, strikeX));
     if (you.strikes <= 0) targeting = false;
-    b |= (autoOn || lockOn ? 1 : !touch || input.pointer.down ? 0 : 2) << 7;
+    b |= ((autoOn || lockOn) && !noAuto ? 1 : !touch || input.pointer.down ? 0 : 2) << 7;
     const qx = Math.max(0, Math.min(255, Math.floor((x / W) * 256))), qy = Math.max(0, Math.min(255, Math.floor((y / H) * 256)));
     return (b | (qx << 16) | (qy << 24)) >>> 0;
   }
@@ -1201,7 +1207,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     mix(R.state);
     mix(G[CLK]!);
     mix(state === "play" ? 1 : state === "count" ? 2 : state === "end" ? 3 : state === "paused" ? 4 : 0);
-    mix(G[RES]!), mix(G[PZ_BY]!);
+    mix(G[RES]!), mix(G[PZ_BY]!), mix(noAuto);
     for (let s = 0; s < P; s++) mix(pzLeft[s]!);
     for (let i = 0; i < N; i++) {
       const t = tanks[i]!;
@@ -1254,8 +1260,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       // One-frame key edges are caught here (a frame can run no step).
       if (input.hit("long")) longQ = true;
       if (input.hit("strike")) strikeT = true;
-      if (input.hit("auto")) autoOn = !autoOn;
-      if (input.hit("lock")) (lockOn = !lockOn), (lockT = -1);
+      if (input.hit("auto") && !noAuto) autoOn = !autoOn;
+      if (input.hit("lock") && !noAuto) (lockOn = !lockOn), (lockT = -1);
     },
     // Net play: presence runs world() once per lockstep frame instead.
     // The crates hold still while paused or counting back in (they used to fall through a pause).
@@ -1284,7 +1290,16 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // pause in bit 12 (PZ_BIT). Both ride in every word: the mode is read through the countdown, the
   // pause in play, and they never share a bit.
   const pick = net ? ((net.fill ? (net.squad === 2 ? 6 : 5) | (((net.sides ?? 5) & 7) << 4) : net.squad! & 7) << 9) : 0, ownInput = net?.input ?? encode;
-  const netInput = () => (ownInput() | pick | (pzWant ? PZ_BIT : 0)) >>> 0;
+  // Auto-aim off (P1's pick, agreed like the mode): bit 16, the pointer's lowest x bit, which no
+  // one aims with before the match. Set or cleared only while this peer is at the start screen or in
+  // the countdown, so the words read there (sent a few frames ahead, from the same state) carry it
+  // and play keeps the full pointer.
+  const NOAUTO_BIT = 0x10000, wantNoAuto = !!net?.noAuto;
+  const netInput = () => {
+    let w = (ownInput() | pick | (pzWant ? PZ_BIT : 0)) >>> 0;
+    if (state === "intro" || state === "count") w = wantNoAuto ? (w | NOAUTO_BIT) >>> 0 : (w & ~NOAUTO_BIT) >>> 0;
+    return w;
+  };
   const link = net
     ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: netInput, step: (_, ins) => ((netIn = ins), world(e.dt * TU[U_SPEED]!)), hash: worldHash })
     : null;
@@ -1299,6 +1314,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (state === "intro" || state === "count") {
         // Net: P1's mode (the same input word on every peer, the same frame).
         if (net && (netIn[0]! & 0xee00) !== agreed) (agreed = netIn[0]! & 0xee00), roster();
+        if (net && +!!(netIn[0]! & NOAUTO_BIT) !== noAuto) (noAuto = +!!(netIn[0]! & NOAUTO_BIT)), (autoOn = lockOn = false);
         // The start screen: the grid lights up with everything that can land on it.
         if ((G[TILE_IN]! -= dt) <= 0) (lightTile(true), (G[TILE_IN] = 0.08 + R() * 0.16));
         for (const s of tiles) {
@@ -1660,7 +1676,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     G[CNT] = 2.4;
     G[RES] = 0;
     over.hidden = false;
-    over.innerHTML = `<div class="count" data-c>3</div>${net && P === 2 ? `<p class="vs" data-vs></p>` : ""}`;
+    over.innerHTML = `<div class="count" data-c>3</div>${net ? `<p class="vs" data-vs></p>` : ""}`;
     e.events.emit("ready", 0);
   }
   function begin() {
@@ -1788,10 +1804,11 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
 
   // ---------- HUD (change-only writes, render phase) ----------
   const teamKills = new Int32Array(4);
-  const last = { pl: false, pr: false, tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "", rs: false, pz: -1, pzl: "" };
+  const last = { pl: false, pr: false, na: 0, tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "", rs: false, pz: -1, pzl: "" };
   function hudFrame() {
     if (last.pl !== platoon) wrap.classList.toggle("platoon", (last.pl = platoon));
     if (last.pr !== practice) wrap.classList.toggle("practice", (last.pr = practice));
+    if (last.na !== noAuto) wrap.classList.toggle("noauto", !!(last.na = noAuto)); // P1 turned auto-aim off: no AUTO / LOCK keys
     const coaching = practice && state === "play";
     if (!coaching && !tunePanel.hidden) tuneOpen(false);
     if (coaching) coachFrame();
@@ -1882,7 +1899,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       if (left !== last.pzl) (last.pzl = left), (ov.querySelector("[data-pzl]")!.textContent = left);
     }
     if (state === "count") {
-      const vs = squad ? `${squad} V ${squad}` : "FREE FOR ALL", vsEl = over.querySelector<HTMLElement>("[data-vs]");
+      const vs = (squad ? `${squad} V ${squad}` : "FREE FOR ALL") + (noAuto ? " · AUTO-AIM OFF" : ""), vsEl = over.querySelector<HTMLElement>("[data-vs]");
       if (vsEl && vsEl.textContent !== vs) vsEl.textContent = vs;
       const c = G[CNT]! > 1.6 ? "3" : G[CNT]! > 0.8 ? "2" : G[CNT]! > 0.15 ? "1" : "BLITZ!";
       if (c !== last.count) {
@@ -2081,6 +2098,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       // at the top and bottom, where the keys and the scoreboard sit (your tank is never under them).
       const s = view[0]!, cw = canvas.width / dpr, ch = canvas.height / dpr, t = view[3]!;
       if (phone.matches) (view[1] = Math.min(0, Math.max(cw - (t ? H : W) * s, cw / 2 - s * (t ? H - you.y : you.x)))), (view[2] = Math.min(ch * 0.12, Math.max(ch * 0.84 - (t ? W : H) * s, ch / 2 - s * (t ? you.x : you.y))));
+      else (view[1] = Math.min(0, Math.max(cw - W * s, cw / 2 - s * you.x))), (view[2] = Math.min(0, Math.max(ch - H * s, ch / 2 - s * you.y)));
     }
     vt();
     ctx.clearRect(0, 0, W, H);
@@ -2412,6 +2430,25 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
     }
+    if (net && state === "play") edges();
+  }
+  /** Net play: an enemy off screen lights the screen's edge on its side, in its colour (drawing only). */
+  function edges() {
+    const s = view[0]!, cw = canvas.width / dpr, ch = canvas.height / dpr, t = view[3]!, L = 54, D = 7;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 0.55 + 0.35 * Math.sin(performance.now() / 160); // port-check: ok render-phase pulse, never in the step
+    for (const o of tanks) {
+      if (!o.alive || o.team === you.team) continue;
+      const x = t ? view[1]! + s * (H - o.y) : view[1]! + s * o.x, y = t ? view[2]! + s * o.x : view[2]! + s * o.y;
+      if (x >= 0 && x <= cw && y >= 0 && y <= ch) continue;
+      const cx = Math.max(L / 2, Math.min(cw - L / 2, x)), cy = Math.max(L / 2, Math.min(ch - L / 2, y));
+      ctx.fillStyle = o.color;
+      if (x < 0) ctx.fillRect(0, cy - L / 2, D, L);
+      else if (x > cw) ctx.fillRect(cw - D, cy - L / 2, D, L);
+      if (y < 0) ctx.fillRect(cx - L / 2, 0, L, D);
+      else if (y > ch) ctx.fillRect(cx - L / 2, ch - D, L, D);
+    }
+    ctx.globalAlpha = 1;
   }
 
   // ---------- Wiring: the round keys ----------
@@ -2566,6 +2603,10 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     /** Net play, two players: tanks a side as agreed (P1's pick), 0 = free-for-all. */
     get squad() {
       return squad;
+    },
+    /** Net play: P1 turned auto-aim off for this match (agreed in the countdown). */
+    get noAuto() {
+      return !!noAuto;
     },
     /** The intensity levers (Practice → TUNE): the live values, set one (saved like the slider), reset. */
     tune: {

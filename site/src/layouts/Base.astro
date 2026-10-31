@@ -76,6 +76,29 @@ const nav = [
     {app && <script is:inline>
       // App pages on phones: no pinch or double-tap zoom (iOS ignores user-scalable=no).
       for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, function (e) { if (matchMedia("(pointer: coarse)").matches) e.preventDefault(); }, { passive: false });
+      // Game mode (a phone): the board is the screen you can see, not the window behind the browser's
+      // bars. The stage follows the visual viewport (--app-h / --app-top, site.css), the page never
+      // scrolls, and a one-finger drag only scrolls a panel that scrolls (a thumb half off the drive
+      // pad used to drag the page). Inside the game's shadow root too: composedPath() sees through it.
+      (function () {
+        var game = matchMedia("(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px)"), vv = window.visualViewport, html = document.documentElement;
+        var fit = function () {
+          if (!game.matches) return;
+          if (vv) html.style.setProperty("--app-h", vv.height + "px"), html.style.setProperty("--app-top", vv.offsetTop + "px");
+          if (scrollX || scrollY) scrollTo(0, 0);
+        };
+        if (vv) vv.addEventListener("resize", fit), vv.addEventListener("scroll", fit);
+        addEventListener("scroll", fit, { passive: true });
+        addEventListener("orientationchange", fit);
+        fit();
+        var SCROLLS = ".tune,.room .body,.cc-banner,[data-scroll]";
+        document.addEventListener("touchmove", function (e) {
+          if (!game.matches || e.touches.length > 1) return;
+          var path = e.composedPath ? e.composedPath() : [e.target];
+          for (var i = 0; i < path.length; i++) if (path[i].matches && path[i].matches(SCROLLS) && path[i].scrollHeight > path[i].clientHeight) return;
+          if (e.cancelable) e.preventDefault();
+        }, { capture: true, passive: false });
+      })();
     </script>}
     <script>
       import { pressCue } from "../../../vendor/fizlet/ui/board-ui";

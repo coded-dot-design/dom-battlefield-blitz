@@ -22,7 +22,9 @@ export interface BlitzOptions {
     /** A 4-seat room started with fewer humans: the computer takes the empty seats (`players` humans,
      *  4 tanks). With `squad` 2 it's 2v2 (`sides`: bits for P2, P3, P4, 1 = side 1; default 0b101,
      *  at most 2 a side), else free-for-all. P1's pick is the match's, like `squad`. */
-    fill?: boolean; sides?: number };
+    fill?: boolean; sides?: number;
+    /** P1 turns auto-aim off for the match (agreed in the countdown, like the mode): no AUTO / LOCK for anyone. */
+    noAuto?: boolean };
   /** Intensity levers. A board match reads the ones Practice → TUNE saved on this device; these
    *  override them in any mode (net play: every peer must pass the same values). */
   tune?: Partial<Record<TuneKey, number>>;
@@ -43,6 +45,8 @@ export interface Blitz {
   readonly state: "intro" | "count" | "play" | "end" | "paused";
   /** Net play, two players: tanks a side as agreed (0 = free-for-all). */
   readonly squad: number;
+  /** Net play: P1 turned auto-aim off for this match (agreed in the countdown). */
+  readonly noAuto: boolean;
   /** The intensity levers: live values, set one (saved on this device in board play), reset, open the card. */
   readonly tune: { readonly values: Record<TuneKey, number>; readonly changed: number; set(key: TuneKey, v: number): void; reset(): void; open(on?: boolean): void };
   /** Leave the intro screen and start the countdown. */

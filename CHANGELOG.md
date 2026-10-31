@@ -8,10 +8,28 @@
   (the engine is still Fizlet). Gameplay unchanged: `test:replay` plays the same matches value for value,
   `test:lockstep` 0 desyncs, zero-alloc step green. What came with it: the Board UI kit's key shadows follow
   a page's `--shadow-x/-y/-color` (defaults unchanged: straight below, on the rim), and the kit hides a
-  `[hidden]` coach card itself. Sizes (gzip): `blitz.js` 45,784 → 46,009, `blitz.mjs` 45,885 → 46,115,
-  `blitz-net.mjs` 47,763 → 47,987; most of it is the kit CSS (4,974 → 5,139 B gzip). Budgets: `blitz.js` and
-  `blitz.mjs` 46,016 → 46,208 (the kit CSS above, measured; `blitz.mjs` was 99 B over, `blitz.js` had 7 B
-  left); `blitz-net.mjs` unchanged. Size-ledger row in fizlet-engine.
+  `[hidden]` coach card itself. Sizes (gzip, on top of the room-to-hide entry below): `blitz.js` 46,207 →
+  46,399, `blitz.mjs` 46,313 → 46,525, `blitz-net.mjs` 48,177 → 48,392; most of it is the kit CSS (4,974 →
+  5,139 B gzip). Budgets: `blitz.js` and `blitz.mjs` 46,528 → 46,720 (the kit CSS above, measured;
+  `blitz.mjs` had 3 B left); `blitz-net.mjs` unchanged. Size-ledger row in fizlet-engine.
+- **Multiplayer: room to hide, enemy edge lights, and an auto-aim switch** (owner feedback from phone play).
+  - **A bigger map than the screen, everywhere.** The fixed 1100 × 640 arena is now scaled so at least
+    2 squares stay off screen on each axis, on desktop as on phones, and the camera follows your tank
+    (before, desktop showed the whole arena and phones cropped one axis only). Drawing only: same match.
+  - **Edge lights:** an enemy off screen lights the screen's edge on its side, in its colour (render only).
+  - **AUTO-AIM ON / OFF** on the room card. P1's pick is the match's, agreed in the countdown like the
+    mode (bit 16 of P1's word, set only at the start screen and in the countdown). Off: no AUTO or LOCK
+    for anyone, every turret aims where its player points or taps. SEND LINK carries it (`&aim=off`);
+    the countdown says "AUTO-AIM OFF". `test:lockstep`: both screens agree, 0 desyncs, and the match
+    differs from the same seed with auto-aim on.
+  - **Phones: the page never moves under the game.** The stage follows the visible viewport
+    (`visualViewport`, so the browser's bars and tabs don't push it), the page is held at the top, and a
+    one-finger drag only scrolls a panel that scrolls (the room card, TUNE, the consent banner). The
+    drive stick takes touches up to 28 px outside its ring, so a thumb half off the pad still drives.
+    `tests/phone-net.mjs`: a drag that starts beside the stick drives; a swipe on the board moves
+    neither the page nor the stage.
+  - Size (gzip): `blitz.js` 45,784 → 46,207, `blitz.mjs` 45,885 → 46,313, `blitz-net.mjs` 47,763 →
+    48,177. Budgets +512 B each (46,528; net 48,576), size-ledger row in the engine.
 - **Multiplayer moves to `/play/multi/`** (owner: it's 2 to 4 players now, so "two" was the wrong name).
   `/play/two/` stays as a redirect that keeps the room, mode, code and hash, so shared links and
   invites still work; it is `noindex` with a canonical to the new page. The footer site map, the play-pass
