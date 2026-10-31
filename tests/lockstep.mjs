@@ -75,7 +75,7 @@ try {
         tables: peers.map((_, i) => [...document.getElementById("abcd"[i]).shadowRoot.querySelectorAll(".table div")].map((d) => d.textContent)),
         teamKills: peers.map((g) => g.world.tanks.reduce((a, t) => ((a[t.team] = (a[t.team] ?? 0) + t.kills), a), [])),
         names: peers.map((g) => g.world.tanks.map((t) => t.name).join(" ")),
-        squad: peers.map((g) => g.squad), rosters: peers.map((g) => g.world.tanks.map((t) => `${t.team}${t.you ? "H" : "A"}`).join(" ")),
+        squad: peers.map((g) => g.squad), noAuto: peers.map((g) => g.noAuto), rosters: peers.map((g) => g.world.tanks.map((t) => `${t.team}${t.you ? "H" : "A"}`).join(" ")),
         ready: peers.map((g) => g.world.tanks.filter((t) => t.alive || t.deaths > 0).length), humanShots: peers[0].world.tanks.slice(0, 2).map((t) => t.rail + "/" + t.strikes),
       };
       peers.forEach((g) => g.destroy());
@@ -156,6 +156,16 @@ try {
     assert.equal(t.ready[0], want.split(" ").length, `${label}: every seat's tank dropped in (bots too)`);
     modes.push(`${label} (${n} peers)`);
   }
+  // Auto-aim off is P1's pick, agreed like the mode: every peer reads it on the same frame (P2 asks
+  // for it on, P1's word wins), the scripted AUTO presses are ignored, so the match differs from the
+  // same seed with auto-aim on, and stays identical on both screens.
+  const aimOn = await run({ frames: 900, latency: 2, jitter: 1, seed: 91, scripted: true, nets: [{ squad: 1 }, { squad: 1, noAuto: true }] });
+  const aimOff = await run({ frames: 900, latency: 2, jitter: 1, seed: 91, scripted: true, nets: [{ squad: 1, noAuto: true }, { squad: 1 }] });
+  assert.deepEqual(aimOn.noAuto, [false, false], "auto-aim on: P1's pick, on both screens");
+  assert.deepEqual(aimOff.noAuto, [true, true], "auto-aim off: P1's pick, on both screens");
+  for (const t of [aimOn, aimOff]) (assert.deepEqual(t.desync, [-1, -1]), assert.equal(new Set(t.final).size, 1, "the same state hash on both peers"));
+  assert.notEqual(aimOff.final[0], aimOn.final[0], "auto-aim off changes the match (AUTO presses are ignored)");
+  modes.push("auto-aim off (P1's pick; 2 peers)");
   // 2v2 to the end (a 20 s match): each side's score is its tanks' kills, bots' too, on every screen,
   // and the side with more kills wins on every screen.
   const duel = await run({ frames: 60 * 26, latency: 1, jitter: 1, seed: 77, scripted: true, n: 3, seconds: 20, nets: [{ fill: true, squad: 2 }, {}, {}] });

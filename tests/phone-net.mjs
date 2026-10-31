@@ -171,6 +171,17 @@ try {
       const up = turned ? -dx : -dy, side = Math.abs(turned ? dy : dx);
       assert.ok(up > 20 && up > side, `${name}: the stick up moves your tank up the screen (arena Δ ${dx.toFixed(0)}, ${dy.toFixed(0)})`);
       assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#arena").shadowRoot.querySelector(".stk i")).translate), "none", `${name}: the stick lets go`);
+      // A thumb half off the stick still drives it (a 28 px margin around the pad), and the page never
+      // moves under it: the stage stays put and nothing scrolls (owner: the page shifted under a drag).
+      const R0 = m.stick.width / 2, off = { x: m.stick.x + R0, y: m.stick.y - 18 };
+      assert.equal(await p.evaluate(({ x, y }) => document.querySelector("#arena").shadowRoot.elementFromPoint(x, y)?.className, off), "stk", `${name}: 18 px outside the stick is still the stick`);
+      const b0 = await at();
+      await drag(p, off, 0, -60, 700);
+      const b1 = await at(), bup = turned ? b0[0] - b1[0] : b0[1] - b1[1];
+      assert.ok(bup > 10, `${name}: a drag that starts beside the stick drives too (up ${bup.toFixed(0)})`);
+      await drag(p, { x: w / 2, y: h / 2 }, 0, 220, 200);
+      const still = await p.evaluate(() => [scrollX, scrollY, document.querySelector(".blitz-stage").getBoundingClientRect().top]);
+      assert.deepEqual(still.map(Math.round), [0, 0, 0], `${name}: a swipe on the board moves neither the page nor the stage`);
       // One match on a portrait and a landscape screen.
       await p.waitForFunction(() => window.blitz.net.frame > 400, null, { timeout: 30000 });
       for (const { page } of [me, other]) assert.equal(await page.evaluate(() => window.blitz.net.desync), -1, `${name}: no desync`);
