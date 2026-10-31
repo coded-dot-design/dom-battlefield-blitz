@@ -32,7 +32,7 @@ await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
 const base = `http://127.0.0.1:${server.address().port}${PREFIX}/`;
 
 // ---------- The mock room server (rooms/src/relay.js, in memory) ----------
-const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4, START = 7;
+const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4, START = 7, LOBBY = 8;
 const msg = (kind, slot, players, frame, value, mode = 0) => {
   const b = Buffer.alloc(12);
   b[0] = kind, b[1] = slot, b[2] = players, b[3] = mode;
@@ -75,6 +75,10 @@ async function mockServer(context, mode) {
       r.started = true;
       r.seats.forEach((p, s) => p.send(msg(WELCOME, s, r.seats.length, r.seed, 1 + s, r.mode ?? 0)));
     };
+    // LOBBY (fizlet#210, "new" server only): before the start, every waiting seat on each join and leave:
+    // [8, your seat, room size, seated]. Seats close up on a leave (arrival order), like the room's.
+    const lobby = () => !r.started && mode === "new" && ((r.seats = [...r.seats.filter(Boolean), ...r.seats.filter((x) => !x)]), r.seats.forEach((p, s) => p?.send(msg(LOBBY, s, r.seats.length, 0, 0, r.seats.filter(Boolean).length))));
+    lobby();
     ready();
     ws.onMessage((d) => {
       if (typeof d === "string" || d.length !== 12) return;
@@ -89,6 +93,7 @@ async function mockServer(context, mode) {
       if (me < 0) return;
       r.seats[me] = null;
       if (r.started) r.seats.forEach((p) => p?.send(msg(LEAVE, me, r.seats.length, 0, 0)));
+      else lobby();
       if (!r.seats.some(Boolean)) r.started = false;
     });
   });
@@ -152,7 +157,7 @@ const CASES = [
 // FULL=1 (with SHOTS): every mode at 1440 and 390, light and dark, for the screenshot sheet.
 if (process.env.FULL) CASES.splice(0, CASES.length, ...[["1v1", 2], ["ffa", 2], ["2v2", 3], ["platoon", 2, 3]].flatMap(([g, n, k]) => [[1440, "dark"], [1440, "light"], [390, "dark"], [390, "light"]].map(([w, t]) => [n, w, t, "new", g, k])));
 if (process.env.ONLY) CASES.splice(0, CASES.length, ...CASES.filter((c) => c[4] === process.env.ONLY));
-const said = [];
+const said = [], counted = [];
 try {
   for (const [n, width, theme, mode, game, squad] of CASES) {
     const tag = `${game}${squad ? squad : ""}-${n}p-${width}-${theme}-${mode}`, room = runs++, seats = game === "ffa" || game === "2v2" ? 4 : 2;
@@ -187,7 +192,7 @@ try {
     await me.click("[data-join]");
     await me.waitForFunction(() => document.querySelector(".room").dataset.step === "wait");
     assert.equal(await me.locator("[data-wait-seats] li").count(), seats, "a seat per player");
-    assert.match(await me.locator("[data-sub]").textContent(), new RegExp(`WAITING · ${seats} PLAYERS`));
+    await me.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), mode === "new" ? `WAITING · 1 OF ${seats}` : `WAITING · ${seats} PLAYERS`);
     await shot(me, `${tag}-2-wait`);
     await layout(me, `${tag} wait`);
     // SEND LINK: the room and mode, never the code.
@@ -210,17 +215,37 @@ try {
     }
     const all = [me, ...others];
     const cpu = seats - n;
+    const sub = (p) => p.locator("[data-sub]").textContent();
+    if (mode === "new" && cpu) {
+      // LOBBY (a room not yet full): every waiting player sees its seat and "n OF size"; a non-host never sees START NOW.
+      await me.waitForFunction(([n, size]) => document.querySelector("[data-sub]").textContent.endsWith(`${n} OF ${size}`), [n, seats]);
+      for (const [i, o] of others.entries()) {
+        await o.waitForFunction(([n, size]) => document.querySelector("[data-sub]").textContent.endsWith(`${n} OF ${size}`), [n, seats]);
+        assert.match(await o.locator("[data-title]").textContent(), new RegExp(`P${i + 2}$`), `${tag}: P${i + 2} knows its seat`);
+        assert.equal(await o.locator("[data-start]").isHidden(), true, `${tag}: no START NOW for a non-host`);
+      }
+      assert.equal(await me.locator("[data-wait-seats] li:not(.open)").count(), n, `${tag}: the seats taken`);
+    }
     if (cpu) {
-      // A 4-seat room with 2 or 3 in: START NOW (P1's counts; the room can't say who is seated first).
+      // The count follows joins and leaves: one more comes and goes (when that doesn't fill the room).
+      if (n + 1 < seats) {
+        const extra = await peer(1440, theme, `${base}play/two/?rooms=wss://rooms.test&room=${room}&mode=${game}&code=${CODE}`, mode);
+        await extra.click("[data-join]");
+        await me.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), `${n + 1} OF ${seats}`);
+        await extra.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), `${n + 1} OF ${seats}`);
+        assert.equal(await extra.locator("[data-start]").isHidden(), true, `${tag}: no START NOW for a non-host`);
+        await extra.close();
+        await me.waitForFunction((t) => document.querySelector("[data-sub]").textContent.endsWith(t), `${n} OF ${seats}`);
+        counted.push(`${n} → ${n + 1} → ${n} OF ${seats}`);
+      }
+      // A 4-seat room with 2 or 3 in: only P1 sees START NOW (and the CPU count).
       await me.waitForFunction(() => !document.querySelector("[data-start]").hidden);
-      assert.match(await me.locator("[data-start]").textContent(), /START NOW/);
-      assert.match(await me.locator("[data-wait-say]").textContent(), /computer takes the empty seats/);
+      assert.match(await me.locator("[data-start]").textContent(), new RegExp(`START NOW · ${cpu} CPU`));
+      assert.match(await me.locator("[data-wait-say]").textContent(), /computer takes the/);
+      for (const o of others) assert.equal(await o.locator("[data-start]").isHidden(), true, `${tag}: only P1 can start`), assert.match(await o.locator("[data-wait-say]").textContent(), /Waiting for P1 to start/);
+      assert.match(await sub(me), new RegExp(`WAITING · ${n} OF ${seats}`));
       await shot(me, `${tag}-2-wait-start`);
       await layout(me, `${tag} wait start`);
-      // Another seat's START is ignored: still waiting.
-      await others.at(-1).click("[data-start]");
-      await me.waitForTimeout(300);
-      assert.equal(await step(me), "wait", `${tag}: only P1's START counts`);
       await me.click("[data-start]");
     }
     for (const p of all) await p.waitForFunction(() => document.querySelector(".room").dataset.step === "play", null, { timeout: 10000 });
@@ -285,7 +310,7 @@ try {
     assert.deepEqual(leaks, [], `${tag}: no code in a URL or referrer on the new server`);
     for (const c of contexts.splice(0)) await c.close();
   }
-  console.log(`Multiplayer: the four modes through a mock room (old and new invite forms; START on the new one), ${runs} runs at 1440 and 390 in light and dark (${said.join("; ")}): join, the MODE pick (P1's on every screen, carried by the link), waiting seats, START NOW with the computer in the empty seats, live match with a row per player and bot in its tank colour and side totals, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
+  console.log(`Multiplayer: the four modes through a mock room (old and new invite forms; LOBBY and START on the new one: seat, n OF size on join and leave, START NOW for the host only; counts ${counted.join(", ")}), ${runs} runs at 1440 and 390 in light and dark (${said.join("; ")}): join, the MODE pick (P1's on every screen, carried by the link), waiting seats, START NOW with the computer in the empty seats, live match with a row per player and bot in its tank colour and side totals, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
 } catch (e) {
   console.error(`multiplayer test failed at ${where}`);
   throw e;
