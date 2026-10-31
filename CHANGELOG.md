@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Multiplayer passes: ask with your GitHub account.** A "Request a multiplayer pass" issue form (`play-pass` label: the open issues are the queue); a maintainer's `approved` label (write access checked through the REST API) makes `.github/workflows/play-pass.yml` post a 1-hour pass that locks to the first device that uses it; closing the issue revokes it. `scripts/play-pass.mjs` (no dependencies) mints it and is the owner's CLI for private family (30 days, 3 devices), owner (a year, 5) and batch passes (`--out` CSV, gitignored), plus `list` / `revoke`. `/play/two/` shows a PASS field only when the room server requires passes (fizlet `rooms/` `REQUIRE_PASS`, off by default), kept in session storage, and links to the form. Off until the owner adds the secrets: [docs/play-pass.md](docs/play-pass.md). Tests: `tests/play-pass.test.mjs` (12).
 - **Reduced motion: no screen shake.** Under `prefers-reduced-motion: reduce` the arena no longer shakes for blasts, hits and the nuke (up to 18 px before; the stickers and launch effects already calmed down). Drawing only: the shake has its own render-side random, so the match is the same (`test:replay` value for value, `test:lockstep` 0 desyncs). `test:browser` steps one seeded match both ways: it shakes without the setting, never with it, same hash. Sizes (gzip, on 0.11.0): `blitz.js` 43,752 → 43,769, `blitz.mjs` 43,864 → 43,886, `blitz-net.mjs` 45,331 → 45,361.
 
 ## 0.11.0

@@ -7,7 +7,7 @@
 // grip or header (remembered on this device, double-click puts it back) and folds to its header.
 import Base from '../../../layouts/Base.astro';
 import Icon from '../../../components/Icon.astro';
-import { base, ROOMS } from '../../../site';
+import { base, REPO, ROOMS } from '../../../site';
 const title = 'Battlefield Blitz · multiplayer';
 const description = 'Two to four players, one Blitz match, over the internet. Enter an invite code and pick a room.';
 ---
@@ -43,8 +43,13 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       <div class="body" id="room-body">
         <!-- 1. Join: code, players, room -->
         <form class="step" data-for="join" id="gate" novalidate>
-          <label>INVITE CODE
+          <label data-invite>INVITE CODE
             <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required minlength="6" maxlength="64" placeholder="BLITZ-XXXX-XXXX" />
+          </label>
+          <!-- Play passes: shown only when the room server requires one (POST /invite says pass:true).
+               Kept in this tab's session storage, never in a URL. docs/play-pass.md -->
+          <label data-pass hidden>PASS
+            <input name="pass" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="600" placeholder="Paste your pass" />
           </label>
           <div class="pick" role="group" aria-label="Players" data-players-pick hidden>
             <span>PLAYERS</span>
@@ -115,7 +120,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   </section>
   <div class="wrap blitz-bar">
     <p><b>BLITZ · MULTIPLAYER</b> · same code, same room · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · phones: drag left to drive</p>
-    <p><a href={base('play/')}>Play solo</a> · <a href={base()}>About Blitz</a></p>
+    <p><a href={base('play/')}>Play solo</a> · <a href={base()}>About Blitz</a> · <a href={`${REPO}/issues/new?template=play-pass.yml`}>Request a pass</a></p>
   </div>
 </Base>
 
@@ -231,6 +236,27 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   const waitSeats = (n: number) =>
     ($("[data-wait-seats]").innerHTML = Array.from({ length: n }, (_, i) => `<li class="${i ? "open" : "me"}">${swatch(i)}<span>${i ? "OPEN SEAT" : "YOU"}</span></li>`).join(""));
 
+  // ---------- Play passes (docs/play-pass.md) ----------
+  // When the room server requires a pass, it replaces the invite. The pass stays in this tab's
+  // session storage; the device key (random, made once) on this device, so a pass locked to it
+  // rejoins. Both travel only as WebSocket subprotocols and in a POST body, never in a URL.
+  let needPass = false, pass = keep.get("blitz-pass", tab), memDevice = "";
+  field("pass").value = pass;
+  const deviceKey = () => {
+    let k = keep.get("blitz:device", device) || memDevice;
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(k)) {
+      const b = crypto.getRandomValues(new Uint8Array(18));
+      k = btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_");
+      keep.set("blitz:device", k, device);
+    }
+    return (memDevice = k);
+  };
+  const showPass = (on: boolean) => {
+    needPass = on;
+    $("[data-pass]").hidden = !on;
+    $("[data-invite]").hidden = on;
+  };
+
   // ---------- The match ----------
   let game: Game | null = null, abort: AbortController | null = null, watch = 0, code = "";
   let link: { close(): void } | null = null, ended = false, freeAt = 0, slot = 0, seats = 2;
@@ -264,7 +290,9 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       try {
         const at = `${ws}/room/${room}?players=${players}`;
         // The invite rides in the WebSocket subprotocols, never the URL (only the old server needs ?invite=).
-        const seat = via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal) : await join(at, signal, ["fizlet-rooms", `invite.${code}`]);
+        const seat = needPass
+          ? await join(at, signal, ["fizlet-rooms", `pass.${pass}`, `device.${deviceKey()}`])
+          : via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal) : await join(at, signal, ["fizlet-rooms", `invite.${code}`]);
         return start(seat);
       } catch {
         if (signal.aborted) return;
@@ -333,24 +361,39 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   // How the room server takes the code. "body": POST /invite, then a WebSocket subprotocol (fizlet-rooms
   // from fizlet#114: the code stays out of URLs and logs). "url": the server deployed before it, which
   // reads ?code= / ?invite= only (it answers a POST with 403). Next release: drop "url" and the fallback.
-  let via: "body" | "url" = "body";
+  let via: "body" | "url" = "body", why = "";
   /** Is the code on the list? Also learns how many players a room may hold. null: no server; "slow": rate capped. */
-  async function check(c: string) {
+  async function check(c: string, old = true) {
     const ask = (url: string, init?: RequestInit) => fetch(url, { referrerPolicy: "no-referrer", ...init }).catch(() => null);
     via = "body";
     let r = await ask(`${http}/invite`, { method: "POST", body: c }); // text/plain: no CORS preflight
-    if (r && !r.ok && [403, 404, 405].includes(r.status)) {
+    // A pass never goes by URL: no old-server fallback for it.
+    if (old && r && !r.ok && [403, 404, 405].includes(r.status)) {
       const old = await ask(`${http}/invite?code=${encodeURIComponent(c)}`);
       if (old?.ok) (r = old), (via = "url");
     }
     if (!r) return null;
     if (r.status === 429) return "slow";
     const body = await r.json().catch(() => ({}));
+    if (body.pass === true) showPass(true);
+    why = typeof body.why === "string" ? body.why : "";
     if (Number.isInteger(body.players)) (maxPlayers = Math.min(4, Math.max(2, body.players))), showPlayers();
     return r.ok;
   }
   gate.addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    if (needPass) {
+      pass = field("pass").value.trim();
+      if (pass.length < 20) return say("Paste the pass you were sent.");
+      say("Checking the pass…");
+      const ok = await check(`${pass}\n${deviceKey()}`, false);
+      if (ok === null) return say("Can't reach the game server. Check your connection and try again.");
+      if (ok === "slow") return say("Too many tries. Wait a minute, then try again.");
+      if (!ok) return say(why === "pass in use on another device" ? "That pass is already locked to another device." : why === "pass expired" ? "That pass has expired. Request a new one." : why === "pass revoked" ? "That pass was revoked." : "That pass isn't valid.");
+      say("");
+      keep.set("blitz-pass", pass, tab);
+      return enter();
+    }
     code = field("code").value.trim().toUpperCase();
     if (code.length < 6) return say("Enter the invite code you were sent.");
     say("Checking the code…");
@@ -378,6 +421,11 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   });
   attract();
   step("join");
+  // Does the room server require a pass? An empty POST /invite answers pass:true when it does.
+  fetch(`${http}/invite`, { method: "POST", body: "", referrerPolicy: "no-referrer" })
+    .then((r) => r.json())
+    .then((b) => b?.pass === true && (showPass(true), step("join")))
+    .catch(() => {});
   // A share link for 3 or 4: ask the server what it allows, so the players pick shows straight away.
   if (Number(q.get("players")) > 2 && field("code").value) check(field("code").value.trim().toUpperCase()).then(() => showPlayers());
 </script>
@@ -523,6 +571,14 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     background: var(--surface);
     border: 2.5px solid var(--line);
     border-radius: 8px;
+  }
+  .step label[hidden] {
+    display: none;
+  }
+  .step input[name="pass"] {
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    text-transform: none;
   }
   .step input::placeholder {
     color: color-mix(in srgb, var(--muted) 55%, transparent);

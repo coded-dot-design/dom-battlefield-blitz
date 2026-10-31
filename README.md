@@ -42,6 +42,7 @@ them back; COPY SETTINGS copies them as JSON. Online matches always play the def
 
 **Two players** (`/play/two/`, online rooms in lockstep): the TEAMS pick is FFA (both players + 4 bots,
 the default), 1V1, or 2V2 to 4V4, where each player leads AI wingmen in their colour. P1's pick is the match's.
+Want to play online? [Request a multiplayer pass](docs/play-pass.md) with your GitHub account.
 
 
 **Two guns.** The cannon fires fast but overheats if you hold it (watch the ring on FIRE). The

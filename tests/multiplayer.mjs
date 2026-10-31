@@ -9,7 +9,9 @@
 // invite as a WebSocket subprotocol) and "old" (the deployed one: ?code= / ?invite= in the URL only;
 // it answers a POST with 403 and fails a handshake that offers protocols, as a browser would without
 // the 101 echo). The page must work on both, never keep ?code= in its URL, and on "new" never put the
-// code in a URL or a referrer.
+// code in a URL or a referrer. A third, "pass" (REQUIRE_PASS on: docs/play-pass.md): the page shows its
+// PASS field instead of the invite, sends pass + device key in the POST body and the subprotocols, never
+// a URL, and a pass held by one device is refused on another.
 // Run after `npm run site:build`. SHOTS=<dir> saves screenshots.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -41,11 +43,20 @@ const msg = (kind, slot, players, frame, value) => {
   return b;
 };
 const rooms = new Map(), CODE = "TEST-CODE-1";
+// Pass mode: two test passes (opaque to the page) and the device each one is locked to.
+const PASSES = ["eyJ2IjoxLCJpZCI6InRlc3QtcGFzcy1hIn0.c2lnLWE", "eyJ2IjoxLCJpZCI6InRlc3QtcGFzcy1iIn0.c2lnLWI"], locked = new Map();
+const passOk = (p, d, claim) => PASSES.includes(p) && /^[A-Za-z0-9_-]{16,64}$/.test(d ?? "") && (locked.get(p) ?? d) === d && (claim ? (locked.set(p, d), true) : true);
 // Where codes travelled on a "new" server (URLs, referrers): must stay empty.
 const leaks = [];
 async function mockServer(context, mode) {
   await context.route("https://rooms.test/**", (r) => {
     const req = r.request(), u = new URL(req.url()), inUrl = u.searchParams.get("code");
+    if (mode === "pass") {
+      if (u.search || PASSES.some((p) => req.url().includes(p) || (req.headers().referer ?? "").includes(p))) leaks.push(req.url());
+      const [p, d] = (req.postData() ?? "").split("\n"), ok = passOk(p, d, false);
+      const why = PASSES.includes(p) && locked.has(p) ? "pass in use on another device" : "pass not valid";
+      return r.fulfill({ status: ok ? 200 : 403, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(ok ? { ok: true, players: 4, pass: true } : { ok: false, pass: true, ...(p ? { why } : {}) }) });
+    }
     if (mode === "new" && (inUrl || /code|invite/i.test(req.headers().referer ?? ""))) leaks.push(inUrl ?? req.headers().referer);
     // old: the method is ignored and the code read from the URL; new: the body of a POST (URL still accepted).
     const code = mode === "new" && req.method() === "POST" ? req.postData() : inUrl;
@@ -58,9 +69,14 @@ async function mockServer(context, mode) {
     const protocols = u.hash.startsWith("#p=") ? JSON.parse(decodeURIComponent(u.hash.slice(3))) : [];
     const viaUrl = u.searchParams.get("invite"), viaProtocol = protocols.find((p) => p.startsWith("invite."))?.slice(7);
     if (mode === "new" && viaUrl) leaks.push(`ws ?invite=${viaUrl}`);
+    if (mode === "pass") {
+      if (PASSES.some((p) => u.search.includes(p))) leaks.push(`ws ${u.search}`);
+      const pass = protocols.find((p) => p.startsWith("pass."))?.slice(5), dev = protocols.find((p) => p.startsWith("device."))?.slice(7);
+      if (!protocols.includes("fizlet-rooms") || !passOk(pass, dev, true)) return ws.close({ code: 4003, reason: "pass needed" });
+    } else
     if (mode === "new" && !protocols.includes("fizlet-rooms")) return ws.close({ code: 4003, reason: "expected the fizlet-rooms subprotocol" });
     if (mode === "old" && protocols.length) return ws.close({ code: 1006, reason: "no subprotocol in the 101: the browser fails the handshake" });
-    if ((mode === "new" ? viaProtocol : viaUrl) !== CODE) return ws.close({ code: 4003, reason: "invite code needed" });
+    if (mode !== "pass" && (mode === "new" ? viaProtocol : viaUrl) !== CODE) return ws.close({ code: 4003, reason: "invite code needed" });
     let r = rooms.get(u.pathname);
     if (!r || !r.seats.some(Boolean)) rooms.set(u.pathname, (r = { players, seats: Array(players).fill(null), started: false, seed: 1234 + rooms.size }));
     if (r.players !== players || r.started) return ws.close({ code: 4000, reason: "room full" });
@@ -224,7 +240,42 @@ try {
     assert.deepEqual(leaks, [], `${tag}: no code in a URL or referrer on the new server`);
     for (const c of contexts.splice(0)) await c.close();
   }
-  console.log(`Multiplayer: 2 and 4 players through a mock room (old and new invite forms), ${runs} runs at 1440 and 390 in light and dark: join, the TEAMS pick (FFA, 1v1, 2v2, 4v4: P1's pick on every screen, the right tank count, carried by the link), waiting seats, live match with a row per player in its tank colour, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
+  // Passes on: the PASS field replaces the invite; each device joins with its own pass.
+  for (const [width, theme] of [[390, "light"], [1440, "dark"]]) {
+    const tag = `pass-${width}-${theme}`, room = runs++, url = `${base}play/two/?rooms=wss://rooms.test&room=${room}&players=2`;
+    where = tag;
+    locked.clear();
+    const me = await peer(width, theme, url, "pass");
+    await me.waitForSelector("[data-pass]:not([hidden])", { timeout: 5000 });
+    assert.equal(await me.locator("[data-invite]").isHidden(), true, `${tag}: no invite field when passes are required`);
+    await layout(me, `${tag} join`);
+    await shot(me, `${tag}-1-join`);
+    await me.fill("input[name=pass]", "not-a-pass.at-all-really");
+    await me.click("[data-join]");
+    await me.waitForFunction(() => /isn't valid/.test(document.querySelector("[data-say]").textContent));
+    await me.fill("input[name=pass]", PASSES[0]);
+    await me.click("[data-join]");
+    await me.waitForFunction(() => document.querySelector(".room").dataset.step === "wait");
+    assert.equal(await me.evaluate(() => sessionStorage.getItem("blitz-pass")), PASSES[0], `${tag}: the pass is kept for this tab`);
+    const other = await peer(1440, theme, url, "pass");
+    await other.waitForSelector("[data-pass]:not([hidden])");
+    await other.fill("input[name=pass]", PASSES[1]);
+    await other.click("[data-join]");
+    for (const p of [me, other]) await p.waitForFunction(() => document.querySelector(".room").dataset.step === "play", null, { timeout: 10000 });
+    // Pass A is locked to my device: another device with it is refused before it joins.
+    const thief = await peer(1440, theme, url, "pass");
+    await thief.waitForSelector("[data-pass]:not([hidden])");
+    await thief.fill("input[name=pass]", PASSES[0]);
+    await thief.click("[data-join]");
+    await thief.waitForFunction(() => /locked to another device/.test(document.querySelector("[data-say]").textContent));
+    for (const p of [me, other, thief]) {
+      assert.doesNotMatch(p.url(), /pass|eyJ/, `${tag}: no pass in the URL`);
+      assert.deepEqual(p.errors, [], `${tag}: no page errors`);
+    }
+    assert.deepEqual(leaks, [], `${tag}: no pass in a URL or referrer`);
+    for (const c of contexts.splice(0)) await c.close();
+  }
+  console.log(`Multiplayer: 2 and 4 players through a mock room (old and new invite forms, and passes), ${runs} runs at 1440 and 390 in light and dark: join, the TEAMS pick (FFA, 1v1, 2v2, 4v4: P1's pick on every screen, the right tank count, carried by the link), waiting seats, live match with a row per player in its tank colour, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
 } catch (e) {
   console.error(`multiplayer test failed at ${where}`);
   throw e;

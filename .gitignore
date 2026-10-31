@@ -1,3 +1,6 @@
 node_modules
 artifacts
 .astro
+# Minted play passes (scripts/play-pass.mjs mint --batch --out): never committed
+passes.csv
+*.passes.csv

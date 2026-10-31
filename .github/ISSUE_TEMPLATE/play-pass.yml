@@ -1,0 +1,38 @@
+name: Request a multiplayer pass
+description: Ask for a 1-hour pass to play Battlefield Blitz online (/play/two/).
+title: "Play pass: "
+labels: ["play-pass"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A pass lets one device join a Blitz multiplayer room for **1 hour**. A maintainer approves the
+        request, then a bot posts your pass here as a comment. It locks to the **first device** that
+        uses it, so use it soon after it arrives. Everyone in the match needs their own pass: send your
+        friends here too. How it works: [docs/play-pass.md](https://github.com/coded-dot-design/dom-battlefield-blitz/blob/main/docs/play-pass.md).
+  - type: input
+    id: when
+    attributes:
+      label: Preferred time (optional)
+      description: When you'd like to play, with your time zone. Passes start when they're posted.
+      placeholder: "Saturday 18:00 UTC"
+    validations:
+      required: false
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - 1v1
+        - 4 seats with bots
+        - 2v2
+        - 1v1 platoons
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: House rules
+      options:
+        - label: "I'll play fair, keep the pass to my own device, and close this issue when I'm done (that revokes the pass)."
+          required: true
