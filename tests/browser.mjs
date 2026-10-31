@@ -91,13 +91,15 @@ try {
   await page.waitForFunction(() => game.world.planes.some((p) => p.on) && game.world.bombs.some((b) => b.on), null, { timeout: 2000 });
   await page.waitForFunction(() => !game.world.bombs.some((b) => b.on), null, { timeout: 4000 });
   assert.equal(await page.evaluate(() => game.controls.targeting), false);
-  // Pause = the surrender question (the Battlefield overlay): KEEP FIGHTING resumes.
+  // Pause: RESUME (after a 3 s countdown, the board held still), RESTART, QUIT TO MENU, SURRENDER.
   [x, y] = await sr("[data-pause]");
   await page.mouse.click(x, y);
   await page.waitForFunction(() => game.state === "paused");
-  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-ov]").textContent), /BATTLE PAUSED.*GIVE UP\?.*KEEP FIGHTING.*SURRENDER/s);
+  assert.match(await page.evaluate(() => document.getElementById("board").shadowRoot.querySelector("[data-ov]").textContent), /BATTLE PAUSED.*PAUSED.*RESUME.*RESTART.*QUIT TO MENU.*SURRENDER.*BY CHRIS COOLEY/s);
   await page.mouse.click(...(await sr("[data-resume]")));
   await page.waitForFunction(() => game.state === "play");
+  await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector("[data-over] [data-c]")?.textContent === "3", null, { timeout: 1000 });
+  await page.waitForFunction(() => document.getElementById("board").shadowRoot.querySelector("[data-over]").hidden, null, { timeout: 5000 });
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => game.state === "paused");
   await page.keyboard.press("Escape");
