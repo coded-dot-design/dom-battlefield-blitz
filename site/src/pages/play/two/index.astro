@@ -37,6 +37,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
         <i class="dot" aria-hidden="true"></i>
         <b id="room-title" data-title>MULTIPLAYER</b>
         <small data-sub role="status">NOT CONNECTED</small>
+        <span class="chip" data-chip></span>
         <button class="bui-key bui-icon-key fold" type="button" data-fold aria-expanded="true" aria-controls="room-body" aria-label="Fold the room card"><Icon name="down" size={18} /></button>
       </header>
 
@@ -46,22 +47,23 @@ const description = 'Two to four players, one Blitz match, over the internet. En
           <label>INVITE CODE
             <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required minlength="6" maxlength="64" placeholder="BLITZ-XXXX-XXXX" />
           </label>
-          <div class="pick" role="group" aria-label="Players" data-players-pick hidden>
-            <span>PLAYERS</span>
-            <div class="bui-seg">
-              <button class="bui-key" type="button" data-players="2" aria-pressed="true">2</button>
-              <button class="bui-key" type="button" data-players="3" aria-pressed="false">3</button>
-              <button class="bui-key" type="button" data-players="4" aria-pressed="false">4</button>
+          <!-- The mode: P1's pick is the match's (the game agrees it in the countdown). 1V1 and PLATOONS are
+               rooms of two; FFA and 2V2 are rooms of four that P1 can start with two or three humans in,
+               the computer taking the empty seats (at most two). -->
+          <div class="pick wide" role="group" aria-labelledby="mode-label" data-mode-pick>
+            <span><b id="mode-label">MODE</b> <small data-mode-say></small></span>
+            <div class="bui-seg modes">
+              <button class="bui-key" type="button" data-mode="1v1" aria-pressed="true" aria-label="1 v 1: two players, one tank each">1V1</button>
+              <button class="bui-key" type="button" data-mode="ffa" aria-pressed="false" aria-label="FFA, free for all: 4 seats, the computer fills up to 2">FFA</button>
+              <button class="bui-key" type="button" data-mode="2v2" aria-pressed="false" aria-label="2 v 2: 4 seats, the computer fills a side that's short">2V2</button>
+              <button class="bui-key" type="button" data-mode="platoon" aria-pressed="false" aria-label="Platoon: two players, each leading AI wingmen">PLATOON</button>
             </div>
           </div>
-          <!-- Two players: free-for-all (with bots, the default) or sides of 1 to 4 tanks, AI wingmen
-               filling each side. P1's pick is the match's (the game agrees it in the countdown). -->
-          <div class="pick wide" role="group" aria-label="Teams" data-squad-pick>
-            <span>TEAMS <small data-squad-say></small></span>
-            <div class="bui-seg">
-              <button class="bui-key" type="button" data-squad="0" aria-pressed="true" aria-label="Free for all, with bots">FFA</button>
-              <button class="bui-key" type="button" data-squad="1" aria-pressed="false" aria-label="1 v 1">1V1</button>
-              <button class="bui-key" type="button" data-squad="2" aria-pressed="false" aria-label="2 v 2: you and 1 AI wingman each">2V2</button>
+          <!-- Platoons: tanks a side (you + AI wingmen). -->
+          <div class="pick wide" role="group" aria-label="Platoon size" data-squad-pick hidden>
+            <span>PLATOON <small data-squad-say></small></span>
+            <div class="bui-seg sizes">
+              <button class="bui-key" type="button" data-squad="2" aria-pressed="true" aria-label="2 v 2: you and 1 AI wingman each">2V2</button>
               <button class="bui-key" type="button" data-squad="3" aria-pressed="false" aria-label="3 v 3: you and 2 AI wingmen each">3V3</button>
               <button class="bui-key" type="button" data-squad="4" aria-pressed="false" aria-label="4 v 4: you and 3 AI wingmen each">4V4</button>
             </div>
@@ -77,7 +79,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
           </div>
           <button class="bui-key bui-sticker-key go" type="submit" data-join><Icon name="play" size={22} /><b>JOIN</b></button>
           <p class="say" role="alert" data-say></p>
-          <p class="fine">Everyone: the same code, the same room. The match starts when the room is full. P1's teams pick is the match's.</p>
+          <p class="fine">Everyone: the same code, the same room. The match starts when the room is full, or when P1 starts it. P1's mode is the match's.</p>
         </form>
 
         <!-- 2. Waiting for the room to fill -->
@@ -85,6 +87,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
           <ol class="seats" data-wait-seats aria-label="Seats"></ol>
           <p class="big" data-wait-say>Waiting for player 2.</p>
           <p class="fine">Send your friends the link and tell them the code (the link never carries it).</p>
+          <!-- P1, in a 4-seat room with 2 or 3 in: start now, the computer takes the empty seats. -->
+          <button class="bui-key bui-sticker-key" type="button" data-start hidden><Icon name="play" size={22} /><b data-start-say>START NOW</b></button>
           <div class="keys">
             <button class="bui-key bui-sticker-key" type="button" data-share><b data-share-say>SEND LINK</b></button>
             <button class="bui-key bui-sticker-key bui-second" type="button" data-cancel><b>CANCEL</b></button>
@@ -124,7 +128,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   import { match, shared } from "../../../lib/analytics/play";
   const online = match("online"); // analytics: no-ops until the visitor accepts
   type Game = ReturnType<typeof createBlitz>;
-  type Tank = { kills: number; deaths: number; alive: boolean };
+  type Tank = { kills: number; deaths: number; alive: boolean; team: number; color: string; name: string };
   const stage = document.querySelector<HTMLElement>(".two")!;
   const card = stage.querySelector<HTMLElement>(".room")!;
   const arena = document.getElementById("arena")!;
@@ -147,37 +151,46 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   };
   const tab = () => sessionStorage, device = () => localStorage;
   let room = Math.min(ROOMS - 1, Math.max(0, Number(q.get("room")) | 0));
-  let players = Math.min(4, Math.max(2, Number(q.get("players")) | 0 || 2));
-  let maxPlayers = 2; // what the server allows: /invite says (an older server doesn't: two)
-  const size = () => Math.min(players, maxPlayers); // the room size we ask for
-  // Teams (two players only): 0 free-for-all, else tanks a side. A share link carries it; remembered here.
-  const SQUAD_SAY = ["every tank for itself, with 4 bots", "just the two of you", "you + 1 AI wingman each", "you + 2 AI wingmen each", "you + 3 AI wingmen each"];
-  let squad = Math.min(4, Math.max(0, Number(q.get("teams") ?? keep.get("blitz:teams", () => localStorage)) | 0));
+  let maxPlayers = 4; // what the server allows: /invite says (an older server doesn't: two). Until asked: 4.
+  // The mode (P1's is the match's). 1v1 and platoons: rooms of two. FFA and 2v2: rooms of four that P1
+  // can start with 2 or 3 in (the computer takes the empty seats). A share link carries it; remembered here.
+  type Mode = "1v1" | "ffa" | "2v2" | "platoon";
+  const MODES: Mode[] = ["1v1", "ffa", "2v2", "platoon"];
+  const MODE_SAY: Record<Mode, string> = {
+    "1v1": "two of you, one tank each",
+    ffa: "4 seats, every tank for itself; the computer fills up to 2",
+    "2v2": "2 a side; the computer fills a side that's short",
+    platoon: "two of you, each leading AI wingmen",
+  };
+  const SQUAD_SAY = ["", "", "you + 1 AI wingman each", "you + 2 AI wingmen each", "you + 3 AI wingmen each"];
+  // Old links: ?players=3|4 was free-for-all, ?teams=1 1v1, ?teams=2-4 platoons.
+  const oldTeams = Number(q.get("teams")) | 0;
+  let mode: Mode = ((m) => (MODES.includes(m as Mode) ? (m as Mode) : null))(q.get("mode")) ?? (Number(q.get("players")) > 2 ? "ffa" : oldTeams === 1 ? "1v1" : oldTeams > 1 ? "platoon" : null) ?? ((m) => (MODES.includes(m as Mode) ? (m as Mode) : "1v1"))(keep.get("blitz:mode2", () => localStorage));
+  let squad = Math.min(4, Math.max(2, oldTeams || Number(keep.get("blitz:teams", () => localStorage)) || 2));
+  const four = (m: Mode) => m === "ffa" || m === "2v2";
+  const size = () => (four(mode) ? Math.min(4, maxPlayers) : 2); // the room size we ask for
+  /** This peer's pick as net options (only P1's counts: src/seats.ts). */
+  const pick = (m: Mode) => (m === "1v1" ? { squad: 1 } : m === "platoon" ? { squad } : m === "2v2" ? { fill: true, squad: 2 } : { fill: true });
   // A ?code= link: the head script took it out of the URL and left it here (memory only).
   const w = window as unknown as { __blitzInvite?: string };
   field("code").value = w.__blitzInvite || keep.get("blitz-code", tab);
   delete w.__blitzInvite;
   const showRoom = () => ((field("room").value = String(room)), ((gate.elements.namedItem("roomShow") as HTMLOutputElement).value = String(room)));
-  const showPlayers = () => {
-    stage.querySelectorAll<HTMLButtonElement>("[data-players]").forEach((b) => {
-      b.setAttribute("aria-pressed", String(Number(b.dataset.players) === size()));
-      b.disabled = Number(b.dataset.players) > maxPlayers;
+  const showMode = () => {
+    stage.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+      b.disabled = four(b.dataset.mode as Mode) && maxPlayers < 3;
     });
-    $("[data-players-pick]").hidden = maxPlayers < 3;
-    const sp = stage.querySelector<HTMLElement>("[data-squad-pick]");
-    if (sp) sp.hidden = size() !== 2;
-  };
-  const showSquad = () => {
+    $("[data-mode-say]").textContent = MODE_SAY[mode];
     stage.querySelectorAll<HTMLButtonElement>("[data-squad]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.squad) === squad)));
     $("[data-squad-say]").textContent = SQUAD_SAY[squad]!;
-    $("[data-squad-pick]").hidden = size() !== 2;
+    $("[data-squad-pick]").hidden = mode !== "platoon";
   };
   showRoom();
-  showPlayers();
-  showSquad();
-  stage.querySelectorAll<HTMLButtonElement>("[data-squad]").forEach((b) => b.addEventListener("click", () => ((squad = Number(b.dataset.squad)), keep.set("blitz:teams", String(squad), device), showSquad())));
+  showMode();
+  stage.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => ((mode = b.dataset.mode as Mode), keep.set("blitz:mode2", mode, device), showMode())));
+  stage.querySelectorAll<HTMLButtonElement>("[data-squad]").forEach((b) => b.addEventListener("click", () => ((squad = Number(b.dataset.squad)), keep.set("blitz:teams", String(squad), device), showMode())));
   stage.querySelectorAll<HTMLButtonElement>("[data-room]").forEach((b) => b.addEventListener("click", () => ((room = (room + Number(b.dataset.room) + ROOMS) % ROOMS), showRoom())));
-  stage.querySelectorAll<HTMLButtonElement>("[data-players]").forEach((b) => b.addEventListener("click", () => ((players = Number(b.dataset.players)), showPlayers())));
 
   // ---------- The card: steps, header, fold, drag ----------
   const head = (title: string, sub: string, conn: "off" | "wait" | "live" | "slow" | "lost") => {
@@ -229,9 +242,10 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   new ResizeObserver(() => clamp()).observe(stage);
 
   // ---------- Seats: who is who ----------
-  const swatch = (i: number) => `<i class="sw" style="--c:${SEAT[i]}"></i>`;
-  const waitSeats = (n: number) =>
-    ($("[data-wait-seats]").innerHTML = Array.from({ length: n }, (_, i) => `<li class="${i ? "open" : "me"}">${swatch(i)}<span>${i ? "OPEN SEAT" : "YOU"}</span></li>`).join(""));
+  const swatch = (c: number | string) => `<i class="sw" style="--c:${typeof c === "number" ? SEAT[c] : c}"></i>`;
+  // `me` and `joined` come from the room's LOBBY (a server without it: you in seat 1, the rest open).
+  const waitSeats = (n: number, me = 0, joined = 1) =>
+    ($("[data-wait-seats]").innerHTML = Array.from({ length: n }, (_, i) => `<li class="${i === me ? "me" : i < joined ? "in" : "open"}">${swatch(i)}<span>${i === me ? "YOU" : i < joined ? `P${i + 1}` : "OPEN SEAT"}</span></li>`).join(""));
 
   // ---------- The match ----------
   let game: Game | null = null, abort: AbortController | null = null, watch = 0, code = "";
@@ -258,7 +272,21 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     waitSeats(players);
     $("[data-wait-say]").textContent = players === 2 ? "Waiting for player 2." : `Waiting for ${players - 1} more players.`;
     $("[data-share-say]").textContent = "SEND LINK";
+    $("[data-start]").hidden = true;
     step("wait");
+    // The room's LOBBY (fizlet#210: every join and leave before the start): your seat, who is in, and
+    // for the host (seat 0) of a 4-seat room with 2 or 3 in, START NOW: the computer takes the empty seats.
+    let asked = false;
+    const lobby = (go: (seats?: number, mode?: number) => void, seat: number, seated: number, size: number) => {
+      const open = size - seated, k = $<HTMLButtonElement>("[data-start]");
+      waitSeats(size, seat, seated);
+      head(`ROOM ${room} · P${seat + 1}`, `WAITING · ${seated} OF ${size}`, "wait");
+      k.hidden = !four(mode) || seat > 0 || seated < 2 || !open;
+      $("[data-wait-say]").textContent = !open || asked ? "Starting…" : seat ? `Waiting for P1 to start, or for ${open} more.` : seated < 2 ? `Waiting for ${open === 1 ? "player 2" : `${open} more players`}.` : !four(mode) ? `Waiting for ${open} more.` : `${seated} in. Start now: the computer takes ${open === 1 ? "the empty seat" : `the ${open} empty seats`}.`;
+      $("[data-start-say]").textContent = asked ? "STARTING…" : `START NOW · ${open} CPU`;
+      k.disabled = asked;
+      k.onclick = () => ((asked = k.disabled = true), ($("[data-start-say]").textContent = "STARTING…"), go(0, mode === "2v2" ? 2 : 1));
+    };
     abort = new AbortController();
     const signal = abort.signal;
     // A rematch can arrive a beat before the last match's sockets are gone: try again for a few seconds.
@@ -266,7 +294,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       try {
         const at = `${ws}/room/${room}?players=${players}`;
         // The invite rides in the WebSocket subprotocols, never the URL (only the old server needs ?invite=).
-        const seat = via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal) : await join(at, signal, ["fizlet-rooms", `invite.${code}`]);
+        const seat = via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal, undefined, { lobby }) : await join(at, signal, ["fizlet-rooms", `invite.${code}`], { lobby });
         return start(seat);
       } catch {
         if (signal.aborted) return;
@@ -289,7 +317,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       // Match length is part of the match: every player needs the same one (the share link carries it).
       ...(seconds ? { seconds } : {}),
       // Teams: P1's pick is the match's (every peer reads it from P1's moves in the countdown).
-      net: { transport: seat.transport, slot, players: seats, again: enter, leave, ...(seats === 2 ? { squad } : {}) },
+      net: { transport: seat.transport, slot, players: seats, again: enter, leave, ...pick(mode) },
       // Match over: free the room, so REMATCH can open it fresh for everyone. Wait a moment first:
       // another player may be a few frames behind and still needs our last inputs.
       onEnd: (st) => {
@@ -315,12 +343,18 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       last = n.frame;
       if (still >= 16) return gone("CONNECTION LOST", "No moves have arrived for 8 seconds. Check your connection, then rejoin.");
       card.dataset.conn = still >= 3 ? "slow" : "live";
-      $("[data-sub]").textContent = still >= 3 ? "WAITING FOR THE OTHERS…" : `LIVE · ${game.squad ? `${game.squad}V${game.squad}` : `${seats} PLAYERS`}`;
-      const tanks = game.world.tanks as Tank[];
-      $("[data-rows]").innerHTML = tanks
-        .slice(0, seats)
-        .map((t, i) => `<tr class="${i === slot ? "you" : ""}${t.alive ? "" : " down"}"><th scope="row">${swatch(i)}P${i + 1}${i === slot ? " · YOU" : ""}</th><td>${t.kills}</td><td>${t.deaths}</td></tr>`)
-        .join("");
+      $("[data-chip]").textContent = `P${slot + 1} · ${seats === 2 && game.squad === 1 ? "1V1" : game.squad ? `${game.squad}V${game.squad}` : "FFA"}`;
+      // What the match agreed (P1's mode): 4 tanks with bots in empty seats, or sides.
+      const tanks = game.world.tanks as Tank[], cpu = tanks.length === 4 ? 4 - seats : 0;
+      $("[data-sub]").textContent = still >= 3 ? "WAITING FOR THE OTHERS…" : `LIVE · ${game.squad ? `${game.squad}V${game.squad}` : "FFA"} · ${seats} PLAYERS${cpu ? ` + ${cpu} CPU` : ""}`;
+      // A row per human, and per bot in a seat; with sides, each side's total (bots' kills count).
+      const rows = tanks.slice(0, seats + cpu).map((t, i) => `<tr class="${i === slot ? "you" : ""}${t.alive ? "" : " down"}"><th scope="row">${swatch(t.color)}${i < seats ? `P${i + 1}${i === slot ? " · YOU" : ""}` : `${t.name} · CPU`}</th><td>${t.kills}</td><td>${t.deaths}</td></tr>`);
+      if (game.squad > 1)
+        for (const side of [tanks[slot]!.team, ...new Set(tanks.map((t) => t.team))].filter((v, i, a) => a.indexOf(v) === i)) {
+          const on = tanks.filter((t) => t.team === side);
+          rows.push(`<tr class="side${side === tanks[slot]!.team ? " you" : ""}"><th scope="row">${swatch(on[0]!.color)}${side === tanks[slot]!.team ? "YOUR SIDE" : `P${tanks.findIndex((t) => t.team === side) + 1} SIDE`}</th><td>${on.reduce((a, t) => a + t.kills, 0)}</td><td>${on.reduce((a, t) => a + t.deaths, 0)}</td></tr>`);
+        }
+      $("[data-rows]").innerHTML = rows.join("");
     };
     tick();
     watch = window.setInterval(tick, 500);
@@ -350,7 +384,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     if (!r) return null;
     if (r.status === 429) return "slow";
     const body = await r.json().catch(() => ({}));
-    if (Number.isInteger(body.players)) (maxPlayers = Math.min(4, Math.max(2, body.players))), showPlayers();
+    if (r.ok) (maxPlayers = Number.isInteger(body.players) ? Math.min(4, Math.max(2, body.players)) : 2), showMode();
     return r.ok;
   }
   gate.addEventListener("submit", async (ev) => {
@@ -362,6 +396,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     if (ok === null) return say("Can't reach the game server. Check your connection and try again.");
     if (ok === "slow") return say("Too many tries. Wait a minute, then try again.");
     if (!ok) return say("That invite code isn't on the list.");
+    if (four(mode) && maxPlayers < 3) return say("This server takes two players: pick 1V1 or PLATOON.");
     say("");
     keep.set("blitz-code", code, tab);
     enter();
@@ -371,7 +406,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   $("[data-again]").addEventListener("click", () => enter());
   $("[data-new]").addEventListener("click", () => (idle(), step("join")));
   $("[data-share]").addEventListener("click", async () => {
-    const url = `${location.origin}${location.pathname}?room=${room}&players=${size()}${size() === 2 && squad ? `&teams=${squad}` : ""}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}`;
+    const url = `${location.origin}${location.pathname}?room=${room}&mode=${mode}${mode === "platoon" ? `&teams=${squad}` : ""}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}`;
     const label = $("[data-share-say]");
     try {
       if (navigator.share) await navigator.share({ title: "Battlefield Blitz · multiplayer", text: `Join me in Blitz, room ${room}.`, url }), shared("share");
@@ -382,8 +417,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   });
   attract();
   step("join");
-  // A share link for 3 or 4: ask the server what it allows, so the players pick shows straight away.
-  if (Number(q.get("players")) > 2 && field("code").value) check(field("code").value.trim().toUpperCase()).then(() => showPlayers());
+  // A share link for a 4-seat mode: ask the server what it allows, so the mode pick is right straight away.
+  if (four(mode) && field("code").value) check(field("code").value.trim().toUpperCase()).then(() => showMode());
 </script>
 
 <style>
@@ -544,7 +579,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   .pick[hidden] {
     display: none;
   }
-  /* Teams: the label over a full-width row of five keys. */
+  /* Mode and platoon size: the label over a full-width row of keys. */
   .pick.wide {
     display: grid;
     gap: 8px;
@@ -561,7 +596,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   }
   .pick.wide .bui-seg {
     display: grid;
-    grid-template-columns: repeat(5, minmax(44px, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(44px, 1fr);
     gap: 6px;
     width: 100%;
   }
@@ -598,6 +634,9 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     height: auto;
     min-height: 52px;
     padding: 8px 14px;
+  }
+  .room .step .bui-sticker-key[hidden] {
+    display: none;
   }
   .room .step .bui-sticker-key svg {
     width: 22px;
@@ -668,6 +707,9 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     border: 2px solid var(--line);
     border-radius: 8px;
   }
+  .seats :global(li.me) {
+    border-color: var(--team);
+  }
   .seats :global(li.open) {
     color: var(--muted);
     border-style: dashed;
@@ -708,6 +750,11 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   :global(html[data-theme="light"]) .score :global(tr.you th) {
     color: color-mix(in srgb, var(--team-ink) 35%, var(--ink));
   }
+  /* With sides: each side's total under the players. */
+  .score :global(tr.side :is(th, td)) {
+    border-top: 2px solid var(--line);
+    color: var(--muted);
+  }
   .score :global(tr.down) {
     opacity: 0.55;
   }
@@ -732,28 +779,6 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     padding: 12px 0;
     color: var(--k-sys-ink);
   }
-  /* Phones: the game is the whole screen, like /play/. No header, footer, scroll or zoom. */
-  @media (pointer: coarse), (max-width: 760px) {
-    :global(html:has(body[data-app])),
-    :global(body[data-app]) {
-      height: 100%;
-      overflow: hidden;
-      overscroll-behavior: none;
-      touch-action: none;
-      -webkit-text-size-adjust: 100%;
-    }
-    :global(body[data-app] :is(.site-head, .site-foot, .skip)),
-    .blitz-bar {
-      display: none;
-    }
-    .blitz-stage {
-      position: fixed;
-      inset: 0;
-      height: auto;
-      min-height: 0;
-      border: 0;
-    }
-  }
   /* Short landscape phones: a wider two-column join card, so it fits without scrolling. */
   @media (max-height: 500px) and (orientation: landscape) {
     .room.bui-card {
@@ -775,6 +800,57 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     }
     [data-for="join"] .fine {
       display: none;
+    }
+  }
+  .chip {
+    display: none;
+  }
+  /* Phones in a match: the folded card is a status chip (dot, seat, mode) at the top right of the key
+     row, clear of the scoreboard, the keys and the board's centre. A tap opens the card; no grip. */
+  @media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
+    .room .bui-grip {
+      display: none;
+    }
+    .room.folded[data-step="play"] {
+      left: auto;
+      right: max(12px, env(safe-area-inset-right));
+      top: calc(max(10px, env(safe-area-inset-top)) + 6px);
+      display: block;
+      width: auto;
+      height: 32px;
+      padding: 0 12px;
+      border-width: 2px;
+      border-radius: 16px;
+      box-shadow: none;
+      background: color-mix(in srgb, var(--surface) 80%, transparent);
+      translate: none !important;
+    }
+    .room.folded[data-step="play"] .head {
+      display: flex;
+      height: 100%;
+      gap: 8px;
+    }
+    .room.folded[data-step="play"] :is(.head b, .head small, .body) {
+      display: none;
+    }
+    .room.folded[data-step="play"] .dot {
+      width: 10px;
+      height: 10px;
+    }
+    .room.folded[data-step="play"] .chip {
+      display: block;
+      font: 900 11px/1 var(--mono);
+      letter-spacing: 0.12em;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    /* The whole chip is the open key: 44 px to tap, 32 px to see. */
+    .room.folded[data-step="play"] .fold {
+      position: absolute;
+      inset: -8px -2px;
+      width: auto;
+      height: auto;
+      opacity: 0;
     }
   }
   @media (prefers-reduced-motion: reduce) {

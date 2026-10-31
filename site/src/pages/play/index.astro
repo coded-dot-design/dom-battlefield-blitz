@@ -1,5 +1,6 @@
 ---
-// Battlefield Blitz, the game: the arena fills the screen under the Battlefield header.
+// Battlefield Blitz, the game: the arena fills the screen under the Battlefield header; on a phone
+// it opens in game mode (site.css "Game mode": the board is the whole screen).
 // The game code is this repo's committed build (dist/blitz.mjs).
 import Base from '../../layouts/Base.astro';
 import { base, BATTLEFIELD } from '../../site';
@@ -13,7 +14,7 @@ const description = 'Battlefield Blitz: free-for-all tank chaos. Parachute in, g
     <div id="blitz" class="blitz-host"></div>
   </section>
   <div class="wrap blitz-bar">
-    <p><b>BLITZ</b> · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike · <kbd>Q</kbd> auto · <kbd>T</kbd> lock · <kbd>Esc</kbd> pause · phones: drag left to drive</p>
+    <p><b>BLITZ</b> · <kbd>WASD</kbd> drive · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · <kbd>E</kbd> long shot · <kbd>F</kbd> airstrike · <kbd>Q</kbd> auto · <kbd>T</kbd> lock · <kbd>Esc</kbd>/<kbd>P</kbd> pause · phones: drag left to drive</p>
     <p><a href={base()}>About Blitz</a> · <a href={base('#drop')}>Put it on your site</a> · <a href={BATTLEFIELD}>The original: DOM Battlefield</a></p>
   </div>
 </Base>
@@ -67,28 +68,6 @@ const description = 'Battlefield Blitz: free-for-all tank chaos. Parachute in, g
   }
   .blitz-bar a {
     color: var(--k-sys-ink);
-  }
-  /* Phones: the game is the whole screen, like the Battlefield app. No header, footer, scroll or zoom. */
-  @media (pointer: coarse), (max-width: 760px) {
-    :global(html:has(body[data-app])),
-    :global(body[data-app]) {
-      height: 100%;
-      overflow: hidden;
-      overscroll-behavior: none;
-      touch-action: none;
-      -webkit-text-size-adjust: 100%;
-    }
-    :global(body[data-app] :is(.site-head, .site-foot, .skip)),
-    .blitz-bar {
-      display: none;
-    }
-    .blitz-stage {
-      position: fixed;
-      inset: 0;
-      height: auto;
-      min-height: 0;
-      border: 0;
-    }
   }
   kbd {
     padding: 1px 6px;

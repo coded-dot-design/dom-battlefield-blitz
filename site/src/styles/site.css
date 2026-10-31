@@ -507,3 +507,42 @@ html.bui[data-theme="light"] .start-key b {
     font-size: 24px;
   }
 }
+
+/* ---------- Game mode (the play pages on a phone) ----------
+   A phone is a coarse pointer on a small screen, portrait or landscape: the same query in the game's
+   own CSS (src/game.ts GAME_MODE). Plain CSS, so the first paint is already the game: no header,
+   footer or bar (still in the HTML for search and screen readers), the board fills the dynamic
+   viewport, nothing scrolls. The way out is the exit key in the game's top-left key row. */
+.bui .game-exit {
+  display: none;
+}
+@media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
+  html:has(body[data-app]),
+  body[data-app] {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  body[data-app] :is(.site-head, .site-foot, .skip, .blitz-bar) {
+    display: none;
+  }
+  /* Edge to edge: fixed to all four edges (no vh unit, so no 100vh bug under an in-app browser's
+     bars); the game pads its keys by the safe-area insets. */
+  body[data-app] .blitz-stage {
+    position: fixed;
+    inset: 0;
+    height: auto;
+    min-height: 0;
+    border: 0;
+    --bz-lead: 52px; /* the game's keys start after the exit key (src/game.ts .fs, .pz) */
+  }
+  .bui .game-exit {
+    position: fixed;
+    z-index: 50;
+    left: max(12px, env(safe-area-inset-left));
+    top: max(10px, env(safe-area-inset-top));
+    display: inline-grid;
+  }
+}

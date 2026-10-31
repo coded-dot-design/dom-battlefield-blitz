@@ -9,7 +9,8 @@ import Skull from '../components/Skull.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { VERSION, REPO, HUB, BATTLEFIELD, base } from '../site';
 import { ldJson } from '../schema';
-// app: a game page. On phones it loads like the Battlefield app: no header or footer, no scroll, no zoom.
+// app: a game page. On phones it loads in game mode (site.css "Game mode"): no header or footer, no
+// scroll, no zoom; an exit key in the game's key row goes back to the Blitz home.
 // jsonld: the page's structured data (site/src/schema.ts), facts already on the page only.
 const { title, description, page = 'home', app = false, jsonld } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -70,6 +71,7 @@ const nav = [
     <main id="main">
       <slot />
     </main>
+    {app && <a class="bui-key bui-icon-key game-exit" href={base()} aria-label="Exit to the Blitz home" title="Blitz home"><Icon name="home" /></a>}
     <SiteFooter />
     {app && <script is:inline>
       // App pages on phones: no pinch or double-tap zoom (iOS ignores user-scalable=no).

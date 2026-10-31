@@ -11,12 +11,12 @@
     "check": "npm run build",
     "size": "node scripts/size.mjs",
     "test": "node --expose-gc --test --test-concurrency=1 tests/*.test.mjs",
-    "test:browser": "node tests/browser.mjs",
+    "test:browser": "node tests/browser.mjs && node tests/pause.mjs",
     "test:replay": "node tests/determinism.mjs",
     "test:lockstep": "node tests/lockstep.mjs",
     "site:dev": "astro dev --config site/astro.config.mjs",
     "site:build": "astro build --config site/astro.config.mjs && node scripts/pages.mjs",
-    "test:site": "node tests/site.mjs && node tests/site-analytics.mjs && node tests/multiplayer.mjs"
+    "test:site": "node tests/site.mjs && node tests/site-analytics.mjs && node tests/multiplayer.mjs && node tests/phone.mjs && node tests/phone-net.mjs"
   },
   "devDependencies": {
     "astro": "7.4.2",
