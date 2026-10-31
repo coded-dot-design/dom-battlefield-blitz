@@ -144,7 +144,7 @@ const ICON = {
   strike: '<path d="M10 1.5l1.6 5.2 6.4 3.6v1.6l-6.3-1.4-.7 4.3 2.3 1.9v1.3l-3.3-.9-3.3.9v-1.3l2.3-1.9-.7-4.3L2 11.9v-1.6l6.4-3.6z"/>',
   auto: '<path d="M10 1v4M10 15v4M1 10h4M15 10h4M5.5 5.5l2 2M14.5 5.5l-2 2M5.5 14.5l2-2M14.5 14.5l-2-2"/>',
   lock: '<path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M10 8v4M8 10h4"/>',
-  flag: '<path d="M5 18V3M5 4h10l-3 3.5 3 3.5H5"/>',
+  pause: '<path d="M7 4v12M13 4v12"/>',
   full: '<path d="M2 7V2h5M18 7V2h-5M2 13v5h5M18 13v5h-5"/>',
   exit: '<path d="M7 2v5H2M13 2v5h5M7 18v-5H2M13 18v-5h5"/>',
   tune: '<path d="M3 5h14M3 10h14M3 15h14"/><circle cx="7" cy="5" r="2" fill="currentColor"/><circle cx="13" cy="10" r="2" fill="currentColor"/><circle cx="9" cy="15" r="2" fill="currentColor"/>',
@@ -157,6 +157,8 @@ const CELLS = [0, 1, 4, 2, 5, 8, 3, 6, 9, 12, 7, 10, 13, 11, 14, 15].map((i, k) 
 const FLAG = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges"><g class="bui-cells">${CELLS}</g><path class="bui-grid" d="M0 16h64M0 32h64M0 48h64M16 0v64M32 0v64M48 0v64"/><rect class="bui-frame" x="1" y="1" width="62" height="62"/><path class="bui-pole" d="M17 9h4v46h-4Z"/><path class="bui-cloth" d="M21 12h24l-6 9 6 9H21Z"/></svg>`;
 const SKULL = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges"><g transform="translate(10 9) scale(.69)"><path fill-rule="evenodd" d="M19 6h26v6h7v6h6v6h5v22h-5v6h-8v12h-9v-8h-6v8h-8v-8h-6v8h-8V52H5v-6H0V24h5v-6h6v-6h8ZM11 29v14h15V29Zm26 0v14h15V29Z"/></g></svg>`;
 const PLAY = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<path d="M22 16v32l26-16Z" fill="currentColor"/></svg>`;
+const AGAIN = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<path d="M30 12v8a13 13 0 1 0 13 13h6a19 19 0 1 1-19-19Zm0-2 10 9-10 8Z" fill="currentColor"/></svg>`;
+const MENU = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<path d="M16 18h32v6H16Zm0 11h32v6H16Zm0 11h32v6H16Z" fill="currentColor"/></svg>`;
 const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="true">${ICON[k]}</svg>`;
 
 const CSS = `:host{all:initial;display:block}*{box-sizing:border-box}
@@ -193,7 +195,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .bui .long{--c:var(--hurt);right:85px;bottom:150px}.bui .strike{--lock:var(--k-attack);right:9px;bottom:150px}
 .bui :is(.lock,.auto){width:52px;height:52px}.bui .auto{right:92px;bottom:84px}.bui .lock{right:12px;bottom:84px}.bui :is(.lock,.auto) svg{width:20px;height:20px}
 .coach-on{outline:3px dashed var(--ink);outline-offset:6px;animation:coach 1s ease-in-out infinite}@keyframes coach{50%{outline-offset:10px}}
-.net [data-pause]{display:none}
 .demo .hud,.demo .pad,.demo .help,.demo .feed,.demo .banner,.demo .tip{display:none}.demo canvas{cursor:default}
 .help{position:absolute;left:max(14px,env(safe-area-inset-left));bottom:max(14px,env(safe-area-inset-bottom));max-width:calc(100% - 240px);padding:6px 10px;font-size:10px;letter-spacing:.08em;color:var(--muted);background:color-mix(in srgb,var(--surface) 85%,transparent);border-radius:8px;pointer-events:none}
 .over{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:30px;background:color-mix(in srgb,#2a2d38 72%,transparent)}
@@ -235,11 +236,16 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .tune .tk{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:0 -14px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--line)}
 .tuned{margin:-14px 0 0;padding:4px 10px;font-size:10px;letter-spacing:.12em;color:var(--rim);background:var(--hurt);border:2px solid var(--rim);border-radius:6px}
 .vs{margin:-18px 0 0;font:900 18px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--k-sys-ink)}
-.bui .fs{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
+.bui .fs{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
-.bui .pz{position:absolute;z-index:3;left:max(60px,calc(env(safe-area-inset-left) + 48px));top:max(10px,env(safe-area-inset-top));height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
+/* PAUSE: always on the top-left key row, away from the stick (left drag) and the fire pad (bottom right). */
+.bui .pz{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 48px);top:max(10px,env(safe-area-inset-top));display:inline-flex;align-items:center;gap:6px;height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
+.pz svg{width:18px;height:18px;stroke:currentColor;stroke-width:3.2;fill:none}
+.ov.pause .bui-overlay-keys{flex-wrap:wrap;justify-content:center;width:min(640px,calc(100% - 24px));bottom:max(20px,env(safe-area-inset-bottom))}
+.bui .ov [data-resume]{width:168px;height:96px}.bui .ov [data-resume] b{font-size:13px}
+.ov .by,.ov .pzl{flex-basis:100%;margin:0;text-align:center;font-size:10px;letter-spacing:.14em;color:#f6f3ff}.ov .by :is(a,button){display:inline-block;padding:8px 2px;font:inherit;letter-spacing:inherit;color:var(--k-sys);background:none;border:0;cursor:pointer;text-decoration:underline}.ov .pzl{font-size:12px;color:var(--k-sys)}
 .ov .table{position:absolute;left:50%;top:56%;translate:-50% -50%}.ov.result .bui-sticker{top:26%}
-@media (pointer:coarse){.pz span{display:none}}
+@media (pointer:coarse){.pz span{display:none}.bui :is(.fs,.pz){width:44px;height:44px;padding:0;justify-content:center}.bui .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 52px)}.pz svg{width:22px;height:22px}}
 @media (max-height:460px){.ov .table{top:57%;gap:2px;padding:6px 12px;font-size:10px}.ov .table div:nth-child(n+4):not(.you){display:none}.ov.result .bui-sticker{top:22%}}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
 @media (max-height:460px){.bui .legend{display:none}.over.intro{padding-top:0}}
@@ -250,7 +256,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .count{font:900 96px/1 ui-monospace,monospace;color:var(--ink);text-shadow:0 0 30px var(--k-sys);animation:bui-slam .5s both}
 .legend{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;translate:-50% 0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;width:max-content;max-width:calc(100% - 128px);padding:8px 16px;font-size:11px;color:var(--muted);background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:10px;box-shadow:0 4px 0 var(--rim)}
 .legend b{color:var(--ink)}
-@media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}}
+@media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}
+/* Narrow: the scoreboard sits under the key row (exit · full screen · pause), never over it. */
+.hud{top:max(62px,calc(env(safe-area-inset-top) + 52px))}.feed{top:max(122px,calc(env(safe-area-inset-top) + 112px))}.banner{top:max(132px,calc(env(safe-area-inset-top) + 122px))}.coach{top:max(118px,calc(env(safe-area-inset-top) + 108px))}}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
 @media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}`;
 
@@ -269,7 +277,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <div class="banner" data-banner><b></b><span></span></div>
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
-<button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause or surrender (Esc)" title="Esc · Pause">${svg("flag")}<span>Surrender</span></button>
+<button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause (Esc or P)" title="Esc · P · Pause">${svg("pause")}<span>PAUSE</span></button>
 <div class="pad" data-pad>
 <button class="bui-grip grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"></button>
 <button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
@@ -278,7 +286,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <button class="rk bui-arcade long" type="button" data-k="long" aria-label="Long shot: locks on and hits from across the field (E)" title="E · Long shot">${svg("long")}<small>LONG</small><span class="n" data-n="long">3</span><kbd>E</kbd></button>
 <button class="rk bui-arcade bui-fire fire" type="button" data-k="fire" aria-label="Hold to fire the cannon (Space)" title="Space · Fire">${svg("fire")}<kbd>SPACE</kbd></button>
 </div>
-<div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : net ? "" : " · ESC PAUSE"}</div>
+<div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC/P PAUSE"}</div>
 <div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><div class="cx"><button class="bui-key" type="button" data-tune aria-expanded="false" aria-controls="bz-tune" title="Intensity levers: game speed, tank speed, fire rate…">${svg("tune")}TUNE</button><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div></div>
 <section class="tune bui-card" id="bz-tune" data-tune-panel hidden aria-labelledby="bz-tune-t"><header><b id="bz-tune-t">TUNE</b><small>PACE &amp; CHAOS · THIS DEVICE</small><button class="bui-key" type="button" data-tune-x>DONE</button></header><div data-tune-rows></div><p class="note">Plays in SOLO, PLATOON and PRACTICE on this device. Online matches keep the defaults.</p><code data-tune-json></code><div class="tk"><button class="bui-key" type="button" data-tune-reset>RESET</button><button class="bui-key" type="button" data-tune-copy>COPY SETTINGS</button></div></section>
 <div class="over" data-over hidden></div>
@@ -341,8 +349,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const shakeRandom = () => ((shakeSeed[0] = Math.imul(shakeSeed[0]!, 1664525) + 1013904223), shakeSeed[0]! / 4294967296);
   // The match's running numbers that the step writes each frame. A double stored in a closure variable
   // is a new heap number on every write; in a typed array it is stored in place.
-  const G = new Float64Array(10);
-  const CLK = 0, CNT = 1, MATCH = 2, TILE_IN = 3, CRATE_IN = 4, QUAKE = 5, WHITE = 6, NUKE_T = 7, MOVED = 8, COACH_T = 9;
+  const G = new Float64Array(12);
+  const CLK = 0, CNT = 1, MATCH = 2, TILE_IN = 3, CRATE_IN = 4, QUAKE = 5, WHITE = 6, NUKE_T = 7, MOVED = 8, COACH_T = 9, RES = 10, PZ_BY = 11;
+  // Pause: resuming counts down RESUME s first (the board holds still); net play, each seat has PZ_CAP s
+  // of pause a match. A net pause is bit 12 of the player's input word (PZ_BIT), so every peer pauses
+  // on the same frame; pzWant is this peer's latch (local, it only feeds the next input word).
+  const RESUME = 3, PZ_CAP = 45, PZ_BIT = 1 << 12, pzLeft = new Float64Array(4).fill(PZ_CAP);
+  let pzWant = false;
+  G[PZ_BY] = -1;
   G[CLK] = o.seconds ?? 180; // the match clock (board)
   G[TILE_IN] = 1.2; // the next power tile
   G[CRATE_IN] = 12; // the next supply crate
@@ -1164,7 +1178,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     hs[0] = 0x811c9dc5;
     mix(R.state);
     mix(G[CLK]!);
-    mix(state === "play" ? 1 : state === "count" ? 2 : state === "end" ? 3 : 0);
+    mix(state === "play" ? 1 : state === "count" ? 2 : state === "end" ? 3 : state === "paused" ? 4 : 0);
+    mix(G[RES]!), mix(G[PZ_BY]!);
+    for (let s = 0; s < P; s++) mix(pzLeft[s]!);
     for (let i = 0; i < N; i++) {
       const t = tanks[i]!;
       mix(t.x), mix(t.y), mix(t.a), mix(t.ta), mix(t.hp), mix(t.alive ? 1 : 0), mix(t.drop), mix(t.kills), mix(t.deaths);
@@ -1211,7 +1227,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       }
       if (input.hit("pause")) {
         if (targeting) targeting = false;
-        else if (!embed && !net) togglePause();
+        else if (!embed) togglePause();
       }
       // One-frame key edges are caught here (a frame can run no step).
       if (input.hit("long")) longQ = true;
@@ -1220,7 +1236,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       if (input.hit("lock")) (lockOn = !lockOn), (lockT = -1);
     },
     // Net play: presence runs world() once per lockstep frame instead.
-    step: net ? undefined : (_, dt) => world(dt * TU[U_SPEED]!),
+    // The crates hold still while paused or counting back in (they used to fall through a pause).
+    step: net ? undefined : (_, dt) => (state === "paused" || G[RES]! > 0 || supply.system.step!(e, dt), world(dt * TU[U_SPEED]!)),
     render() {
       fxPlay(); // what the steps asked for, in order
       // A crate that landed this frame raises a dust puff.
@@ -1239,18 +1256,18 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     },
   });
   // Crates are a fizlet/rules system: in net play they move on lockstep frames too, so world()
-  // steps them (first, as the engine would) and the engine doesn't.
-  if (net) e.remove(supply.system);
+  // steps them (first, as the engine would) and the engine doesn't; solo, the game's step does.
+  e.remove(supply.system);
   // This peer's word, with its team-size pick in bits 9-11 (only P1's counts).
   const squadBits = squadOf(net?.squad ?? 0) << 9, ownInput = net?.input ?? encode;
-  const netInput = () => (ownInput() | squadBits) >>> 0;
+  const netInput = () => (ownInput() | squadBits | (pzWant ? PZ_BIT : 0)) >>> 0;
   const link = net
     ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: netInput, step: (_, ins) => ((netIn = ins), world(e.dt * TU[U_SPEED]!)), hash: worldHash })
     : null;
 
   /** One fixed step of the match. */
   function world(dt: number) {
-      if (net) supply.system.step!(e, dt);
+      if (net && state !== "paused" && G[RES]! <= 0) supply.system.step!(e, dt);
       G[MATCH]! += dt;
       fx.step(dt);
       G[QUAKE] = Math.max(0, G[QUAKE]! - dt * 40);
@@ -1272,7 +1289,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         }
         return;
       }
+      if (net) netPause(dt);
       if (state !== "play") return;
+      if (G[RES]! > 0) return void (G[RES]! -= dt);
       if (!embed && !demo && !practice) {
         G[CLK]! -= dt;
         if (G[CLK]! <= 0) return void end();
@@ -1513,7 +1532,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (const pool of [shells, tiles, marks, planes, bombs, booms] as { on: boolean }[][]) for (const s of pool) s.on = false;
     supply.reset();
     targeting = false;
-    G[NUKE_T] = G[WHITE] = G[QUAKE] = 0;
+    G[NUKE_T] = G[WHITE] = G[QUAKE] = G[RES] = 0;
     fx.clear();
     roster();
     intro();
@@ -1615,6 +1634,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     state = "count";
     over.classList.remove("intro");
     G[CNT] = 2.4;
+    G[RES] = 0;
     over.hidden = false;
     over.innerHTML = `<div class="count" data-c>3</div>${net && P === 2 ? `<p class="vs" data-vs></p>` : ""}`;
     e.events.emit("ready", 0);
@@ -1681,16 +1701,26 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     slam(ov.querySelector(".bui-sticker"));
     requestAnimationFrame(() => ov.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true }));
   }
-  const closeOverlay = () => ((ov.hidden = true), (ov.innerHTML = ""));
-  /** Pause = the surrender question, exactly like DOM Battlefield: KEEP FIGHTING or SURRENDER. */
+  const closeOverlay = () => ((ov.hidden = true), (ov.innerHTML = ""), ov.classList.remove("pause"));
+  /** Pause: one key (PAUSE, Esc, P), and the tab going away pauses too. The overlay: RESUME (a short
+   *  countdown first, so nothing hits you the moment you're back), RESTART, QUIT TO MENU, and the
+   *  white flag (SURRENDER) from DOM Battlefield. Net play can't stop one screen: see netPause(). */
+  // The menu's byline, with the links the hidden footer carried on a phone: PRIVACY, and COOKIE SETTINGS
+  // once the page has a consent pattern (<html data-consent>; the key sends it a composed
+  // "consent:open" event). No analytics here.
+  const BYLINE = () => `<p class="by">BATTLEFIELD BLITZ · BY CHRIS COOLEY · <a href="https://domvirus.com/privacy/">PRIVACY</a>${"consent" in document.documentElement.dataset ? ` · <button type="button" data-consent>COOKIE SETTINGS</button>` : ""}</p>`;
+  ov.addEventListener("click", (ev) => (ev.target as Element).closest?.("[data-consent]") && host.dispatchEvent(new CustomEvent("consent:open", { bubbles: true, composed: true })), { signal: e.signal });
   function togglePause() {
-    if (net) return; // a lockstep match never pauses for one player
+    if (net) return void (pzWant = state === "play" || (state === "paused" && G[PZ_BY] === net.slot) ? !pzWant : pzWant);
     if (state === "play") {
       state = "paused";
       targeting = false;
       input.press("fire", false);
-      overlay("BATTLE PAUSED", "GIVE UP?", `<button class="bui-sticker-key" type="button" data-resume>${SKULL}<b>KEEP FIGHTING</b></button><button class="bui-sticker-key bui-second bui-surrender" type="button" data-surrender>${FLAG}<b>SURRENDER</b></button>`);
+      overlay("BATTLE PAUSED", "PAUSED", `<button class="bui-sticker-key" type="button" data-resume>${PLAY}<b>RESUME</b></button><button class="bui-sticker-key bui-plan" type="button" data-restart>${AGAIN}<b>RESTART</b></button><button class="bui-sticker-key bui-second" type="button" data-menu>${MENU}<b>QUIT TO MENU</b></button><button class="bui-sticker-key bui-second bui-surrender" type="button" data-surrender>${FLAG}<b>SURRENDER</b></button>${BYLINE()}`);
+      ov.classList.add("pause");
       ov.querySelector("[data-resume]")!.addEventListener("click", togglePause, { signal: e.signal });
+      ov.querySelector("[data-restart]")!.addEventListener("click", () => (closeOverlay(), rematch()), { signal: e.signal });
+      ov.querySelector("[data-menu]")!.addEventListener("click", () => toIntro(), { signal: e.signal });
       const flag = ov.querySelector<HTMLButtonElement>("[data-surrender]")!;
       flag.addEventListener("click", () => {
         if (flag.classList.contains("go")) return;
@@ -1700,12 +1730,41 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
         const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
         setTimeout(() => launch(flag, () => (practice ? (closeOverlay(), toIntro()) : end(true)), { reduced }), reduced ? 0 : 480);
       }, { signal: e.signal });
-    } else if (state === "paused") (closeOverlay(), (state = "play"));
+    } else if (state === "paused") (closeOverlay(), (state = "play"), (G[RES] = RESUME));
   }
+  /** Net play: a pause is bit 12 of a player's input word, so every peer pauses on the same frame and
+   *  the lockstep keeps ticking (inputs only, nothing frozen on one screen). Every screen shows who
+   *  paused. Each seat has PZ_CAP s of pause a match; letting go, or running out, resumes everyone
+   *  after the same countdown. */
+  function netPause(dt: number) {
+    if (state !== "play" && state !== "paused") return;
+    if (state === "paused") pzLeft[G[PZ_BY]!]! -= dt;
+    let by = -1;
+    for (let s = 0; s < P && by < 0; s++) if (netIn[s]! & PZ_BIT && pzLeft[s]! > 0) by = s;
+    if (state === "paused" && by < 0) (state = "play"), (G[RES] = RESUME);
+    else if (state === "play" && by >= 0) state = "paused";
+    G[PZ_BY] = by;
+  }
+  /** Net overlay (render phase): RESUME for the one who paused, the wait and the cap for the others. */
+  function netPauseUI() {
+    const me = G[PZ_BY] === net!.slot, who = `P${G[PZ_BY]! + 1}`;
+    overlay(me ? "YOU PAUSED" : "BATTLE PAUSED", me ? "PAUSED" : `${who} PAUSED`, (me ? `<button class="bui-sticker-key" type="button" data-resume>${PLAY}<b>RESUME</b></button>` : "") + (net!.leave ? `<button class="bui-sticker-key bui-second" type="button" data-new>${MENU}<b>LEAVE ROOM</b></button>` : "") + `<p class="pzl" data-pzl></p>${BYLINE()}`);
+    ov.classList.add("pause");
+    ov.querySelector("[data-resume]")?.addEventListener("click", () => (pzWant = false), { signal: e.signal });
+    ov.querySelector("[data-new]")?.addEventListener("click", () => net!.leave!(), { signal: e.signal });
+  }
+  // The tab hidden or the phone locked: pause. Net play sends the pause now (one lockstep frame, the
+  // normal path), because a hidden tab stops its frames and the others would just wait in silence.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "hidden" || embed || demo || state !== "play") return;
+    if (!net) return togglePause();
+    pzWant = true;
+    for (let k = 0; k < 3; k++) e.advance(e.dt);
+  }, { signal: e.signal });
 
   // ---------- HUD (change-only writes, render phase) ----------
   const teamKills = new Int32Array(4);
-  const last = { pl: false, pr: false, tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "" };
+  const last = { pl: false, pr: false, tm: "", k: "", t: "", lead: "", st: "", hp: -1, sn: "", ln: "", sDis: false, lDis: false, fDis: false, auto: "", lock: "", aim: "", heat: -1, hot: false, aiming: false, count: "", rs: false, pz: -1, pzl: "" };
   function hudFrame() {
     if (last.pl !== platoon) wrap.classList.toggle("platoon", (last.pl = platoon));
     if (last.pr !== practice) wrap.classList.toggle("practice", (last.pr = practice));
@@ -1777,6 +1836,26 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
         [{ opacity: 0, transform: "scale(2.2)" }, { opacity: 1, transform: "scale(.94)", offset: 0.12 }, { opacity: 1, transform: "scale(1)", offset: 0.2 }, { opacity: 1, transform: "scale(1)", offset: 0.82 }, { opacity: 0, transform: "scale(.9) translateY(-14px)" }],
         { duration: 2200, easing: "ease-out" },
       );
+    }
+    // Resume countdown (3, 2, 1 over the held board) and the net pause overlay: change-only.
+    const rs = state === "play" && G[RES]! > 0, pz = net && state === "paused" ? G[PZ_BY]! : -1;
+    if (rs !== last.rs) {
+      over.hidden = !(last.rs = rs);
+      over.innerHTML = rs ? `<div class="count" data-c></div>` : "";
+      last.count = "";
+    }
+    if (rs) {
+      const c = G[RES]! > 2 ? "3" : G[RES]! > 1 ? "2" : "1";
+      if (c !== last.count) (last.count = c), (over.querySelector("[data-c]")!.textContent = c);
+    }
+    if (pz !== last.pz) {
+      if ((last.pz = pz) >= 0) netPauseUI();
+      else if (state !== "end") closeOverlay();
+      if (pz < 0 && net && state === "play") pzWant = false; // the cap ran out: let go
+    }
+    if (pz >= 0) {
+      const left = `${G[PZ_BY] === net!.slot ? "YOU HAVE" : `P${pz + 1} HAS`} ${Math.ceil(pzLeft[pz]!)} S OF PAUSE LEFT · ${RESUME} S COUNTDOWN FOR EVERYONE`;
+      if (left !== last.pzl) (last.pzl = left), (ov.querySelector("[data-pzl]")!.textContent = left);
     }
     if (state === "count") {
       const vs = squad ? `${squad} V ${squad}` : "FREE FOR ALL", vsEl = over.querySelector<HTMLElement>("[data-vs]");

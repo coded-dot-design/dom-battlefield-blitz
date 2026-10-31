@@ -728,28 +728,6 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     padding: 12px 0;
     color: var(--k-sys-ink);
   }
-  /* Phones: the game is the whole screen, like /play/. No header, footer, scroll or zoom. */
-  @media (pointer: coarse), (max-width: 760px) {
-    :global(html:has(body[data-app])),
-    :global(body[data-app]) {
-      height: 100%;
-      overflow: hidden;
-      overscroll-behavior: none;
-      touch-action: none;
-      -webkit-text-size-adjust: 100%;
-    }
-    :global(body[data-app] :is(.site-head, .site-foot, .skip)),
-    .blitz-bar {
-      display: none;
-    }
-    .blitz-stage {
-      position: fixed;
-      inset: 0;
-      height: auto;
-      min-height: 0;
-      border: 0;
-    }
-  }
   /* Short landscape phones: a wider two-column join card, so it fits without scrolling. */
   @media (max-height: 500px) and (orientation: landscape) {
     .room.bui-card {
