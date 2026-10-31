@@ -68,7 +68,7 @@ export function applyPalette(root: HTMLElement, palette: Palette): () => void {
 }
 
 /** Readouts (BOARD-UI.md section 18): a `.bui-readouts` group of `[label, tone?]` items, appended to
- *  `parent`. Returns the value elements in order, for fizlet/hud (or your own change-only writes).
+ *  `parent`. Returns the value elements in order, for @fzlt/core/hud (or your own change-only writes).
  *  Text is set with textContent. The caller owns the group: add it through the engine's ledger. */
 export function readouts(parent: HTMLElement, items: [label: string, tone?: "team" | "enemy"][], onMap = false) {
   const group = parent.ownerDocument.createElement("div");
@@ -130,7 +130,7 @@ export const PERF_KEY = "dom-virus:perf";
  * in localStorage under `key` as "1" / "0". Storage that throws (private mode, blocked cookies,
  * a sandboxed frame) is ignored: the switch still works, it just forgets. `change` runs once
  * with the stored value and on every flip; `set(on)` flips it from code (a keyboard shortcut).
- * Example: `setting(btn, PERF_KEY, (on) => overlay.show(on), signal)` with `fizlet/perf`.
+ * Example: `setting(btn, PERF_KEY, (on) => overlay.show(on), signal)` with `@fzlt/core/perf`.
  */
 export function setting(button: HTMLElement, key: string, change: (on: boolean) => void, signal: AbortSignal, fallback = false) {
   let on = fallback;
@@ -197,7 +197,8 @@ export function launch(button: HTMLElement, action: () => void, opts: { reduced?
     // Inline styles only: the burst lives on <body>, outside any shadow root the board is in.
     Object.assign(layer.style, { position: "fixed", contain: "layout style", zIndex: "2147483000", pointerEvents: "none", left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
     document.body.append(layer);
-    const sink = Number(style.boxShadow.match(/(-?[\d.]+)px\s+(-?[\d.]+)px/)?.[2] || 5);
+    // The press travels along the key's base (the domain's shadow direction): its first offset.
+    const base = style.boxShadow.match(/(-?[\d.]+)px\s+(-?[\d.]+)px/), sx = base ? +base[1]! : 0, sink = base ? +base[2]! : 5;
     // Freeze the look (the copies live outside the .bui root): read once, before the copies go in,
     // so seven copies cost one style pass, not one each.
     const look = [button, ...button.querySelectorAll<HTMLElement>("*")].map((n) => {
@@ -216,8 +217,8 @@ export function launch(button: HTMLElement, action: () => void, opts: { reduced?
     layer.append(cap);
     cap.animate([
       { transform: "translateY(0)", boxShadow: style.boxShadow, filter: "invert(0) hue-rotate(0deg)" },
-      { transform: `translateY(${sink}px)`, boxShadow: "0 0 0 transparent", filter: INVERT, offset: 0.9 },
-      { transform: `translateY(${sink}px)`, boxShadow: "0 0 0 transparent", filter: INVERT, opacity: 0 },
+      { transform: `translate(${sx}px,${sink}px)`, boxShadow: "0 0 0 transparent", filter: INVERT, offset: 0.9 },
+      { transform: `translate(${sx}px,${sink}px)`, boxShadow: "0 0 0 transparent", filter: INVERT, opacity: 0 },
     ], { duration: PRESS + 10, fill: "both" });
     const add = (el: HTMLElement, frames: Keyframe[], ms: number) => {
       layer!.append(el);
@@ -226,7 +227,7 @@ export function launch(button: HTMLElement, action: () => void, opts: { reduced?
     const W = r.width, H = r.height, R = Math.min(W, H);
     for (let i = 0; i < 6; i++) {
       const col = i % 3, row = Math.floor(i / 3), chunk = copy();
-      Object.assign(chunk.style, { filter: INVERT, boxShadow: "none", translate: `0 ${sink}px` });
+      Object.assign(chunk.style, { filter: INVERT, boxShadow: "none", translate: `${sx}px ${sink}px` });
       chunk.style.clipPath = `inset(${row * 50}% ${100 - (col + 1) * 33.34}% ${100 - (row + 1) * 50}% ${col * 33.33}%)`;
       chunk.style.transformOrigin = `${(col + 0.5) * 33.33}% ${(row + 0.5) * 50}%`;
       const cx = (col + 0.5) / 3 - 0.5, cy = (row + 0.5) / 2 - 0.5, dx = cx * W * 1.1 + (i % 2 ? 8 : -8), dy = cy * H * 1.4 - 18, spin = (cx || 0.3) * (col === 1 ? 60 : 120);
@@ -240,7 +241,7 @@ export function launch(button: HTMLElement, action: () => void, opts: { reduced?
       const d = document.createElement("i");
       d.className = cls;
       Object.assign(d.style, {
-        position: "absolute", width: `${size}px`, height: `${size}px`, left: `${W / 2 - size / 2}px`, top: `${H / 2 - size / 2 + sink}px`,
+        position: "absolute", width: `${size}px`, height: `${size}px`, left: `${W / 2 - size / 2 + sx}px`, top: `${H / 2 - size / 2 + sink}px`,
         borderRadius: cls === "bui-bit" ? "0" : "50%",
         background: cls === "bui-ring" ? "none" : tone,
         border: cls === "bui-ring" ? `3px solid ${tone}` : "0",

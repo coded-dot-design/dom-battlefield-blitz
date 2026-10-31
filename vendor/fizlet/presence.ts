@@ -1,4 +1,4 @@
-// fizlet/presence: lockstep input exchange for multiplayer, behind a tiny transport adapter.
+// @fzlt/core/presence: lockstep input exchange for multiplayer, behind a tiny transport adapter.
 // Every peer runs the same fixed-step simulation from the same seed. Each sim frame needs every
 // player's input for that frame; your own input is sent `delay` frames ahead, so on a good link the
 // game never waits. A missing input stalls the sim (never guesses), so peers can't drift apart.
@@ -19,6 +19,8 @@ export interface Transport {
   close(): void;
 }
 
+/** Options for `presence()`: the transport, this peer's seat, the number of players, the input delay
+ *  and the ring sizes. */
 export interface PresenceOptions {
   transport: Transport;
   /** This peer's seat, 0..players-1 (the room says which). */
@@ -40,6 +42,9 @@ export interface PresenceOptions {
 
 const FRAME = 0, STALLS = 1, DROPPED = 2, DESYNC = 3, LOST = 4;
 
+/** Lockstep multiplayer on engine `e`: each sim frame waits for every player's input (sent `delay`
+ *  frames ahead), so peers never drift; state hashes are compared to catch a desync. Read `frame`,
+ *  `stalls`, `desync` and `lost`; `destroy()` stops it. */
 export function presence(e: Engine, o: PresenceOptions) {
   const P = o.players, me = o.slot, D = o.delay ?? 2, C = o.cap ?? 64, every = o.hashEvery ?? 30, t = o.transport;
   // A seat outside 0..players-1 (or a fraction) would never store its own input: the sim would stall
@@ -128,6 +133,7 @@ export function presence(e: Engine, o: PresenceOptions) {
     destroy: stop,
   };
 }
+/** The lockstep session `presence()` returns. */
 export type Presence = ReturnType<typeof presence>;
 
 /** FNV-1a over bytes: hash a byte view of your state's typed arrays (make the view once). */

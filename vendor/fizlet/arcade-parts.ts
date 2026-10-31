@@ -1,4 +1,4 @@
-// fizlet/arcade internals shared by the shell and its HUD presets (not a public module): the icons,
+// @fzlt/core/arcade internals shared by the shell and its HUD presets (not a public module): the icons,
 // HTML escaping and the overlay CSS every preset starts from.
 const svg = (d: string) => `<svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 export const ICON = {

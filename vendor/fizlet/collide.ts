@@ -1,5 +1,5 @@
 /**
- * fizlet/collide: a fixed-capacity spatial hash (no allocation per insert or query) and the shape
+ * @fzlt/core/collide: a fixed-capacity spatial hash (no allocation per insert or query) and the shape
  * tests games need: circle–circle, circle–rect, swept segment–circle.
  */
 
@@ -35,12 +35,15 @@ export class Grid {
   readonly cap: number;
   /** Index capacity: cell entries per step (a body covering 4 cells takes 4). */
   readonly nodes: number;
-  private head = new Int32Array(0);
-  private readonly next: Int32Array;
-  private readonly ids: Int32Array;
-  private readonly stamp: Int32Array;
-  private used = 0;
-  private mark = 0;
+  // Private names are one letter on purpose (esbuild keeps property names; board-page ships this):
+  // h cell heads, n next node, d node ids, s query stamps, u nodes used, k stamp; a the circle,
+  // p put, q scan.
+  private h = new Int32Array(0);
+  private readonly n: Int32Array;
+  private readonly d: Int32Array;
+  private readonly s: Int32Array;
+  private u = 0;
+  private k = 0;
   /** Index entries refused because the node store was full (raise `nodes`). Cumulative. */
   dropped = 0;
   /** Inserts and queries refused: id outside 0..cap-1, or a non-finite (or negative r) circle. Cumulative. */
@@ -53,35 +56,35 @@ export class Grid {
     this.cell = size("cell", cell);
     this.cap = count("cap", cap);
     this.nodes = count("nodes", nodes);
-    this.next = new Int32Array(nodes);
-    this.ids = new Int32Array(nodes);
-    this.stamp = new Int32Array(cap);
+    this.n = new Int32Array(nodes);
+    this.d = new Int32Array(nodes);
+    this.s = new Int32Array(cap);
     this.resize(w, h);
   }
   /** World size changed (resize is not a hot path). */
   resize(w: number, h: number) {
     this.cols = Math.max(1, Math.ceil(size("w", w) / this.cell));
     this.rows = Math.max(1, Math.ceil(size("h", h) / this.cell));
-    if (this.head.length < this.cols * this.rows) this.head = new Int32Array(this.cols * this.rows);
+    if (this.h.length < this.cols * this.rows) this.h = new Int32Array(this.cols * this.rows);
     this.clear();
   }
   clear() {
-    this.head.fill(-1);
-    this.used = 0;
+    this.h.fill(-1);
+    this.u = 0;
   }
   /** The circle being inserted or queried. The work below takes only integers, so a call that
    *  V8 doesn't inline never boxes a number (numbers stay in this typed array). */
-  private readonly at = new Float64Array(3);
+  private readonly a = new Float64Array(3);
   /** Add id (0..cap-1) covering the circle (x, y, r). */
   insert(id: number, x: number, y: number, r: number) {
-    const a = this.at;
+    const a = this.a;
     a[0] = x;
     a[1] = y;
     a[2] = r;
-    this.put(id);
+    this.p(id);
   }
-  private put(id: number) {
-    const a = this.at, x = a[0]!, y = a[1]!, r = a[2]!;
+  private p(id: number) {
+    const a = this.a, x = a[0]!, y = a[1]!, r = a[2]!;
     if (!((id | 0) === id && id >= 0 && id < this.cap && finite(x) && finite(y) && finite(r) && r >= 0)) return void this.rejected++;
     const c = this.cell, mx = this.cols - 1, my = this.rows - 1;
     let x0 = Math.floor((x - r) / c), x1 = Math.floor((x + r) / c), y0 = Math.floor((y - r) / c), y1 = Math.floor((y + r) / c);
@@ -91,14 +94,14 @@ export class Grid {
     y1 = y1 < 0 ? 0 : y1 > my ? my : y1;
     for (let gy = y0; gy <= y1; gy++)
       for (let gx = x0; gx <= x1; gx++) {
-        if (this.used === this.nodes) {
+        if (this.u === this.nodes) {
           this.dropped += (y1 - gy) * (x1 - x0 + 1) + x1 - gx + 1;
           return;
         }
-        const k = gy * this.cols + gx, n = this.used++;
-        this.ids[n] = id;
-        this.next[n] = this.head[k]!;
-        this.head[k] = n;
+        const k = gy * this.cols + gx, n = this.u++;
+        this.d[n] = id;
+        this.n[n] = this.h[k]!;
+        this.h[k] = n;
       }
   }
   /**
@@ -106,37 +109,37 @@ export class Grid {
    * when a big step function stops V8 inlining these calls). `pad` widens the search radius.
    */
   add(x: Nums, y: Nums, r: Nums, i: number) {
-    const a = this.at;
+    const a = this.a;
     a[0] = x[i]!;
     a[1] = y[i]!;
     a[2] = r[i]!;
-    this.put(i);
+    this.p(i);
   }
   near(x: Nums, y: Nums, r: Nums, i: number, out: Int32Array, pad = 0) {
-    const a = this.at;
+    const a = this.a;
     a[0] = x[i]!;
     a[1] = y[i]!;
     a[2] = r[i]! + pad;
-    return this.scan(out);
+    return this.q(out);
   }
   /**
    * Ids whose cells touch the circle, each once, into `out`. Returns the count written. If more
    * were found than `out` holds, `missed` says how many (and `truncated` counts the query).
    */
   query(x: number, y: number, r: number, out: Int32Array): number {
-    const a = this.at;
+    const a = this.a;
     a[0] = x;
     a[1] = y;
     a[2] = r;
-    return this.scan(out);
+    return this.q(out);
   }
-  private scan(out: Int32Array): number {
-    const a = this.at, x = a[0]!, y = a[1]!, r = a[2]!;
+  private q(out: Int32Array): number {
+    const a = this.a, x = a[0]!, y = a[1]!, r = a[2]!;
     this.missed = 0;
     if (!(finite(x) && finite(y) && finite(r))) return this.rejected++, 0;
     // The dedupe stamp wraps after 2^31 queries: start the stamps over instead of aliasing.
-    if (this.mark === 0x7fffffff) this.stamp.fill(0), (this.mark = 0);
-    const m = ++this.mark, c = this.cell, mx = this.cols - 1, my = this.rows - 1;
+    if (this.k === 0x7fffffff) this.s.fill(0), (this.k = 0);
+    const m = ++this.k, c = this.cell, mx = this.cols - 1, my = this.rows - 1;
     let x0 = Math.floor((x - r) / c), x1 = Math.floor((x + r) / c), y0 = Math.floor((y - r) / c), y1 = Math.floor((y + r) / c);
     x0 = x0 < 0 ? 0 : x0 > mx ? mx : x0;
     x1 = x1 < 0 ? 0 : x1 > mx ? mx : x1;
@@ -145,10 +148,10 @@ export class Grid {
     let count = 0, missed = 0;
     for (let gy = y0; gy <= y1; gy++)
       for (let gx = x0; gx <= x1; gx++)
-        for (let n = this.head[gy * this.cols + gx]!; n >= 0; n = this.next[n]!) {
-          const id = this.ids[n]!;
-          if (this.stamp[id] === m) continue;
-          this.stamp[id] = m;
+        for (let n = this.h[gy * this.cols + gx]!; n >= 0; n = this.n[n]!) {
+          const id = this.d[n]!;
+          if (this.s[id] === m) continue;
+          this.s[id] = m;
           if (count === out.length) missed++;
           else out[count++] = id;
         }

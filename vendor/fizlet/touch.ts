@@ -1,5 +1,5 @@
 /**
- * fizlet/touch: taps and swipes on an animation or a game never zoom or pan the page. One
+ * @fzlt/core/touch: taps and swipes on an animation or a game never zoom or pan the page. One
  * delegated listener set on the document (capture, not passive) cancels, on the surfaces that match
  * `sel`, what CSS `touch-action` can't: iOS Safari's `gesturestart` / `gesturechange` (its pinch,
  * which ignores `user-scalable=no`) and any multi-touch `touchstart` / `touchmove` (a pinch

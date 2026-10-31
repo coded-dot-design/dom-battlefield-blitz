@@ -111,7 +111,7 @@ game.start();             // intro → countdown → match
 ## Two players (lockstep, demo)
 
 Every peer runs the same match from the room's seed; only inputs travel, 12 bytes per player per
-frame, through [`fizlet/presence`](https://github.com/coded-dot-design/fizlet) and a
+frame, through [`@fzlt/core/presence`](https://github.com/coded-dot-design/fizlet) and a
 room server that speaks the `fizlet-rooms` protocol (ours is in-house: a Cloudflare Worker +
 Durable Object, gated by an invite code; to run your own, see
 [Build your own room server](https://fizlet.com/guides/build-your-own-room-server/)).

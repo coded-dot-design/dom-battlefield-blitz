@@ -1,5 +1,5 @@
 /**
- * fizlet/match: the match flow every game shares, intro → count → play → paused → end, on the
+ * @fzlt/core/match: the match flow every game shares, intro → count → play → paused → end, on the
  * Board UI kit's overlay (grey dim, a sticker that slams, at most two sticker keys). One overlay is
  * built once; each phase only flips attributes, styles and text through the ledger, so destroy()
  * gives the page back exactly. Every transition is an event on the ring (`match:play`, …), so the
@@ -8,10 +8,13 @@
  */
 import { READ, STEP, type Engine, type System } from "./kernel/engine";
 
+/** Where a match is: the intro, the countdown, play, paused or the end. */
 export type Phase = "intro" | "count" | "play" | "paused" | "end";
 /** A sticker: kicker (small, blinking) and word (big). */
 export type Sticker = [kicker: string, word: string];
+/** The overlay's sticker keys, by what they do. */
 export type MatchKey = "start" | "resume" | "surrender" | "again" | "next";
+/** Every word on the match overlay: the stickers per phase, the countdown kicker and the key labels. */
 export interface MatchLabels extends Record<MatchKey, string> {
   intro: Sticker;
   /** The kicker over the 3-2-1. */
@@ -22,6 +25,7 @@ export interface MatchLabels extends Record<MatchKey, string> {
   /** Lost by surrender (the white flag). */
   flag: Sticker;
 }
+/** How a match ended: won or lost, why, and the clock. */
 export interface MatchResult {
   won: boolean;
   /** "time" (the clock ran out), "flag" (surrender) or what the game passed to finish(). */
@@ -29,6 +33,7 @@ export interface MatchResult {
   /** The clock when it ended. */
   clock: number;
 }
+/** Options for `match()`: the countdown, the match length, labels and key icons, the pause keys. */
 export interface MatchOptions {
   /** Countdown beats of one second before play (default 3; 0 skips it). */
   count?: number;
@@ -45,10 +50,10 @@ export interface MatchOptions {
   end?(r: MatchResult): Sticker | void;
   /** The clock ran out: did the player win? (default: no) */
   timeUp?(): boolean;
-  /** The kit's launch burst (`launch` from fizlet/ui) for PRESS START and SURRENDER. */
+  /** The kit's launch burst (`launch` from @fzlt/core/ui) for PRESS START and SURRENDER. */
   launch?(key: HTMLElement, action: () => void, o: { reduced?: boolean }): void;
   /** Each phase change, once it is painted (in the call that made it, or in the render of the frame
-   *  a step made it in): a host that owns more than the overlay (fizlet/arcade's skirmish preset)
+   *  a step made it in): a host that owns more than the overlay (@fzlt/core/arcade's skirmish preset)
    *  follows the phase here. Not called for the first intro. */
   on?(phase: Phase): void;
   /** Phases that show no overlay (the phase machine and its events still run), e.g. ["paused"]. */
@@ -69,6 +74,9 @@ const WORDS: MatchLabels = {
 };
 const svg = (d: string) => `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${d}</svg>`;
 
+/** The shared match flow on engine `e`, intro → count → play → paused → end, on the Board UI overlay
+ *  in `root`. Every transition is an event on the ring (`match:play`, …). Drive it with `start()`,
+ *  `pause()`, `finish()`, `restart()`; read `phase` and `clock`. */
 export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {}) {
   const lab = { ...WORDS, ...o.labels }, L = e.ledger, total = o.seconds ?? 0, beats = o.count ?? 3;
   const codes = o.keys ?? ["Escape", "KeyP"];
@@ -263,4 +271,5 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
   paint();
   return m;
 }
+/** The match flow `match()` returns. */
 export type Match = ReturnType<typeof match>;

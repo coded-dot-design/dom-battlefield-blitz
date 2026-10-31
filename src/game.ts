@@ -18,7 +18,7 @@ import { createEngine } from "../vendor/fizlet/index";
 import type { presence as Presence, Transport } from "../vendor/fizlet/presence";
 import type { seats as Seats } from "./seats";
 
-// Net play's lockstep (fizlet/presence) and seat map (src/seats.ts) are registered by the net build
+// Net play's lockstep (@fzlt/core/presence) and seat map (src/seats.ts) are registered by the net build
 // (src/net.ts → dist/blitz-net.mjs), so the drop-in and the solo module don't carry them.
 let lockstep: typeof Presence | null = null, seatMap: typeof Seats = null!;
 export function useLockstep(p: typeof Presence, s: typeof Seats) {
@@ -48,7 +48,7 @@ export interface BlitzOptions {
   platoons?: boolean;
   /** Seed for the match's randomness (engine.random). Same seed + same input = the same match. Default: random. */
   seed?: number;
-  /** Lockstep multiplayer (fizlet/presence): every peer runs the same match from the same seed and
+  /** Lockstep multiplayer (@fzlt/core/presence): every peer runs the same match from the same seed and
    *  only inputs cross the wire. A fixed 1100 × 640 arena (scaled to fit), humans in seats
    *  0..players-1, bots after them, no pause. `input` replaces this peer's controls (tests). */
   net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void; squad?: number; fill?: boolean; sides?: number; noAuto?: boolean };
@@ -454,7 +454,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const planes: Plane[] = Array.from({ length: 6 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, a: 0, t: 0, owner: 0, on: false }));
   const bombs: Bomb[] = Array.from({ length: 40 }, () => ({ x: 0, y: 0, wait: 0, fall: 0, owner: 0, main: false, on: false }));
   const booms: Boom[] = Array.from({ length: 48 }, () => ({ x: 0, y: 0, t: 0, p: 0, c: 0, on: false }));
-  // Supply crates are fizlet/rules drops: 2 at once, a 2.2 s parachute fall of 170 px, 14 s on the
+  // Supply crates are @fzlt/core/rules drops: 2 at once, a 2.2 s parachute fall of 170 px, 14 s on the
   // ground (life counts from the spawn). The brick keeps where each one is, where it lands (`landY`)
   // and how old it is (`age`): the fall shadow and the blink read those, the landing puff is its
   // `drop:land` event.
@@ -529,7 +529,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   /** a and b (tanks, shells) are closer than r (a constant: a literal never boxes). */
   const within = (a: { x: number; y: number }, b: { x: number; y: number }, r: number) => dist(a.x - b.x, a.y - b.y) < r;
-  /** The live block that a circle at (F[BX], F[BY]) of radius F[BR] touches (fizlet/collide circleRect, inline), or null. */
+  /** The live block that a circle at (F[BX], F[BY]) of radius F[BR] touches (@fzlt/core/collide circleRect, inline), or null. */
   function blockedF() {
     const cx = F[BX]!, cy = F[BY]!, r = F[BR]!;
     for (const b of blocks) {
@@ -1222,7 +1222,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // presence's step hands every player's input for the frame here, then runs world().
   let netIn: Uint32Array = new Uint32Array(Math.max(1, P));
 
-  /** A live tank sits on block b (fizlet/collide circleRect, radius 20, inline): it can't grow back yet. */
+  /** A live tank sits on block b (@fzlt/core/collide circleRect, radius 20, inline): it can't grow back yet. */
   function tankOn(b: Block) {
     const x = b.x, y = b.y, w = b.w, h = b.h;
     for (let i = 0; i < tanks.length; i++) {
@@ -1233,7 +1233,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     }
     return false;
   }
-  /** Shell s, going to (F[SX], F[SY]) this step, touches tank t (radius F[SR]): fizlet/collide segCircle(...) >= 0, inline. */
+  /** Shell s, going to (F[SX], F[SY]) this step, touches tank t (radius F[SR]): @fzlt/core/collide segCircle(...) >= 0, inline. */
   function shellHits(s: Shell, t: Tank) {
     const x0 = s.x, y0 = s.y, cx = t.x, cy = t.y, r = F[SR]!;
     const dx = F[SX]! - x0, dy = F[SY]! - y0, ox = x0 - cx, oy = y0 - cy;
@@ -1283,7 +1283,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       }
     },
   });
-  // Crates are a fizlet/rules system: in net play they move on lockstep frames too, so world()
+  // Crates are a @fzlt/core/rules system: in net play they move on lockstep frames too, so world()
   // steps them (first, as the engine would) and the engine doesn't; solo, the game's step does.
   e.remove(supply.system);
   // This peer's word: its mode pick in bits 9-11 and 13-15 (only P1's counts: src/seats.ts) and its
@@ -1397,7 +1397,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         // Tiles and crates under the tracks.
         for (const s of tiles) {
           if (!s.on || s.roll > 0) continue;
-          const x0 = s.c * T, y0 = s.r * T; // fizlet/collide inRect, inline
+          const x0 = s.c * T, y0 = s.r * T; // @fzlt/core/collide inRect, inline
           if (t.x >= x0 && t.x <= x0 + T && t.y >= y0 && t.y <= y0 + T) takeTile(s, t);
         }
         for (let i = supply.count - 1; i >= 0; i--) if (supply.landed(i) && ((F[HX] = supply.x[i]! - t.x), (F[HY] = supply.y[i]! - t.y), hyp(), F[HO]! < 26 * scale)) takeCrate(i, t);
@@ -2592,7 +2592,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       steps(n: number) {
         for (let k = 0; k < n; k++) world(1 / 60);
       },
-      /** Supply crates on the board (a snapshot of the fizlet/rules drops). */
+      /** Supply crates on the board (a snapshot of the @fzlt/core/rules drops). */
       get crates() {
         return Array.from({ length: supply.count }, (_, i) => ({ x: supply.x[i]!, y: supply.y[i]!, kind: supply.kind[i]!, landed: supply.landed(i), on: true }));
       },

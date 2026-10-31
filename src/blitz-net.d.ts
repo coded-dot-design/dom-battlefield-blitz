@@ -5,7 +5,7 @@ import type { Transport } from "./blitz";
  *  humans in (`players`), the room's seed and the host's START `mode` byte. `protocols` go to the
  *  WebSocket handshake: fizlet-rooms reads the invite there (`["fizlet-rooms", "invite." + code]`).
  *  `o.lobby(start, seat, seated, size)` runs on each LOBBY (every join and leave before the start); on
- *  seat 0, `start(seats, mode)` asks the room to begin once `seats` are taken (0: now). Same call as fizlet/presence's join (fizlet#210). */
+ *  seat 0, `start(seats, mode)` asks the room to begin once `seats` are taken (0: now). Same call as @fzlt/core/presence's join (fizlet#210). */
 export function join(url: string, signal?: AbortSignal, protocols?: string | string[], o?: { lobby?(start: (seats?: number, mode?: number) => void, seat: number, seated: number, size: number): void }): Promise<{ transport: Transport; slot: number; players: number; seed: number; mode: number }>;
 /** fizlet-rooms START: [7, 0, seats, mode, 0…], from the host before the start. LOBBY: [8, your seat, room size, seated, 0…], from the room. */
 export const START: 7, LOBBY: 8;

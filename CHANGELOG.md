@@ -1,7 +1,25 @@
 # Changelog
 
-## Unreleased
+## 1.0.0: on @fzlt/core 0.21.2
 
+What's in it (details below): the engine on `@fzlt/core` 0.21.2 (Fizlet v0.21.2); net play with room
+to hide, enemy edge lights and an AUTO-AIM switch (phones: the page never moves); multiplayer at
+`/play/multi/` (`/play/two/` redirects) with SEND LINK carrying the invite code; multiplayer passes
+(request with GitHub, approve with a label); multiplayer on a phone (board covers the screen, drive stick,
+status chip); one MODE picker (1V1, FFA, 2V2, PLATOON); phone game mode and an easy PAUSE (net pause on
+every screen); the footer's family line; no screen shake under reduced motion; site analytics behind a
+consent banner (off until the owner sets the ids).
+
+- **On `@fzlt/core` 0.21.2** (pending owner review). `vendor/fizlet` re-synced from fizlet tag v0.21.2
+  (`2922cbd`, the commit npm's `@fzlt/core@0.21.2` was published from), was 0.20.0 (`bf42a8c`). Fizlet's
+  npm package is now `@fzlt/core`; brick labels in the README, types and comments read `@fzlt/core/<brick>`
+  (the engine is still Fizlet). Gameplay unchanged: `test:replay` plays the same matches value for value,
+  `test:lockstep` 0 desyncs, zero-alloc step green. What came with it: the Board UI kit's key shadows follow
+  a page's `--shadow-x/-y/-color` (defaults unchanged: straight below, on the rim), and the kit hides a
+  `[hidden]` coach card itself. Sizes (gzip, on top of the room-to-hide entry below): `blitz.js` 46,207 →
+  46,399, `blitz.mjs` 46,313 → 46,525, `blitz-net.mjs` 48,177 → 48,392; most of it is the kit CSS (4,974 →
+  5,139 B gzip). Budgets: `blitz.js` and `blitz.mjs` 46,528 → 46,720 (the kit CSS above, measured;
+  `blitz.mjs` had 3 B left); `blitz-net.mjs` unchanged. Size-ledger row in fizlet-engine.
 - **Multiplayer: room to hide, enemy edge lights, and an auto-aim switch** (owner feedback from phone play).
   - **A bigger map than the screen, everywhere.** The fixed 1100 × 640 arena is now scaled so at least
     2 squares stay off screen on each axis, on desktop as on phones, and the camera follows your tank

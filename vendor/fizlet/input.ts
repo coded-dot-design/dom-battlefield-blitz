@@ -1,5 +1,5 @@
 /**
- * fizlet/input: one controller for keys, pointer and a touch stick, mapped to named intents.
+ * @fzlt/core/input: one controller for keys, pointer and a touch stick, mapped to named intents.
  * Listeners only record; the engine's read phase latches edges and measures the target, so a step
  * sees a stable snapshot. Keys typed into the host page's fields (or inside [data-fizlet-ignore])
  * never count. Keys, the pointer, `press()` and `steer()` wake a settled engine. Held state is
@@ -12,6 +12,7 @@
  */
 import type { Engine, System } from "./kernel/engine";
 
+/** Options for `controls()`: the intents and their keys, the pointer target and the touch stick. */
 export interface ControlsOptions {
   /** intent → key codes, e.g. { fire: ["Space"], up: ["KeyW", "ArrowUp"] } (KeyboardEvent.code). */
   keys?: Record<string, string[]>;
@@ -27,6 +28,9 @@ const EDIT = "input,textarea,select,[contenteditable],[data-fizlet-ignore]";
 /** An intent by name, or by the number `id(name)` gave. */
 export type Intent = string | number;
 
+/** One controller for keys, pointer and a touch stick on engine `e`, mapped to named intents:
+ *  `down(intent)`, `hit(intent)` (one step per press), `pointer` and `stick`. It registers its
+ *  own read-phase system; `dispose()` removes it. */
 export function controls(e: Engine, o: ControlsOptions = {}) {
   const ctl = new AbortController(), on = { signal: ctl.signal };
   const names = Object.keys(o.keys ?? {}), N = names.length;
@@ -186,7 +190,7 @@ export function controls(e: Engine, o: ControlsOptions = {}) {
       if (down && !isDown(i)) pend[i] = 1;
       btn[i] = +down;
     },
-    /** Drive the stick from code (an on-screen stick, fizlet/pad): x, y in -1..1; `on = false` lets go. */
+    /** Drive the stick from code (an on-screen stick, @fzlt/core/pad): x, y in -1..1; `on = false` lets go. */
     steer(x: number, y: number, on = true) {
       e.wake();
       s[0] = on ? x : 0;
@@ -197,4 +201,5 @@ export function controls(e: Engine, o: ControlsOptions = {}) {
     system,
   };
 }
+/** The controller `controls()` returns. */
 export type Controls = ReturnType<typeof controls>;

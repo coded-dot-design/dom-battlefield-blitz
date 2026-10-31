@@ -1,9 +1,9 @@
-// fizlet/arcade's `skirmish` preset (Battlefield Blitz's HUD): a bar across the top with the title,
+// @fzlt/core/arcade's `skirmish` preset (Battlefield Blitz's HUD): a bar across the top with the title,
 // readouts (kills, clock, rank, an armor bar, streak…), aim toggles, action keys with counts and
 // header keys; a feed and a banner driven by the event ring; the pad on phones with counted keys and
-// aim toggles. Values go through fizlet/hud: change-only, from typed-array slots, nothing allocated
+// aim toggles. Values go through @fzlt/core/hud: change-only, from typed-array slots, nothing allocated
 // in the steady state. The run's flow (countdown, pause / surrender, result: BOARD-UI.md §9) is
-// fizlet/match on a small engine of its own that lives as long as the overlay: its clock runs the
+// @fzlt/core/match on a small engine of its own that lives as long as the overlay: its clock runs the
 // countdown while the game's engine waits, and its END sticker outlives the game's engine (whose end
 // gives the page back) until REMATCH, EXIT or Recall. Match owns the phase; the shell asks it.
 import type { ArcadeHud, HudView } from "./arcade";
@@ -16,6 +16,7 @@ import { pad } from "./pad";
 import type { PadAction } from "./pad";
 import { toast } from "./ui/board-ui";
 
+/** One readout on the skirmish bar: its label, how the value shows and its tone. */
 export interface SkirmishReadout {
   label: string;
   /** How the value shows: `num` (default) 12 · `clock` 3:05 from seconds · `rank` #2 · `pct` 75%
@@ -25,6 +26,8 @@ export interface SkirmishReadout {
   /** A bar: class `low` at or under this (0..1). */
   low?: number;
 }
+/** Options for the `skirmish` HUD preset: its readouts, header and nav keys, feed, banner, overlays,
+ *  result, aim toggles and key counts. */
 export interface SkirmishOptions {
   /** Readouts, in the order `hud(out)` fills them. */
   readouts: SkirmishReadout[];
@@ -38,7 +41,7 @@ export interface SkirmishOptions {
   feed?: { rows?: number; on: string; line: (a: number, b: number) => string };
   /** A centred banner (title, sub) on each event of type `on`. */
   banner?: { on: string; text: (a: number, b: number) => readonly [string, string?] };
-  /** Overlays (default all four; fizlet/match runs the flow either way). `countdown` holds the start
+  /** Overlays (default all four; @fzlt/core/match runs the flow either way). `countdown` holds the start
    *  for 3, 2, 1 on the flow's clock; without `pause` or `result` that phase shows no overlay; without
    *  `surrender` the pause card has no SURRENDER key. */
   overlays?: ("pause" | "surrender" | "countdown" | "result")[];
@@ -51,7 +54,7 @@ export interface SkirmishOptions {
 }
 
 const CSS = `
-.sk{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;max-width:calc(100% - 20px);display:flex;align-items:center;gap:14px;padding:8px 10px 8px 14px;pointer-events:auto;color:var(--ink);background:color-mix(in srgb,var(--card) 94%,transparent);border:2.5px solid var(--line);border-radius:10px;box-shadow:0 5px 0 var(--rim)}
+.sk{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;max-width:calc(100% - 20px);display:flex;align-items:center;gap:14px;padding:8px 10px 8px 14px;pointer-events:auto;color:var(--ink);background:color-mix(in srgb,var(--card) 94%,transparent);border:2.5px solid var(--line);border-radius:10px;box-shadow:calc(5px*var(--bui-sx)) calc(5px*var(--bui-sy)) 0 var(--bui-shadow)}
 .sk>b{font:900 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:var(--team-a);white-space:nowrap}
 .sk .bui-readouts{gap:16px}.sk .bui-readout b{font-size:16px;margin-top:3px}
 .sk .bui-readout i{display:block;width:72px;height:8px;margin-top:7px;border-radius:3px;background:var(--surface);border:1.5px solid var(--line);overflow:hidden}
@@ -60,7 +63,7 @@ const CSS = `
 .bui .bui-badge:empty{display:none}.sk .bui-badge{top:-8px;right:-8px;min-width:18px;height:18px;font-size:10px;line-height:15px}
 .sk-feed{position:absolute;left:max(12px,env(safe-area-inset-left));top:80px;margin:0;padding:0;list-style:none;display:grid;gap:4px;font:700 11px/1.3 ui-monospace,monospace;color:var(--ink)}
 .sk-feed li{padding:3px 8px;background:color-mix(in srgb,var(--surface) 85%,transparent);border-left:3px solid var(--team-a);border-radius:4px}.sk-feed li:empty{display:none}
-.sk-ban{position:absolute;left:50%;top:24%;translate:-50% 0;display:grid;justify-items:center;gap:6px;padding:10px 18px;color:var(--ink);background:color-mix(in srgb,var(--surface) 94%,transparent);border:2px solid var(--line);border-radius:8px;box-shadow:0 4px 0 var(--rim);opacity:0}
+.sk-ban{position:absolute;left:50%;top:24%;translate:-50% 0;display:grid;justify-items:center;gap:6px;padding:10px 18px;color:var(--ink);background:color-mix(in srgb,var(--surface) 94%,transparent);border:2px solid var(--line);border-radius:8px;box-shadow:calc(4px*var(--bui-sx)) calc(4px*var(--bui-sy)) 0 var(--bui-shadow);opacity:0}
 .sk-ban b{font:900 28px/1 ui-monospace,monospace;letter-spacing:.1em}.sk-ban span{font:800 11px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--team-a)}
 .sk-ban.a{animation:ska 1.8s both}.sk-ban.b{animation:skb 1.8s both}
 @keyframes ska{0%{opacity:0;scale:1.4}12%,75%{opacity:1;scale:1}100%{opacity:0}}@keyframes skb{0%{opacity:0;scale:1.4}12%,75%{opacity:1;scale:1}100%{opacity:0}}
@@ -136,7 +139,7 @@ ${o.feed ? '<ol class="sk-feed" aria-label="Feed"></ol>' : ""}${o.banner ? '<div
       }
       for (const [b, slot] of counted) h.num(b as HTMLElement, [out, slot]);
 
-      // The flow: fizlet/match on its own engine, alive as long as the overlay (Recall destroys it,
+      // The flow: @fzlt/core/match on its own engine, alive as long as the overlay (Recall destroys it,
       // and its ledger takes the overlay back). Match owns the phase and its keys' clicks; the shell
       // keeps the keyboard (P, Escape) and asks (`ask`); each phase change answers it (`go`).
       let won = false, kept = "", play = () => {};
@@ -204,7 +207,7 @@ ${o.feed ? '<ol class="sk-feed" aria-label="Feed"></ol>' : ""}${o.banner ? '<div
           play = go;
           m.restart();
         },
-        // The engine's ledger takes back what fizlet/hud wrote: the bar keeps the final numbers.
+        // The engine's ledger takes back what @fzlt/core/hud wrote: the bar keeps the final numbers.
         hold: () => void (kept = group.innerHTML),
         end(_, notice, stats) {
           group.innerHTML = kept;
