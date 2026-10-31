@@ -69,7 +69,7 @@ try {
   assert.match(await ov(), /RESUME/);
   // The menu carries what the hidden footer did on a phone: the byline, PRIVACY, and COOKIE SETTINGS
   // only when the page has a consent pattern (it gets a composed "consent:open").
-  assert.equal(await page.evaluate(() => document.getElementById("a").shadowRoot.querySelector("[data-ov] .by a").href), "https://domvirus.com/privacy/");
+  assert.equal(await page.evaluate(() => document.getElementById("a").shadowRoot.querySelector("[data-ov] .by a").href), "https://domvirus.com/legal/privacy/");
   assert.equal(await page.evaluate(() => !!document.getElementById("a").shadowRoot.querySelector("[data-consent]")), false, "no COOKIE SETTINGS without a consent pattern");
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => g.state === "play");

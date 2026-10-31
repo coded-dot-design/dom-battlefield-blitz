@@ -1708,7 +1708,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
   // The menu's byline, with the links the hidden footer carried on a phone: PRIVACY, and COOKIE SETTINGS
   // once the page has a consent pattern (<html data-consent>; the key sends it a composed
   // "consent:open" event). No analytics here.
-  const BYLINE = () => `<p class="by">BATTLEFIELD BLITZ · BY CHRIS COOLEY · <a href="https://domvirus.com/privacy/">PRIVACY</a>${"consent" in document.documentElement.dataset ? ` · <button type="button" data-consent>COOKIE SETTINGS</button>` : ""}</p>`;
+  const BYLINE = () => `<p class="by">BATTLEFIELD BLITZ · BY CHRIS COOLEY · <a href="https://domvirus.com/legal/privacy/">PRIVACY</a>${"consent" in document.documentElement.dataset ? ` · <button type="button" data-consent>COOKIE SETTINGS</button>` : ""}</p>`;
   ov.addEventListener("click", (ev) => (ev.target as Element).closest?.("[data-consent]") && host.dispatchEvent(new CustomEvent("consent:open", { bubbles: true, composed: true })), { signal: e.signal });
   function togglePause() {
     if (net) return void (pzWant = state === "play" || (state === "paused" && G[PZ_BY] === net.slot) ? !pzWant : pzWant);
