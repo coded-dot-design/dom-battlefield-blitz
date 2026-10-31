@@ -4,7 +4,7 @@
     "blitz.js": "a1f0edddbd1b6b6a3ff2b426e463cc432d3cfcaf37afdf56537c9f83874b1d44",
     "blitz.mjs": "5863d1763be3ddb30c074fe68b9dd0a08ab6615207546c7426c757a3a0ddd060",
     "blitz.d.ts": "28e5e00e1f372c3b5d8f1974ef9e6d5311ba523eded8b463a2b96fb34459eb5e",
-    "blitz-net.mjs": "77e76d509422934047a4cdc6729404006366a8b237a67f7356810e010ecd8567",
-    "blitz-net.d.ts": "1a5a34687f782bf97f0504f77ee150489cb2d142da9eeb8ccff151f1ec009ec0"
+    "blitz-net.mjs": "4878b6ae289da9110110f8e6eac3db3482f2c189169cad6db77fe5123ba6735d",
+    "blitz-net.d.ts": "de0b4028c8a9cdbbc85e41355e4875d3668b36bc25d9f1abe48c7bc412700261"
   }
 }

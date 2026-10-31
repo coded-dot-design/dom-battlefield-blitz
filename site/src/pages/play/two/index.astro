@@ -240,9 +240,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
 
   // ---------- Seats: who is who ----------
   const swatch = (c: number | string) => `<i class="sw" style="--c:${typeof c === "number" ? SEAT[c] : c}"></i>`;
-  // `me` and `joined` come from the room's LOBBY (a server without it: you in seat 1, the rest open).
-  const waitSeats = (n: number, me = 0, joined = 1) =>
-    ($("[data-wait-seats]").innerHTML = Array.from({ length: n }, (_, i) => `<li class="${i === me ? "me" : i < joined ? "in" : "open"}">${swatch(i)}<span>${i === me ? "YOU" : i < joined ? `P${i + 1}` : "OPEN SEAT"}</span></li>`).join(""));
+  const waitSeats = (n: number) =>
+    ($("[data-wait-seats]").innerHTML = Array.from({ length: n }, (_, i) => `<li class="${i ? "open" : "me"}">${swatch(i)}<span>${i ? "OPEN SEAT" : "YOU"}</span></li>`).join(""));
 
   // ---------- The match ----------
   let game: Game | null = null, abort: AbortController | null = null, watch = 0, code = "";
@@ -271,15 +270,22 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     $("[data-share-say]").textContent = "SEND LINK";
     $("[data-start]").hidden = true;
     step("wait");
-    // The room's LOBBY (a server that sends it): who is in; P1 may start a 4-seat room with 2 or 3.
-    const lobby = (l: { slot: number; joined: number; size: number; start(): void }) => {
-      waitSeats(l.size, l.slot, l.joined);
-      const open = l.size - l.joined, k = $<HTMLButtonElement>("[data-start]");
-      $("[data-wait-say]").textContent = !open ? "Starting…" : l.slot ? `Waiting for P1 to start, or for ${open} more.` : l.joined < 2 ? `Waiting for ${open === 1 ? "player 2" : `${open} more players`}.` : `${l.joined} in. Start now: the computer takes ${open === 1 ? "the empty seat" : `the ${open} empty seats`}.`;
-      k.hidden = !!l.slot || l.joined < 2 || !open;
-      $("[data-start-say]").textContent = `START NOW · ${open} CPU`;
-      k.onclick = () => ((k.disabled = true), l.start());
-      k.disabled = false;
+    // A 4-seat room on a server with START (fizlet#210): the host (P1, the first in) may start it once
+    // 2 are in; the computer takes the empty seats. The room counts only seat 0's START, and it doesn't
+    // say who is seated before the start, so every waiting player sees the key.
+    const lobby = (go: (seats?: number, mode?: number) => void) => {
+      if (!four(mode)) return;
+      const k = $<HTMLButtonElement>("[data-start]");
+      k.hidden = k.disabled = false;
+      $("[data-start-say]").textContent = "START NOW";
+      $("[data-wait-say]").textContent = `Waiting for ${players - 1} more, or for P1 to start: 2 or 3 in, the computer takes the empty seats.`;
+      k.onclick = () => {
+        // Begin as soon as 2 are seated (now, if they are); the mode byte rides in WELCOME too.
+        go(2, mode === "2v2" ? 2 : 1);
+        k.disabled = true;
+        $("[data-start-say]").textContent = "STARTING…";
+        $("[data-wait-say]").textContent = "Starting as soon as 2 are in (only P1's START counts).";
+      };
     };
     abort = new AbortController();
     const signal = abort.signal;
@@ -288,7 +294,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       try {
         const at = `${ws}/room/${room}?players=${players}`;
         // The invite rides in the WebSocket subprotocols, never the URL (only the old server needs ?invite=).
-        const seat = via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal, undefined, lobby) : await join(at, signal, ["fizlet-rooms", `invite.${code}`], lobby);
+        const seat = via === "url" ? await join(`${at}&invite=${encodeURIComponent(code)}`, signal, undefined, { lobby }) : await join(at, signal, ["fizlet-rooms", `invite.${code}`], { lobby });
         return start(seat);
       } catch {
         if (signal.aborted) return;

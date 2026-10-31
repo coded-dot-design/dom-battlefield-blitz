@@ -32,10 +32,10 @@ await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
 const base = `http://127.0.0.1:${server.address().port}${PREFIX}/`;
 
 // ---------- The mock room server (rooms/src/relay.js, in memory) ----------
-const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4, LOBBY = 5, START = 6;
-const msg = (kind, slot, players, frame, value) => {
+const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4, START = 7;
+const msg = (kind, slot, players, frame, value, mode = 0) => {
   const b = Buffer.alloc(12);
-  b[0] = kind, b[1] = slot, b[2] = players;
+  b[0] = kind, b[1] = slot, b[2] = players, b[3] = mode;
   b.writeUInt32LE(frame >>> 0, 4);
   b.writeUInt32LE(value >>> 0, 8);
   return b;
@@ -66,15 +66,19 @@ async function mockServer(context, mode) {
     if (r.players !== players || r.started) return ws.close({ code: 4000, reason: "room full" });
     r.seats[r.seats.indexOf(null)] = ws;
     const slot = () => r.seats.indexOf(ws);
-    const welcome = () => ((r.started = true), r.seats.forEach((p, s) => p.send(msg(WELCOME, s, r.seats.length, r.seed, 0))));
-    // The proposed wire (rooms "start now", "new" server only): LOBBY to everyone waiting on each join
-    // and leave; START from seat 0 with 2+ in seats the ones in (arrival order) and welcomes them.
-    const lobby = () => mode === "new" && r.seats.forEach((p, s) => p?.send(msg(LOBBY, s, r.seats.filter(Boolean).length, r.players, 0)));
-    if (r.seats.every(Boolean)) welcome();
-    else lobby();
+    // START (fizlet#210, "new" server only): from seat 0 before the start, [7, 0, n, mode]: begin once n
+    // seats are taken (0: now) with the seats taken, renumbered in arrival order; WELCOME carries mode.
+    const ready = () => {
+      const taken = r.seats.filter(Boolean);
+      if (r.started || !(taken.length === r.seats.length || (r.want && taken.length >= r.want))) return;
+      r.seats = taken;
+      r.started = true;
+      r.seats.forEach((p, s) => p.send(msg(WELCOME, s, r.seats.length, r.seed, 1 + s, r.mode ?? 0)));
+    };
+    ready();
     ws.onMessage((d) => {
       if (typeof d === "string" || d.length !== 12) return;
-      if (d[0] === START && mode === "new" && !r.started && slot() === 0 && r.seats.filter(Boolean).length >= 2) return (r.seats = r.seats.filter(Boolean)), (r.startedWith = r.seats.length), welcome();
+      if (d[0] === START && mode === "new" && !r.started && slot() === 0) return (r.want = Math.max(1, d[2])), (r.mode = d[3]), ready();
       if (!r.started || (d[0] !== INPUT && d[0] !== HASH)) return;
       const b = Buffer.from(d), me = slot();
       b[1] = me;
@@ -85,7 +89,6 @@ async function mockServer(context, mode) {
       if (me < 0) return;
       r.seats[me] = null;
       if (r.started) r.seats.forEach((p) => p?.send(msg(LEAVE, me, r.seats.length, 0, 0)));
-      else lobby();
       if (!r.seats.some(Boolean)) r.started = false;
     });
   });
@@ -146,6 +149,9 @@ const CASES = [
   [2, 390, "dark", "new", "platoon", 4],
   [3, 1440, "light", "new", "ffa"],
 ];
+// FULL=1 (with SHOTS): every mode at 1440 and 390, light and dark, for the screenshot sheet.
+if (process.env.FULL) CASES.splice(0, CASES.length, ...[["1v1", 2], ["ffa", 2], ["2v2", 3], ["platoon", 2, 3]].flatMap(([g, n, k]) => [[1440, "dark"], [1440, "light"], [390, "dark"], [390, "light"]].map(([w, t]) => [n, w, t, "new", g, k])));
+if (process.env.ONLY) CASES.splice(0, CASES.length, ...CASES.filter((c) => c[4] === process.env.ONLY));
 const said = [];
 try {
   for (const [n, width, theme, mode, game, squad] of CASES) {
@@ -205,13 +211,16 @@ try {
     const all = [me, ...others];
     const cpu = seats - n;
     if (cpu) {
-      // A 4-seat room with 2 or 3 in: P1 sees who's in and START NOW; the others wait for P1.
-      await me.waitForFunction((n) => document.querySelectorAll("[data-wait-seats] li:not(.open)").length === n, n);
+      // A 4-seat room with 2 or 3 in: START NOW (P1's counts; the room can't say who is seated first).
       await me.waitForFunction(() => !document.querySelector("[data-start]").hidden);
-      assert.match(await me.locator("[data-start]").textContent(), new RegExp(`START NOW · ${cpu} CPU`));
-      for (const o of others) assert.equal(await o.locator("[data-start]").isHidden(), true, `${tag}: only P1 can start`), assert.match(await o.locator("[data-wait-say]").textContent(), /Waiting for P1 to start/);
+      assert.match(await me.locator("[data-start]").textContent(), /START NOW/);
+      assert.match(await me.locator("[data-wait-say]").textContent(), /computer takes the empty seats/);
       await shot(me, `${tag}-2-wait-start`);
       await layout(me, `${tag} wait start`);
+      // Another seat's START is ignored: still waiting.
+      await others.at(-1).click("[data-start]");
+      await me.waitForTimeout(300);
+      assert.equal(await step(me), "wait", `${tag}: only P1's START counts`);
       await me.click("[data-start]");
     }
     for (const p of all) await p.waitForFunction(() => document.querySelector(".room").dataset.step === "play", null, { timeout: 10000 });
@@ -267,6 +276,8 @@ try {
       await me.click("[data-again]");
       const back = await peer(1440, theme, url, mode);
       await back.click("[data-join]");
+      // A 4-seat room: P1 starts it again with the two of them.
+      if (seats === 4) await me.waitForFunction(() => !document.querySelector("[data-start]").hidden), await me.click("[data-start]");
       for (const p of [me, back]) await p.waitForFunction(() => document.querySelector(".room").dataset.step === "play", null, { timeout: 10000 });
       await back.close();
     }
@@ -274,7 +285,7 @@ try {
     assert.deepEqual(leaks, [], `${tag}: no code in a URL or referrer on the new server`);
     for (const c of contexts.splice(0)) await c.close();
   }
-  console.log(`Multiplayer: the four modes through a mock room (old and new invite forms; LOBBY/START on the new one), ${runs} runs at 1440 and 390 in light and dark (${said.join("; ")}): join, the MODE pick (P1's on every screen, carried by the link), waiting seats, START NOW with the computer in the empty seats, live match with a row per player and bot in its tank colour and side totals, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
+  console.log(`Multiplayer: the four modes through a mock room (old and new invite forms; START on the new one), ${runs} runs at 1440 and 390 in light and dark (${said.join("; ")}): join, the MODE pick (P1's on every screen, carried by the link), waiting seats, START NOW with the computer in the empty seats, live match with a row per player and bot in its tank colour and side totals, a player leaving (named), rejoin; no desync, no sideways scroll, card keys ≥ 44 px.`);
 } catch (e) {
   console.error(`multiplayer test failed at ${where}`);
   throw e;
