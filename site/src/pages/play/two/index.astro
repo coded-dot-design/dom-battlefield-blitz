@@ -489,8 +489,12 @@ const description = 'Two to four players, one Blitz match, over the internet. En
   .room.folded .body {
     display: none;
   }
+  /* The body scrolls, so it clips whatever paints outside it: a 6px gutter each side (taken back
+     by the negative margin, so nothing moves) keeps the input's focus ring (3px + 2px offset) whole. */
   .body {
     min-height: 0;
+    margin-inline: -6px;
+    padding-inline: 6px;
     overflow-y: auto;
     overscroll-behavior: contain;
     touch-action: pan-y;
