@@ -3,7 +3,7 @@
 //
 // A pass is base64url(payload).base64url(HMAC-SHA256(payload, PASS_SECRET)), payload
 // { v: 1, id (96 random bits), exp (Unix s), kind?, dev?, gh?, issue?, name? }. The room server
-// (fizlet rooms/src/pass.js) checks it with the same secret and locks it to the first `dev` devices.
+// (ours, in-house) checks it with the same secret and locks it to the first `dev` devices.
 //
 //   node scripts/play-pass.mjs event      the play-pass workflow: issue labeled `approved` (by someone
 //                                         with write access) → a 1-hour pass as a comment; issue

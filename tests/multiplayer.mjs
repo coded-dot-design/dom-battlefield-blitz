@@ -33,7 +33,7 @@ const server = createServer((req, res) => {
 await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
 const base = `http://127.0.0.1:${server.address().port}${PREFIX}/`;
 
-// ---------- The mock room server (rooms/src/relay.js, in memory) ----------
+// ---------- The mock room server (the fizlet-rooms protocol, in memory) ----------
 const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4, START = 7, LOBBY = 8;
 const msg = (kind, slot, players, frame, value, mode = 0) => {
   const b = Buffer.alloc(12);
