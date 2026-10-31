@@ -1,0 +1,35 @@
+# Multiplayer play passes (docs/play-pass.md). A `play-pass` issue labeled `approved` by someone with
+# write access (checked through the REST API, in the script) gets a 1-hour pass as a comment; an
+# allowlisted requester gets one when the issue opens; closing the issue revokes its passes.
+# Secrets (owner, optional): PASS_SECRET (without it the bot says passes aren't on yet),
+# ROOMS_ADMIN_KEY (without it closing revokes nothing). Repo variable ROOMS_URL overrides the server.
+# The script reads the event from GITHUB_EVENT_PATH: no issue text ever reaches a shell.
+name: Play pass
+on:
+  issues:
+    types: [opened, labeled, closed]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: play-pass-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  pass:
+    if: contains(github.event.issue.labels.*.name, 'play-pass') && (github.event.action != 'labeled' || github.event.label.name == 'approved')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/play-pass.mjs
+            .github/play-pass-allow.json
+          sparse-checkout-cone-mode: false
+      - run: node scripts/play-pass.mjs event
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PASS_SECRET: ${{ secrets.PASS_SECRET }}
+          ROOMS_ADMIN_KEY: ${{ secrets.ROOMS_ADMIN_KEY }}
+          ROOMS_URL: ${{ vars.ROOMS_URL }}
