@@ -162,6 +162,9 @@ const AGAIN = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="cris
 const MENU = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<path d="M16 18h32v6H16Zm0 11h32v6H16Zm0 11h32v6H16Z" fill="currentColor"/></svg>`;
 const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="true">${ICON[k]}</svg>`;
 
+// A phone: a coarse pointer on a small screen (site.css "Game mode", the same query). The board covers
+// the screen, the keys float at its edges, and a drive stick shows bottom left.
+const PHONE = "(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px)";
 const CSS = `:host{all:initial;display:block}*{box-sizing:border-box}
 .bz{position:absolute;inset:0;overflow:hidden;font:600 12px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;touch-action:none;user-select:none;-webkit-user-select:none}
 .bz.embed{position:fixed;z-index:2147483000}
@@ -261,7 +264,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 /* Narrow: the scoreboard sits under the key row (exit · full screen · pause), never over it. */
 .hud{top:max(62px,calc(env(safe-area-inset-top) + 52px))}.feed{top:max(122px,calc(env(safe-area-inset-top) + 112px))}.banner{top:max(132px,calc(env(safe-area-inset-top) + 122px))}.coach{top:max(118px,calc(env(safe-area-inset-top) + 108px))}}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
-@media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}`;
+@media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}
+.stk{display:none}
+@media ${PHONE}{.stk{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));display:block;width:116px;height:116px;border:2.5px solid var(--line);border-radius:50%;background:color-mix(in srgb,var(--surface) 55%,transparent);touch-action:none}
+.stk i{position:absolute;left:31px;top:31px;width:50px;height:50px;background:var(--team);border:2.5px solid var(--rim);border-radius:50%;box-shadow:0 4px 0 var(--rim)}
+.pre .stk,.demo .stk,.bui .pad .grab{display:none}.bui :is(.auto,.lock){bottom:106px;width:56px;height:56px}.bui :is(.long,.strike){bottom:166px}.hud{translate:-50% 0!important;cursor:default;background:color-mix(in srgb,var(--surface) 80%,transparent)}.pad{translate:none!important}
+.feed{left:50%;right:auto;translate:-50% 0;justify-items:center}.feed li:nth-child(n+3){display:none}}`;
 
 export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const net = o.net ?? null, P = net ? net.players : 0;
@@ -279,6 +287,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
 <button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause (Esc or P)" title="Esc · P · Pause">${svg("pause")}<span>PAUSE</span></button>
+<div class="stk" data-stk aria-hidden="true"><i></i></div>
 <div class="pad" data-pad>
 <button class="bui-grip grab" type="button" data-grab aria-label="Move the controls: drag (double-click puts them back)" title="Drag to move · double-click to reset"></button>
 <button class="rk bui-arcade bui-aim auto" type="button" data-k="auto" aria-pressed="false" aria-label="Auto-aim at the nearest tank (Q)" title="Q · Auto-aim">${svg("auto")}<small>AUTO</small><kbd>Q</kbd></button>
@@ -361,7 +370,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   G[CLK] = o.seconds ?? 180; // the match clock (board)
   G[TILE_IN] = 1.2; // the next power tile
   G[CRATE_IN] = 12; // the next supply crate
-  const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)");
+  const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)"), phone = matchMedia(PHONE);
   // Reduced motion: the screen never shakes (the blasts, flags and stickers already calm down).
   const calm = matchMedia("(prefers-reduced-motion: reduce)");
   let shook = 0; // the last frame's shake (px), for the tests
@@ -385,11 +394,18 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 
   // ---------- World ----------
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
-  // Canvas px → arena: scale, offset x, offset y (identity unless the arena is fixed: net).
-  const view = new Float64Array([1, 0, 0]);
+  // Canvas px → arena: scale, offset x, offset y, turned (identity unless the arena is fixed: net).
+  // Net play on a phone covers the screen: the arena is scaled to cover (not fit), turned 90° on a
+  // portrait screen so its long side runs down the tall one, and the camera follows your tank on the
+  // axis that's cropped. Drawing and input only: the match never knows (lockstep-safe).
+  const view = new Float64Array([1, 0, 0, 0]);
   // Drawn as yours (ring, tag): in net play every human is a player in the match, but only one is you.
   const mine = (t: Tank) => (net ? t === you : t.you);
-  const wx = (x: number) => (x - view[1]!) / view[0]!, wy = (y: number) => (y - view[2]!) / view[0]!;
+  const wx = (x: number, y = input.pointer.y) => (view[3] ? y - view[2]! : x - view[1]!) / view[0]!, wy = (y: number, x = input.pointer.x) => (view[3] ? H - (x - view[1]!) / view[0]! : (y - view[2]!) / view[0]!);
+  /** The arena on screen (render): the view's transform, × dpr. */
+  const vt = () => (view[3] ? ctx.setTransform(0, dpr * view[0]!, -dpr * view[0]!, 0, dpr * (view[1]! + H * view[0]!), dpr * view[2]!) : ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!));
+  /** Text and pips about (x, y) read upright on a turned view. */
+  const upright = (x: number, y: number) => view[3] && (ctx.translate(x, y), ctx.rotate(-Math.PI / 2), ctx.translate(-x, -y));
   let state: "intro" | "count" | "play" | "end" | "paused" = embed || demo ? "play" : "intro";
   // Solo: every tank for itself. Platoons: teams of 4 (3 on a dropped-in page), three platoons.
   const saved = (() => {
@@ -463,9 +479,11 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       dpr = Math.min(devicePixelRatio || 1, cw < 760 ? 1.5 : 2);
       canvas.width = Math.round(cw * dpr);
       canvas.height = Math.round(ch * dpr);
-      view[0] = Math.min(cw / W, ch / H);
-      view[1] = (cw - W * view[0]) / 2;
-      view[2] = (ch - H * view[0]) / 2;
+      // A phone (game mode) covers the screen, turned when portrait; elsewhere the arena fits whole.
+      const turn = (view[3] = +(phone.matches && ch > cw)), aw = turn ? H : W, ah = turn ? W : H;
+      view[0] = (phone.matches ? Math.max : Math.min)(cw / aw, ch / ah);
+      view[1] = (cw - aw * view[0]) / 2;
+      view[2] = (ch - ah * view[0]) / 2;
       return;
     }
     W = Math.max(320, r.width);
@@ -1155,14 +1173,17 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   /** This peer's controls as one input word (latched taps are spent here, once). */
   function encode() {
-    const ax = input.axis("left", "right", 0), ay = input.axis("up", "down", 1), touch = input.stick.active || coarse.matches;
+    let ax = input.axis("left", "right", 0), ay = input.axis("up", "down", 1);
+    const touch = input.stick.active || coarse.matches;
+    // A turned view: up on the screen is left in the arena, right on the screen is up.
+    if (view[3]) (ay = -ax), (ax = input.axis("up", "down", 1));
     let b = (ax < -0.3 ? 1 : ax > 0.3 ? 2 : 0) | ((ay < -0.3 ? 1 : ay > 0.3 ? 2 : 0) << 2);
     if (!targeting && (input.down("fire") || input.pointer.down || fireQ)) b |= 16;
     fireQ = false;
     if (longQ) (longQ = false), (b |= 32);
     if (strikeT) (strikeT = false), (targeting = !targeting && you.strikes > 0);
     let x = wx(input.pointer.x), y = wy(input.pointer.y);
-    if (strikeQ) (strikeQ = false), (targeting = false), (b |= 64), (x = wx(strikeX)), (y = wy(strikeY));
+    if (strikeQ) (strikeQ = false), (targeting = false), (b |= 64), (x = wx(strikeX, strikeY)), (y = wy(strikeY, strikeX));
     if (you.strikes <= 0) targeting = false;
     b |= (autoOn || lockOn ? 1 : !touch || input.pointer.down ? 0 : 2) << 7;
     const qx = Math.max(0, Math.min(255, Math.floor((x / W) * 256))), qy = Math.max(0, Math.min(255, Math.floor((y / H) * 256)));
@@ -1466,7 +1487,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
         return;
       }
       if (lockOn) {
-        const k = nearestTo(wx(x), wy(y), 44 * (scale / 1.4), you.team);
+        const k = nearestTo(wx(x, y), wy(y, x), 44 * (scale / 1.4), you.team);
         if (k >= 0 && k !== lockT) {
           ev.stopPropagation();
           lockT = k;
@@ -2054,8 +2075,14 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     }
   }
   function draw() {
-    if (net) ctx.setTransform(1, 0, 0, 1, 0, 0), ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!);
+    if (net) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0), ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Cover: the camera keeps your tank mid-screen, up to the arena's edges, or a little past them
+      // at the top and bottom, where the keys and the scoreboard sit (your tank is never under them).
+      const s = view[0]!, cw = canvas.width / dpr, ch = canvas.height / dpr, t = view[3]!;
+      if (phone.matches) (view[1] = Math.min(0, Math.max(cw - (t ? H : W) * s, cw / 2 - s * (t ? H - you.y : you.x)))), (view[2] = Math.min(ch * 0.12, Math.max(ch * 0.84 - (t ? W : H) * s, ch / 2 - s * (t ? you.x : you.y))));
+    }
+    vt();
     ctx.clearRect(0, 0, W, H);
     // The shake draws from the screen's own random, never engine.random: how often the screen is drawn must not change the match.
     const sh = calm.matches ? 0 : G[QUAKE]!, sx = sh ? (shakeRandom() - 0.5) * sh : 0, sy = sh ? (shakeRandom() - 0.5) * sh : 0;
@@ -2242,6 +2269,8 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       }
       // Name tag and health pips.
       const ty = (t.drop < 1 ? t.y - (1 - t.drop) * 150 - 70 * scale : t.y - 27 * scale) - 6;
+      ctx.save();
+      upright(t.x, t.y);
       ctx.font = `800 ${mine(t) ? 12 : 10}px ui-monospace,monospace`;
       ctx.lineWidth = 3;
       ctx.strokeStyle = lightTheme ? "#f6f3ff" : "#07060f";
@@ -2254,6 +2283,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
           ctx.fillStyle = k < t.hp ? (t.hp <= 2 ? "#ff2b4e" : t.color) : "rgba(174,164,214,.3)";
           ctx.fillRect(t.x - 17 + k * 7, ty + 4, 5, 3);
         }
+      ctx.restore();
     }
     if (!demo) locatePulse();
     // Your aim: the lock (cyan brackets) or auto's pick (thin).
@@ -2265,7 +2295,10 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
         if (lockOn) {
           ctx.font = "800 9px ui-monospace,monospace";
           ctx.fillStyle = "#19f0ff";
+          ctx.save();
+          upright(o2.x, o2.y);
           ctx.fillText("LOCK", o2.x, o2.y + 36 * (scale / 1.4));
+          ctx.restore();
         }
       }
     }
@@ -2336,9 +2369,12 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       ctx.font = "900 12px ui-monospace,monospace";
       ctx.lineWidth = 4;
       ctx.strokeStyle = "#07060f";
+      ctx.save();
+      upright(x, y);
       ctx.strokeText("AIRSTRIKE", x, y - r - 22);
       ctx.fillStyle = "#ff2e88";
       ctx.fillText("AIRSTRIKE", x, y - r - 22);
+      ctx.restore();
     } else if (!demo && you.alive && !input.stick.active && fine.matches) {
       // Aim cursor (desktop).
       ctx.strokeStyle = "#39ffb0";
@@ -2347,7 +2383,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       ctx.arc(wx(input.pointer.x), wy(input.pointer.y), 9, 0, TAU);
       ctx.stroke();
     }
-    ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!);
+    vt();
     // The nuke: a red siren, then everything goes white.
     if (G[NUKE_T]! > 0) {
       const blink = ((now * 4) | 0) % 2;
@@ -2362,9 +2398,12 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       ctx.lineWidth = 8;
       ctx.strokeStyle = "#07060f";
       const txt = `NUKE ${Math.ceil(G[NUKE_T]!)}`;
+      ctx.save();
+      upright(W / 2, H / 2);
       ctx.strokeText(txt, W / 2, H / 2);
       ctx.fillStyle = blink ? "#ff2b4e" : "#ffc21a";
       ctx.fillText(txt, W / 2, H / 2);
+      ctx.restore();
       ctx.textBaseline = "alphabetic";
     }
     if (G[WHITE]! > 0) {
@@ -2396,6 +2435,18 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     fireQ = true;
   }, { signal: e.signal });
   for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) keys.fire.addEventListener(t, fireUp, { signal: e.signal });
+  // The drive stick (phones): a drag from its centre steers, up on the screen is up (see encode).
+  const stk = $<HTMLElement>("[data-stk]"), knob = stk.firstElementChild as HTMLElement;
+  const steer = (ev: PointerEvent) => {
+    const r = stk.getBoundingClientRect(), R = r.width / 2;
+    let x = (ev.clientX - r.left - R) / R, y = (ev.clientY - r.top - R) / R;
+    const d = Math.max(1, Math.hypot(x, y));
+    input.steer((x /= d), (y /= d));
+    knob.style.translate = `${x * 40}px ${y * 40}px`;
+  };
+  stk.addEventListener("pointerdown", (ev) => (ev.stopPropagation(), stk.setPointerCapture?.(ev.pointerId), steer(ev)), { signal: e.signal });
+  stk.addEventListener("pointermove", (ev) => stk.hasPointerCapture?.(ev.pointerId) && steer(ev), { signal: e.signal });
+  for (const t of ["pointerup", "pointercancel", "lostpointercapture"]) stk.addEventListener(t, () => (input.steer(0, 0, false), (knob.style.translate = "")), { signal: e.signal });
   // Drag to move, remembered on this device; double-click puts it back. The keys move by their grab
   // bar; the scoreboard by any part of it (in-page scoreboards always drag: Board UI).
   const movable = (el: HTMLElement, handle: HTMLElement, id: string, clamp: (at: Float64Array, w: DOMRect) => void, css: (x: number, y: number) => string, moved?: () => void) => {

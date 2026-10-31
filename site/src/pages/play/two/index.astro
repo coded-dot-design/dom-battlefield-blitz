@@ -37,6 +37,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
         <i class="dot" aria-hidden="true"></i>
         <b id="room-title" data-title>MULTIPLAYER</b>
         <small data-sub role="status">NOT CONNECTED</small>
+        <span class="chip" data-chip></span>
         <button class="bui-key bui-icon-key fold" type="button" data-fold aria-expanded="true" aria-controls="room-body" aria-label="Fold the room card"><Icon name="down" size={18} /></button>
       </header>
 
@@ -338,6 +339,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       last = n.frame;
       if (still >= 16) return gone("CONNECTION LOST", "No moves have arrived for 8 seconds. Check your connection, then rejoin.");
       card.dataset.conn = still >= 3 ? "slow" : "live";
+      $("[data-chip]").textContent = `P${slot + 1} · ${seats === 2 && game.squad === 1 ? "1V1" : game.squad ? `${game.squad}V${game.squad}` : "FFA"}`;
       // What the match agreed (P1's mode): 4 tanks with bots in empty seats, or sides.
       const tanks = game.world.tanks as Tank[], cpu = tanks.length === 4 ? 4 - seats : 0;
       $("[data-sub]").textContent = still >= 3 ? "WAITING FOR THE OTHERS…" : `LIVE · ${game.squad ? `${game.squad}V${game.squad}` : "FFA"} · ${seats} PLAYERS${cpu ? ` + ${cpu} CPU` : ""}`;
@@ -794,6 +796,57 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     }
     [data-for="join"] .fine {
       display: none;
+    }
+  }
+  .chip {
+    display: none;
+  }
+  /* Phones in a match: the folded card is a status chip (dot, seat, mode) at the top right of the key
+     row, clear of the scoreboard, the keys and the board's centre. A tap opens the card; no grip. */
+  @media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
+    .room .bui-grip {
+      display: none;
+    }
+    .room.folded[data-step="play"] {
+      left: auto;
+      right: max(12px, env(safe-area-inset-right));
+      top: calc(max(10px, env(safe-area-inset-top)) + 6px);
+      display: block;
+      width: auto;
+      height: 32px;
+      padding: 0 12px;
+      border-width: 2px;
+      border-radius: 16px;
+      box-shadow: none;
+      background: color-mix(in srgb, var(--surface) 80%, transparent);
+      translate: none !important;
+    }
+    .room.folded[data-step="play"] .head {
+      display: flex;
+      height: 100%;
+      gap: 8px;
+    }
+    .room.folded[data-step="play"] :is(.head b, .head small, .body) {
+      display: none;
+    }
+    .room.folded[data-step="play"] .dot {
+      width: 10px;
+      height: 10px;
+    }
+    .room.folded[data-step="play"] .chip {
+      display: block;
+      font: 900 11px/1 var(--mono);
+      letter-spacing: 0.12em;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+    /* The whole chip is the open key: 44 px to tap, 32 px to see. */
+    .room.folded[data-step="play"] .fold {
+      position: absolute;
+      inset: -8px -2px;
+      width: auto;
+      height: auto;
+      opacity: 0;
     }
   }
   @media (prefers-reduced-motion: reduce) {

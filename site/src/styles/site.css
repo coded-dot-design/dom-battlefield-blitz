@@ -486,11 +486,12 @@ html.bui[data-theme="light"] .start-key b {
   body[data-app] :is(.site-head, .site-foot, .skip, .blitz-bar) {
     display: none;
   }
+  /* Edge to edge: fixed to all four edges (no vh unit, so no 100vh bug under an in-app browser's
+     bars); the game pads its keys by the safe-area insets. */
   body[data-app] .blitz-stage {
     position: fixed;
-    inset: 0 0 auto;
-    height: 100vh;
-    height: 100dvh;
+    inset: 0;
+    height: auto;
     min-height: 0;
     border: 0;
     --bz-lead: 52px; /* the game's keys start after the exit key (src/game.ts .fs, .pz) */
