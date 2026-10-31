@@ -1,6 +1,6 @@
 // Blitz net play through a real room server: two peers in Chromium join one fizlet-rooms room over
 // WebSockets (with an invite code), play in lockstep and must end with the same match.
-// Needs a running room server (fizlet's rooms/: `npm run dev`, or the e2e setup) and:
+// Needs a running room server that speaks fizlet-rooms (fizlet.com/guides/build-your-own-room-server/) and:
 //   ROOMS_URL=ws://127.0.0.1:8799  ROOMS_INVITE=<a code on the list>  node tests/room.mjs
 // Without ROOMS_URL it says so and skips (CI has no room server).
 import assert from "node:assert/strict";

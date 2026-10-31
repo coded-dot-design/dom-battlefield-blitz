@@ -52,7 +52,7 @@ never an email.
 
 A pass is `base64url(payload).base64url(HMAC-SHA256(payload, PASS_SECRET))`, payload
 `{v:1, id, exp, kind?, dev?, gh?, issue?, name?}`. `scripts/play-pass.mjs` mints it (no
-dependencies); the room server ([fizlet `rooms/`](https://github.com/coded-dot-design/fizlet/tree/main/rooms))
+dependencies); the room server (ours, in-house; the protocol: [Build your own room server](https://fizlet.com/guides/build-your-own-room-server/))
 checks the signature and expiry, keeps which devices hold each pass until it expires, and refuses
 revoked ones. The page makes a random device key once per device and sends it with the pass.
 The workflow is `.github/workflows/play-pass.yml` (no third-party actions).
