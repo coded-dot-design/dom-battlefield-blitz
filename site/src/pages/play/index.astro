@@ -20,8 +20,11 @@ const description = 'Battlefield Blitz: free-for-all tank chaos. Parachute in, g
 
 <script>
   import { createBlitz } from "../../../../dist/blitz.mjs";
+  import { played, tuning } from "../../lib/analytics/play";
   const seconds = Number(new URLSearchParams(location.search).get("seconds")) || 180;
-  (window as unknown as { blitz: unknown }).blitz = createBlitz(document.getElementById("blitz")!, { mode: "board", seconds });
+  const host = document.getElementById("blitz")!;
+  (window as unknown as { blitz: unknown }).blitz = played("solo", (onEnd) => createBlitz(host, { mode: "board", seconds, onEnd }));
+  tuning(host); // analytics: no-ops until the visitor accepts
 </script>
 
 <style>

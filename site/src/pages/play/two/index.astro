@@ -121,6 +121,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
 
 <script>
   import { createBlitz, join } from "../../../../../dist/blitz-net.mjs";
+  import { match, shared } from "../../../lib/analytics/play";
+  const online = match("online"); // analytics: no-ops until the visitor accepts
   type Game = ReturnType<typeof createBlitz>;
   type Tank = { kills: number; deaths: number; alive: boolean };
   const stage = document.querySelector<HTMLElement>(".two")!;
@@ -290,13 +292,15 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       net: { transport: seat.transport, slot, players: seats, again: enter, leave, ...(seats === 2 ? { squad } : {}) },
       // Match over: free the room, so REMATCH can open it fresh for everyone. Wait a moment first:
       // another player may be a few frames behind and still needs our last inputs.
-      onEnd: () => {
+      onEnd: (st) => {
+        online.end(st);
         ended = true;
         head(`ROOM ${room} · P${slot + 1}`, "MATCH OVER", "off");
         freeAt = window.setTimeout(() => (link?.close(), (link = null)), 2000);
       },
     });
     (window as unknown as { blitz: Game }).blitz = game;
+    online.start();
     let last = -1, still = 0;
     const tick = () => {
       if (!game || ended) return;
@@ -370,8 +374,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
     const url = `${location.origin}${location.pathname}?room=${room}&players=${size()}${size() === 2 && squad ? `&teams=${squad}` : ""}${q.get("rooms") ? `&rooms=${encodeURIComponent(ws)}` : ""}${seconds ? `&seconds=${seconds}` : ""}`;
     const label = $("[data-share-say]");
     try {
-      if (navigator.share) await navigator.share({ title: "Battlefield Blitz · multiplayer", text: `Join me in Blitz, room ${room}.`, url });
-      else (await navigator.clipboard.writeText(url), (label.textContent = "LINK COPIED"));
+      if (navigator.share) await navigator.share({ title: "Battlefield Blitz · multiplayer", text: `Join me in Blitz, room ${room}.`, url }), shared("share");
+      else (await navigator.clipboard.writeText(url), (label.textContent = "LINK COPIED"), shared("copy"));
     } catch {
       label.textContent = "COPY FAILED";
     }

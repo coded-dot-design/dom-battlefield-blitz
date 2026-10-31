@@ -5,6 +5,10 @@
 import Skull from './Skull.astro';
 import { REPO, BATTLEFIELD, BATTLEFIELD_PLAY, FAMILY, FIZLET, base } from '../site';
 import { GROUPS, PAGES, FAMILY_LINE, SELF } from '../sitemap.mjs';
+import { SITE } from '../lib/analytics/site.mjs';
+
+// Legal: the DOM VIRUS privacy and cookie pages. Cookie settings shows only on a build with analytics.
+const { privacyUrl: PRIVACY, cookiesUrl: COOKIES } = SITE;
 
 const here = Astro.url.pathname;
 const links = Object.fromEntries(GROUPS.map((g) => [g.id, []]));
@@ -45,6 +49,6 @@ links.about.push(
     ))}
   </nav>
   <div class="foot-base">
-    <div class="wrap"><span>© 2026 coded.design · MIT</span><span>Created by Chris Cooley</span></div>
+    <div class="wrap"><span>© 2026 coded.design · MIT</span><span class="foot-legal"><a href={PRIVACY}>Privacy</a> · <a href={COOKIES}>Cookies</a><button type="button" data-cookie-settings hidden>Cookie settings</button></span><span>Created by Chris Cooley</span></div>
   </div>
 </footer>
