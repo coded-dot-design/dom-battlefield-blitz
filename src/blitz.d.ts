@@ -18,7 +18,11 @@ export interface BlitzOptions {
   net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void;
     /** Two players: tanks a side, 1 (1v1) to 4 (4v4: each player + 3 AI wingmen); 0 or none = free-for-all
      *  with `bots` bots. P1's pick is the match's (it rides in P1's input word through the countdown). */
-    squad?: number };
+    squad?: number;
+    /** A 4-seat room started with fewer humans: the computer takes the empty seats (`players` humans,
+     *  4 tanks). With `squad` 2 it's 2v2 (`sides`: bits for P2, P3, P4, 1 = side 1; default 0b101,
+     *  at most 2 a side), else free-for-all. P1's pick is the match's, like `squad`. */
+    fill?: boolean; sides?: number };
   /** Intensity levers. A board match reads the ones Practice → TUNE saved on this device; these
    *  override them in any mode (net play: every peer must pass the same values). */
   tune?: Partial<Record<TuneKey, number>>;

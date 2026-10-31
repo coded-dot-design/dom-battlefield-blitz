@@ -1,10 +1,10 @@
 {
   "version": "0.11.0",
   "files": {
-    "blitz.js": "0bf3b2b27b354aa72907d6739ff6298405d29092cc1ad2987919e9015f62e51c",
-    "blitz.mjs": "bfa9d0b0e8354df6f548ecaaad69058025abe812537ae88ab26f02dd42670ba8",
-    "blitz.d.ts": "69e06e79bc0512aaea28feacc3b35710a13d6a28520e9adddfa2186ae0220a94",
-    "blitz-net.mjs": "fde42f9bcca835c4c5e5922de22eb8626d03b98b17d55d9d9262ddaf2d12bf72",
-    "blitz-net.d.ts": "1e200274f900b84868c0a1bbf990a6a2339e80694ccfd198f84c68d96949ab2b"
+    "blitz.js": "a1f0edddbd1b6b6a3ff2b426e463cc432d3cfcaf37afdf56537c9f83874b1d44",
+    "blitz.mjs": "5863d1763be3ddb30c074fe68b9dd0a08ab6615207546c7426c757a3a0ddd060",
+    "blitz.d.ts": "28e5e00e1f372c3b5d8f1974ef9e6d5311ba523eded8b463a2b96fb34459eb5e",
+    "blitz-net.mjs": "77e76d509422934047a4cdc6729404006366a8b237a67f7356810e010ecd8567",
+    "blitz-net.d.ts": "1a5a34687f782bf97f0504f77ee150489cb2d142da9eeb8ccff151f1ec009ec0"
   }
 }

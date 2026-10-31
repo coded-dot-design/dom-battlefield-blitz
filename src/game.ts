@@ -16,12 +16,13 @@
  */
 import { createEngine } from "../vendor/fizlet/index";
 import type { presence as Presence, Transport } from "../vendor/fizlet/presence";
+import type { seats as Seats } from "./seats";
 
-// Net play's lockstep (fizlet/presence) is registered by the net build (src/net.ts → dist/blitz-net.mjs),
-// so the drop-in and the solo module don't carry it.
-let lockstep: typeof Presence | null = null;
-export function useLockstep(p: typeof Presence) {
-  lockstep = p;
+// Net play's lockstep (fizlet/presence) and seat map (src/seats.ts) are registered by the net build
+// (src/net.ts → dist/blitz-net.mjs), so the drop-in and the solo module don't carry them.
+let lockstep: typeof Presence | null = null, seatMap: typeof Seats = null!;
+export function useLockstep(p: typeof Presence, s: typeof Seats) {
+  (lockstep = p), (seatMap = s);
 }
 import { controls } from "../vendor/fizlet/input";
 import { effects } from "../vendor/fizlet/fx";
@@ -50,7 +51,7 @@ export interface BlitzOptions {
   /** Lockstep multiplayer (fizlet/presence): every peer runs the same match from the same seed and
    *  only inputs cross the wire. A fixed 1100 × 640 arena (scaled to fit), humans in seats
    *  0..players-1, bots after them, no pause. `input` replaces this peer's controls (tests). */
-  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void; squad?: number };
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; again?: () => void; leave?: () => void; squad?: number; fill?: boolean; sides?: number };
   /** Intensity levers (see TUNE). A board match on this device reads the ones saved by Practice →
    *  TUNE; these override them in any mode. Net play: every peer must pass the same values. */
   tune?: Partial<Record<TuneKey, number>>;
@@ -363,11 +364,10 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       tuneLoad(JSON.parse(localStorage.getItem("blitz:tune") ?? "null"));
     } catch {}
   tuneLoad(o.tune);
-  // Net play, two players: tanks a side (1 = 1v1 … 4 = 4v4: you + AI wingmen; 0 = free-for-all).
-  // P1's pick rides in bits 9-11 of P1's input word through the countdown, so every peer builds the
-  // same roster on the same lockstep frame; nobody's seat changes.
-  const squadOf = (v: number) => (P === 2 && v >= 1 && v <= 4 ? v | 0 : 0);
-  let squad = 0;
+  // Net play: the mode (tanks a side, a 4-seat room the computer backfills, the 2v2 sides). P1's
+  // pick rides in bits 9-15 of P1's input word through the countdown, so every peer builds the same
+  // roster (src/seats.ts) on the same lockstep frame; nobody's seat changes.
+  let squad = 0, agreed = 0;
 
   // ---------- World ----------
   let W = 0, H = 0, dpr = 1, scale = 1.4, T = 44, cols = 0, rows = 0;
@@ -390,20 +390,21 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   let platoon = !net && (o.platoons ?? saved === "platoon"), practice = !net && !embed && !demo && o.platoons === undefined && saved === "practice";
   let N = 0, tanks: Tank[] = [], you: Tank = null!;
   const per = embed ? 3 : 4;
-  /** How many sides a platoon match has: three locally, one per player in net play. */
-  const sides = net ? P : 3;
-  const sideName = (team: number) => (net ? (team === you.team ? "YOUR" : `P${team + 1}`) : PLATOON[team]!);
+  /** How many sides a platoon match has: three locally; in net play, one per player (2v2: two). */
+  let sides = 3, S: ReturnType<typeof Seats> = null!;
+  // A net side is named for the first human on it.
+  const sideName = (team: number) => (net ? (team === you.team ? "YOUR" : `P${S.lead[team]! + 1}`) : PLATOON[team]!);
   function roster() {
-    if (net) platoon = squad > 1;
-    N = net ? (squad ? P * squad : P + (o.bots ?? 4)) : practice ? 7 : platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : TU[U_BOTS]!));
+    if (net) (S = seatMap(P, agreed, o.bots ?? 4)), (squad = S.squad), (platoon = squad > 1), (sides = S.sides);
+    N = net ? S.team.length : practice ? 7 : platoon ? per * 3 : 1 + (o.bots ?? (embed ? 5 : TU[U_BOTS]!));
     tanks = Array.from({ length: N }, (_, i) => {
-      const hu = net ? i < P : i === 0, w = i - P;
-      // Net squads: the humans (seats 0..P-1) lead sides 0..P-1; their AI wingmen come after.
-      const team = net && squad ? (hu ? i : (w / (squad - 1)) | 0) : platoon ? (i / per) | 0 : i;
-      const slot = net && squad ? (hu ? 0 : 1 + (w % (squad - 1))) : platoon ? i % per : 0;
+      const hu = net ? i < P : i === 0;
+      // Net: the humans (seats 0..P-1), then the computer's tanks (src/seats.ts).
+      const team = net ? S.team[i]! : platoon ? (i / per) | 0 : i;
+      const slot = net ? S.slot[i]! : platoon ? i % per : 0;
       return {
         i, team, slot, you: net ? hu : i === 0 && !demo,
-        name: net ? (i === net.slot ? "YOU" : hu ? `P${i + 1}` : squad ? (team === net.slot ? WING[slot - 1]! : `P${team + 1}·${WING[slot - 1]}`) : NAMES[i % NAMES.length]!) : practice ? (i === 0 ? "YOU" : i <= 3 ? `TARGET${i}` : `MOVER${i - 3}`) : platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
+        name: net ? (i === net.slot ? "YOU" : hu ? `P${i + 1}` : squad ? (team === S.team[net.slot] ? WING[slot - 1]! : `P${S.lead[team]! + 1}·${WING[slot - 1]}`) : NAMES[i % NAMES.length]!) : practice ? (i === 0 ? "YOU" : i <= 3 ? `TARGET${i}` : `MOVER${i - 3}`) : platoon ? (i === 0 ? (demo ? "ACE" : "YOU") : team === 0 ? WING[slot - 1]! : `${PLATOON[team]}${slot + 1}`) : demo && i === 0 ? "ACE" : NAMES[i % NAMES.length]!,
         color: platoon ? TEAM_COLORS[team]! : COLORS[i % COLORS.length]!,
         x: 0, y: 0, a: 0, ta: 0, hp: MAXHP, alive: false, dead: platoon ? 0.2 + team * 0.45 + slot * 0.12 : 0.2 + i * 0.18, drop: 0, shield: 0, rapid: 0, triple: 0,
         strikes: hu ? 1 : 0, carpet: 0, rail: hu ? RAIL_START : 1, charge: 0, chargeT: -1, heat: 0, hot: 0,
@@ -1241,9 +1242,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // Crates are a fizlet/rules system: in net play they move on lockstep frames too, so world()
   // steps them (first, as the engine would) and the engine doesn't.
   if (net) e.remove(supply.system);
-  // This peer's word, with its team-size pick in bits 9-11 (only P1's counts).
-  const squadBits = squadOf(net?.squad ?? 0) << 9, ownInput = net?.input ?? encode;
-  const netInput = () => (ownInput() | squadBits) >>> 0;
+  // This peer's word, with its mode pick in bits 9-15 (only P1's counts: src/seats.ts).
+  const pick = net ? (((net.squad! & 7) | (net.fill ? 8 | ((net.sides ?? 5) & 7) << 4 : 0)) << 9) : 0, ownInput = net?.input ?? encode;
+  const netInput = () => (ownInput() | pick) >>> 0;
   const link = net
     ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: netInput, step: (_, ins) => ((netIn = ins), world(e.dt * TU[U_SPEED]!)), hash: worldHash })
     : null;
@@ -1256,8 +1257,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       G[QUAKE] = Math.max(0, G[QUAKE]! - dt * 40);
       G[WHITE] = Math.max(0, G[WHITE]! - dt * 0.9);
       if (state === "intro" || state === "count") {
-        // Net, two players: P1's team size (the same input word on every peer, the same frame).
-        if (net && P === 2 && squadOf((netIn[0]! >>> 9) & 7) !== squad) (squad = squadOf((netIn[0]! >>> 9) & 7)), roster();
+        // Net: P1's mode (the same input word on every peer, the same frame).
+        if (net && ((netIn[0]! >>> 9) & 127) !== agreed >>> 9) (agreed = netIn[0]! & 0xfe00), roster();
         // The start screen: the grid lights up with everything that can land on it.
         if ((G[TILE_IN]! -= dt) <= 0) (lightTile(true), (G[TILE_IN] = 0.08 + R() * 0.16));
         for (const s of tiles) {
