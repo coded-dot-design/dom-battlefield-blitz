@@ -388,6 +388,48 @@ a.bui-sticker-key {
   letter-spacing: 0.08em;
   color: var(--muted);
 }
+.foot-legal a,
+.foot-legal button {
+  color: inherit;
+}
+.foot-legal button {
+  min-height: 24px;
+  margin-left: 0.6em;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.foot-legal button::before {
+  content: "· ";
+}
+/* Consent banner (site/src/lib/analytics, the astro-engine kit): the Board UI tokens, as fizlet.com. */
+:root {
+  --cc-bg: var(--surface);
+  --cc-fg: var(--ink);
+  --cc-accent: var(--k-go);
+  --cc-accent-fg: var(--rim);
+  --cc-border: 1px solid var(--line);
+  --cc-btn-border: 1px solid var(--line);
+  --cc-focus: var(--k-sys);
+}
+/* Game mode on a phone: the banner sits below the game's top-left key row and clear of the fire pad
+   (bottom-right). Landscape: to the left of the pad's column. Same query as the game's GAME_MODE. */
+@media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
+  body[data-app] .cc-banner {
+    top: calc(max(10px, env(safe-area-inset-top)) + 56px);
+    bottom: auto;
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    margin: 0;
+    max-height: calc(100% - 80px);
+    overflow-y: auto;
+  }
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  body[data-app] .cc-banner {
+    right: auto;
+    width: min(36rem, calc(100% - 260px - env(safe-area-inset-right)));
+  }
+}
 @media (max-width: 1000px) {
   .foot-map {
     grid-template-columns: repeat(3, minmax(0, 1fr));
