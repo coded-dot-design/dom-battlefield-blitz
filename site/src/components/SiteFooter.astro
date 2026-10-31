@@ -3,8 +3,8 @@
 // from site/src/sitemap.mjs (one source; the build fails on a page that is in neither PAGES nor
 // HIDDEN), so a new page shows up here by itself. Other sites (the hub, the family, the repo) follow.
 import Skull from './Skull.astro';
-import { REPO, HUB, BATTLEFIELD, BATTLEFIELD_PLAY, FAMILY, FIZLET, base } from '../site';
-import { GROUPS, PAGES } from '../sitemap.mjs';
+import { REPO, BATTLEFIELD, BATTLEFIELD_PLAY, FAMILY, FIZLET, base } from '../site';
+import { GROUPS, PAGES, FAMILY_LINE, SELF } from '../sitemap.mjs';
 import { SITE } from '../lib/analytics/site.mjs';
 
 // Legal: the DOM VIRUS privacy and cookie pages. Cookie settings shows only on a build with analytics.
@@ -18,11 +18,12 @@ for (const p of PAGES)
 const out = (label, href) => ({ label, href, out: true });
 links.play.push(out('Play the original', BATTLEFIELD_PLAY));
 links.board.push(out('Style guide', `${BATTLEFIELD}style-guide/`), out('Board UI spec', `${FIZLET}/blob/main/src/ui/BOARD-UI.md`));
-links.family.push(out('DOM VIRUS arcade', HUB), ...FAMILY.map(([label, href]) => out(label, href)));
+// The family line first (sitemap.mjs FAMILY_LINE, the same on every family site), then the other games.
+links.family.push(...FAMILY_LINE.map((f) => (f.href === SELF ? { label: f.label, href: f.href } : out(f.label, f.href))));
+links.family.push(...FAMILY.filter(([, href]) => !FAMILY_LINE.some((f) => f.href === href)).map(([label, href]) => out(label, href)));
 links.about.push(
   out('Release notes', `${REPO}/blob/main/CHANGELOG.md`),
   out('Source on GitHub', REPO),
-  out('Built on Fizlet', FIZLET),
   out('Contributing', `${REPO}/blob/main/CONTRIBUTING.md`),
   out('MIT licence', `${REPO}/blob/main/LICENSE`),
 );
