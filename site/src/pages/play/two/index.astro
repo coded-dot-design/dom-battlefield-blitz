@@ -122,8 +122,8 @@ const description = 'Two to four players, one Blitz match, over the internet. En
 <script>
   import { createBlitz, join } from "../../../../../dist/blitz-net.mjs";
   import { match, shared } from "../../../lib/analytics/play";
+  const online = match("online"); // analytics: no-ops until the visitor accepts
   type Game = ReturnType<typeof createBlitz>;
-  const online = match("online");
   type Tank = { kills: number; deaths: number; alive: boolean };
   const stage = document.querySelector<HTMLElement>(".two")!;
   const card = stage.querySelector<HTMLElement>(".room")!;
@@ -293,7 +293,7 @@ const description = 'Two to four players, one Blitz match, over the internet. En
       // Match over: free the room, so REMATCH can open it fresh for everyone. Wait a moment first:
       // another player may be a few frames behind and still needs our last inputs.
       onEnd: (st) => {
-        online.end(st); // analytics: no-ops until the visitor accepts
+        online.end(st);
         ended = true;
         head(`ROOM ${room} · P${slot + 1}`, "MATCH OVER", "off");
         freeAt = window.setTimeout(() => (link?.close(), (link = null)), 2000);
