@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Multiplayer: room to hide, enemy edge lights, and an auto-aim switch** (owner feedback from phone play).
+  - **A bigger map than the screen, everywhere.** The fixed 1100 × 640 arena is now scaled so at least
+    2 squares stay off screen on each axis, on desktop as on phones, and the camera follows your tank
+    (before, desktop showed the whole arena and phones cropped one axis only). Drawing only: same match.
+  - **Edge lights:** an enemy off screen lights the screen's edge on its side, in its colour (render only).
+  - **AUTO-AIM ON / OFF** on the room card. P1's pick is the match's, agreed in the countdown like the
+    mode (bit 16 of P1's word, set only at the start screen and in the countdown). Off: no AUTO or LOCK
+    for anyone, every turret aims where its player points or taps. SEND LINK carries it (`&aim=off`);
+    the countdown says "AUTO-AIM OFF". `test:lockstep`: both screens agree, 0 desyncs, and the match
+    differs from the same seed with auto-aim on.
+  - **Phones: the page never moves under the game.** The stage follows the visible viewport
+    (`visualViewport`, so the browser's bars and tabs don't push it), the page is held at the top, and a
+    one-finger drag only scrolls a panel that scrolls (the room card, TUNE, the consent banner). The
+    drive stick takes touches up to 28 px outside its ring, so a thumb half off the pad still drives.
+    `tests/phone-net.mjs`: a drag that starts beside the stick drives; a swipe on the board moves
+    neither the page nor the stage.
+  - Size (gzip): `blitz.js` 45,784 → 46,207, `blitz.mjs` 45,885 → 46,313, `blitz-net.mjs` 47,763 →
+    48,177. Budgets +512 B each (46,528; net 48,576), size-ledger row in the engine.
 - **Multiplayer moves to `/play/multi/`** (owner: it's 2 to 4 players now, so "two" was the wrong name).
   `/play/two/` stays as a redirect that keeps the room, mode, code and hash, so shared links and
   invites still work; it is `noindex` with a canonical to the new page. The footer site map, the play-pass
