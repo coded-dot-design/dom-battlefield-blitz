@@ -1,5 +1,45 @@
 # Changelog
 
+## Unreleased
+
+- **Phone: the start screen, laid out on purpose** (owner report from an iPhone, pending owner review).
+  The start screen is one column under the top-left key row: the sticker, the mode keys and their
+  caption, then PRESS START.
+  - **The directions behind a key.** The start screen has no directions card any more: an (i)
+    DIRECTIONS key sits next to HOME, in the slot the FULL SCREEN key had (`aria-expanded`,
+    `aria-controls`). At PRESS START the card opens on its own, under the key row, and closes 1.2 s later,
+    inside the 3-2-1 countdown. After that the key opens and closes it at any time, mid-match too. Escape
+    (focus back on the key) or a tap elsewhere closes it, and it never pauses the match or takes its
+    input. It slides in, or just shows under reduced motion. Desktop keeps the card on the start screen;
+    a desktop browser with no Fullscreen API gets the key in that free slot.
+  - **The sticker sized to its content.** The BLITZ! sticker drops its "BATTLEFIELD · …" line, and the
+    mode ("FREE FOR ALL", "PLATOONS", "PRACTICE", following the pick) rides on a small tilted tag stuck
+    over its corner: the fizlet.com brick-sticker recipe (`--k-attack` face, rim ink and border, hard
+    3 px base, 10° against the sticker's −4°; 5.8:1 in both themes). The sticker's accessible name is
+    "Battlefield Blitz". This one is on desktop too: it's the same sticker.
+  - **The mode keys are one row of titles:** SOLO · PLATOON · PRACTICE as equal thirds, 46 px tall
+    (Board UI keys; the picked one keeps the pressed look). Their lines leave the keys: the picked
+    mode's line shows as a quiet sub-header under the row, left-aligned with it: plain text one step
+    smaller, muted ink, normal weight, sentence case; no fill, border or base, not clickable (a label,
+    not a key). It swaps with a quick fade when you pick another (CSS only, none under reduced motion),
+    in a reserved line, so nothing shifts. Each key stays described by its line (`aria-describedby`);
+    the line is not live, since the key's own press and description already announce it. PRESS START
+    sits centred under it at the pause screen's big-key size (168 × 96), with more air around it and
+    the sticker. It all fits at 375 × 667, 360 × 740 and 390 × 844 without scrolling. Desktop keeps the
+    lines inside the keys.
+  - **No FULL SCREEN key where it can't work:** hidden without the Fullscreen API (iPhone Safari) and on
+    any phone (game mode already fills the screen); DIRECTIONS takes its slot. Desktop keeps it.
+  - Desktop at 1440: the start screen as it was apart from the sticker. Gameplay unchanged. Sizes
+    (gzip): `blitz.js` 46,398 → 46,754, `blitz.mjs` 46,525 → 46,874, `blitz-net.mjs` 48,391 → 48,746.
+    Budgets 46,720 / 46,720 / 48,576 → 46,784 / 46,912 / 48,768 (measured + 22–38 B; `scripts/size.mjs`
+    says why). Paid for in part by three CSS notes moved out of the shipped CSS string, the mode keys
+    built from one table and a dead sticker rule. `tests/phone.mjs` checks it all at three phone sizes:
+    no card on the start screen; it opens at START and closes in the countdown; the key toggles it with
+    `aria-expanded` in sync; Escape and a tap elsewhere close it without pausing; the tag follows the
+    pick; one row of keys; the caption's text, style and swap; no overlaps, no scroll. At 1440 it checks
+    the lines in the keys, the card on the start screen, and the full screen key with and without the
+    Fullscreen API.
+
 ## 1.0.0: on @fzlt/core 0.21.2
 
 What's in it (details below): the engine on `@fzlt/core` 0.21.2 (Fizlet v0.21.2); net play with room
