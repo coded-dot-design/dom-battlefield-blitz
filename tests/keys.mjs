@@ -17,6 +17,21 @@ const basePx = (key) => key.evaluate((e) => {
   probe.remove();
   return px;
 });
+/** The face's resting offset down (a locked key rests dropped). */
+const restOf = (key) => key.evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+
+/** Wait for the key to come to rest: two frames (so a press or release has restyled and started its
+ *  transitions), then until none of its finite transitions or animations is still running (a call
+ *  key's ring and a locked key's breathing loop forever, so they never finish). On state, never
+ *  wall time: a loaded CI runner can take longer than any fixed wait. */
+const settle = (key) => key.evaluate(async (e) => {
+  const frame = () => new Promise((r) => requestAnimationFrame(r));
+  await frame(); await frame();
+  for (let running; (running = e.getAnimations({ subtree: true }).filter((a) => a.playState === "running" && a.effect?.getComputedTiming().endTime !== Infinity)).length;) {
+    await Promise.all(running.map((a) => a.finished.catch(() => {})));
+    await frame();
+  }
+});
 
 /** Number the page's enabled, visible, pressable keys (a decorative key with pointer-events: none
  *  inside a card link is the card's, not a key) and catch every click (recording which key it hit).
@@ -58,14 +73,14 @@ export async function checkKeys(page, label, { skip = "" } = {}) {
     const x = box.x + box.width / 2;
     // A locked key (aria-pressed) rests dropped: its base is under the face, so measure from rest.
     await page.mouse.move(2, 2);
-    await page.waitForTimeout(150);
-    const rest = await key.evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+    await settle(key);
+    const rest = await restOf(key);
     for (const [where, y] of [["centre", box.y + box.height / 2], ["top edge", box.y + 1], ["base", box.y + box.height - rest + py / 2]]) {
       await page.mouse.move(2, 2);
       await page.mouse.move(x, y);
       await page.mouse.down();
-      await page.waitForTimeout(90);
-      const ty = await key.evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+      await settle(key);
+      const ty = await restOf(key);
       assert.ok(Math.abs(ty - py) < 0.5, `${name} at the ${where}: the face drops by its base (${ty} vs ${py})`);
       await page.mouse.up();
       const hits = await page.evaluate(() => window.__hits.splice(0));
@@ -90,7 +105,8 @@ export async function checkTaps(page, label, { skip = "" } = {}) {
     await key.evaluate((e) => e.scrollIntoView({ block: "center", behavior: "instant" }));
     const box = await key.boundingBox();
     const py = await basePx(key);
-    const rest = await key.evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).m42);
+    await settle(key);
+    const rest = await restOf(key);
     await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height - rest + py / 2);
     const hits = await page.evaluate(() => window.__hits.splice(0));
     assert.deepEqual(hits, [id], `${label}: a tap on the base of key ${id} clicks it`);
