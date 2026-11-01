@@ -170,8 +170,8 @@ const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="tru
 // (.nofs) it takes that slot. Narrow (≤ 620 px): the scoreboard sits under the key row (exit · full
 // screen · pause), never over it, and the start screen is one column under the key row, so the
 // directions card never sits under the corner keys: the card, the sticker, the mode keys (one row of
-// titles) with the picked mode's line as a pill under them (the key's own <small>, also its
-// aria-describedby), and START.
+// titles) with the picked mode's line as a caption under them (the key's own <small>, also
+// its aria-describedby), and START.
 // A phone: a coarse pointer on a small screen (site.css "Game mode", the same query). The board covers
 // the screen, the keys float at its edges, and a drive stick shows bottom left.
 const PHONE = "(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px)";
@@ -273,7 +273,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .over.intro{grid-template-columns:min(100%,400px);align-content:safe center;gap:24px;padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 16px 16px}
 .bui .legend{position:static;translate:none;display:grid;justify-content:start;justify-self:stretch;width:auto;max-width:none}
 .sticker{margin:12px 0;width:max-content}.bui .modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;justify-self:stretch;margin:0 0 38px;max-width:none}.bui .mode{height:46px;padding:0 4px;margin:0}
-.mode small{display:none;position:absolute;top:58px;left:calc(var(--i) * (-100% - 12px) - 2px);width:calc(300% + 28px);padding:7px;font-size:11px;background:inherit;border:inherit;border-radius:99px;animation:dsc .2s}.mode[aria-pressed=true] small{display:block;opacity:1}
+.mode small{display:none;position:absolute;top:58px;left:calc(var(--i) * (-100% - 12px) - 2px);width:max-content;font-size:11px;pointer-events:none;animation:dsc .2s}.mode[aria-pressed=true] small{display:block;font-weight:400;color:var(--muted);opacity:1}.mode small::first-letter{text-transform:uppercase}
 .bui .intro [data-go]{width:168px;height:96px;margin-top:4px}}
 .bui.nofs .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px))}.nofs .fs{display:none}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
@@ -1654,7 +1654,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }, { signal: e.signal });
 
   // ---------- Match flow ----------
-  // The three modes and their lines (each key's description; on a phone, the picked one's pill).
+  // The three modes and their lines (each key's description; on a phone, the picked one's caption).
   const MODES = [["solo", "every tank for itself"], ["platoon", "you + 3 wingmen vs 2 platoons"], ["practice", "learn the keys, with tips"]] as const;
   const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
   function intro() {

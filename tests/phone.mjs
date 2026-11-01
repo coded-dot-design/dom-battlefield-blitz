@@ -141,7 +141,7 @@ try {
   }
   // The start screen on a phone (iPhone, portrait): no full screen key (a dead click there), the
   // directions card and its text clear of the corner keys, the mode keys one row of equal thirds with
-  // titles only (≤ 52 px), the picked mode's line in a pill between the keys and START (it swaps on a
+  // titles only (≤ 52 px), the picked mode's line as a caption between the keys and START (it swaps on a
   // tap; every key keeps its line as aria-describedby), START centred, nothing overlaps, no scroll.
   // Desktop keeps the lines in the keys and the full screen key, unless there is no Fullscreen API.
   const IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
@@ -153,7 +153,8 @@ try {
     return {
       fs: { hidden: fs.hidden, display: getComputedStyle(fs).display }, corner: [document.querySelector(".game-exit"), fs].filter((el) => getComputedStyle(el).display !== "none").map(R),
       card: [sr.querySelector(".legend"), ...sr.querySelectorAll(".legend span")].map(R), sticker: R(sr.querySelector(".sticker")), modes: keys.map(R), go: R(sr.querySelector("[data-go]")),
-      picked: keys.find((k) => k.getAttribute("aria-pressed") === "true").dataset.mode, lines: lines.map((el) => ({ text: el.textContent, ...R(el), opacity: getComputedStyle(el).opacity })),
+      picked: keys.find((k) => k.getAttribute("aria-pressed") === "true").dataset.mode, lines: lines.map((el) => { const c = getComputedStyle(el); return { text: el.textContent, ...R(el), opacity: c.opacity, bg: c.backgroundColor, shadow: c.boxShadow, border: c.borderTopWidth, size: parseFloat(c.fontSize), weight: c.fontWeight, events: c.pointerEvents }; }),
+      keySize: parseFloat(getComputedStyle(keys[0].querySelector("b")).fontSize),
       described: keys.map((k) => [k.dataset.mode, sr.getElementById(k.getAttribute("aria-describedby"))?.textContent]),
       scroll: document.documentElement.scrollHeight - innerHeight,
     };
@@ -178,16 +179,18 @@ try {
       if (tap !== s.picked) {
         const k = s.modes[Object.keys(LINES).indexOf(tap)];
         await page.touchscreen.tap(k.x + k.width / 2, k.y + k.height / 2);
-        await page.waitForTimeout(260); // the pill's swap (0.2 s)
+        await page.waitForTimeout(260); // the caption's fade (0.2 s)
         s = await start(page);
       }
       assert.equal(s.picked, tap);
       assert.equal(s.lines.length, 1, `${where}: only the picked mode's line shows (the subtext is hidden)`);
-      const [pill] = s.lines;
-      assert.equal(pill.text, LINES[tap], `${where}: the pill reads ${tap}'s line`);
-      assert.equal(pill.opacity, "1", `${where}: the swap settles`);
-      assert.ok(Math.abs(pill.x - solo.x) < 1 && Math.abs(pill.x + pill.width - (practice.x + practice.width)) < 1, `${where}: the pill spans the key row`);
-      assert.ok(Math.max(...s.modes.map((m) => m.y + m.height)) <= pill.y && pill.y + pill.height <= s.go.y, `${where}: the pill sits between the keys and START`);
+      const [cap] = s.lines;
+      assert.equal(cap.text, LINES[tap], `${where}: the caption reads ${tap}'s line`);
+      assert.equal(cap.opacity, "1", `${where}: the swap settles`);
+      assert.ok(Math.abs(cap.x - solo.x) < 1 && cap.x + cap.width <= practice.x + practice.width, `${where}: the caption sits under the key row, left-aligned with it`);
+      assert.deepEqual([cap.bg, cap.shadow, cap.border, cap.events, cap.weight], ["rgba(0, 0, 0, 0)", "none", "0px", "none", "400"], `${where}: a quiet caption, not a key (no fill, base or border, not clickable, normal weight)`);
+      assert.ok(cap.size < s.keySize, `${where}: caption type (${cap.size}px) smaller than the keys' (${s.keySize}px)`);
+      assert.ok(Math.max(...s.modes.map((m) => m.y + m.height)) <= cap.y && cap.y + cap.height <= s.go.y, `${where}: the caption sits between the keys and START`);
     }
     assert.ok(s.card[0].y + s.card[0].height <= s.sticker.y && s.sticker.y + s.sticker.height <= solo.y, `${where}: card, sticker, modes in order`);
     assert.ok(Math.abs(s.go.x + s.go.width / 2 - w / 2) < 1 && s.go.y + s.go.height <= h && s.scroll === 0, `${where}: START centred and on screen, no scroll`);
@@ -205,7 +208,7 @@ try {
     assert.deepEqual(s.lines.map((l) => l.text), Object.values(LINES), `${where}: desktop keys keep their lines`);
     await ctx.close();
   }
-  console.log("Blitz phone start screen: 390×844, 375×667, 360×740 (iPhone): no full screen key, the directions card clear of the corner keys, SOLO · PLATOON · PRACTICE one row of equal thirds (titles only, 44-52 px), the picked mode's line in a pill between the keys and START that swaps on a tap (each key described by its line), START centred, no scroll; 1440×900 keeps the lines in the keys and the full screen key (hidden without the Fullscreen API).");
+  console.log("Blitz phone start screen: 390×844, 375×667, 360×740 (iPhone): no full screen key, the directions card clear of the corner keys, SOLO · PLATOON · PRACTICE one row of equal thirds (titles only, 44-52 px), the picked mode's line as a caption between the keys and START (no fill or base, smaller type) that swaps on a tap (each key described by its line), START centred, no scroll; 1440×900 keeps the lines in the keys and the full screen key (hidden without the Fullscreen API).");
   console.log("Blitz phone game mode: 390×844 and 844×390 (coarse pointer): no header, footer or bar on screen (h1 and footer byline in the HTML), the board fills the viewport, no scroll, no layout shift, a 44 px exit key home (/play/ and /play/multi/); the pause key ≥ 44 px, on top, clear of the HUD, pad and keys; tap / Escape / P pause, RESUME counts down, RESTART and QUIT TO MENU on screen, a hidden tab pauses; 1440×900 keeps the header, board, bar and footer.");
 } catch (err) {
   console.error(`Blitz phone test failed at: ${where}`);

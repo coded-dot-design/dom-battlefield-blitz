@@ -8,20 +8,22 @@
     room above and below, the mode keys, then PRESS START. Before, the card sat under the HOME and FULL
     SCREEN keys and lost its first words.
   - **The mode keys are one row of titles:** SOLO · PLATOON · PRACTICE as equal thirds, 46 px tall
-    (Board UI keys; the picked one keeps the pressed look). Their lines leave the keys: the picked mode's
-    line shows in a pill under the row, in the picked key's face (cyan, rim ink), and swaps with a quick
-    fade when you pick another (CSS only, none under reduced motion). Each key stays described by its
-    line (`aria-describedby`); the pill is not live, since the key's own press and description already
-    announce it. PRESS START sits centred under the pill at the pause screen's big-key size (168 × 96),
-    with more air around it and the sticker. It all fits at 375 × 667, 360 × 740 and 390 × 844 without
-    scrolling, so the card stays open (no toggle). Desktop keeps the lines inside the keys.
+    (Board UI keys; the picked one keeps the pressed look). Their lines leave the keys: the picked
+    mode's line shows as a quiet sub-header under the row, left-aligned with it: plain text one step
+    smaller, muted ink, normal weight, sentence case; no fill, border or base, not clickable (a label,
+    not a key). It swaps with a quick fade when you pick another (CSS only, none under reduced motion),
+    in a reserved line, so nothing shifts. Each key stays described by its line (`aria-describedby`);
+    the line is not live, since the key's own press and description already announce it. PRESS START
+    sits centred under it at the pause screen's big-key size (168 × 96), with more air around it and
+    the sticker. It all fits at 375 × 667, 360 × 740 and 390 × 844 without scrolling, so the card stays
+    open (no toggle). Desktop keeps the lines inside the keys.
   - **No FULL SCREEN key where it can't work:** hidden without the Fullscreen API (iPhone Safari) and on
     any phone (game mode already fills the screen); PAUSE takes its slot. Desktop keeps it.
-  - Desktop at 1440 is unchanged. Gameplay unchanged. Sizes (gzip): `blitz.js` 46,398 → 46,578,
-    `blitz.mjs` 46,525 → 46,703, `blitz-net.mjs` 48,391 → 48,564 (budgets unchanged; three CSS notes moved
+  - Desktop at 1440 is unchanged. Gameplay unchanged. Sizes (gzip): `blitz.js` 46,398 → 46,587,
+    `blitz.mjs` 46,525 → 46,710, `blitz-net.mjs` 48,391 → 48,571 (budgets unchanged; three CSS notes moved
     out of the shipped CSS string, the mode keys built from one table). `tests/phone.mjs` checks it at all
-    three phone sizes (one row, the pill's text and swap, no overlaps, no scroll) and at 1440 (the lines
-    in the keys; the full screen key with and without the Fullscreen API).
+    three phone sizes (one row, the caption's text, style and swap, no overlaps, no scroll) and at 1440
+    (the lines in the keys; the full screen key with and without the Fullscreen API).
 
 ## 1.0.0: on @fzlt/core 0.21.2
 

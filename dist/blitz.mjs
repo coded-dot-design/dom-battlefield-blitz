@@ -97,7 +97,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .over.intro{grid-template-columns:min(100%,400px);align-content:safe center;gap:24px;padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 16px 16px}
 .bui .legend{position:static;translate:none;display:grid;justify-content:start;justify-self:stretch;width:auto;max-width:none}
 .sticker{margin:12px 0;width:max-content}.bui .modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;justify-self:stretch;margin:0 0 38px;max-width:none}.bui .mode{height:46px;padding:0 4px;margin:0}
-.mode small{display:none;position:absolute;top:58px;left:calc(var(--i) * (-100% - 12px) - 2px);width:calc(300% + 28px);padding:7px;font-size:11px;background:inherit;border:inherit;border-radius:99px;animation:dsc .2s}.mode[aria-pressed=true] small{display:block;opacity:1}
+.mode small{display:none;position:absolute;top:58px;left:calc(var(--i) * (-100% - 12px) - 2px);width:max-content;font-size:11px;pointer-events:none;animation:dsc .2s}.mode[aria-pressed=true] small{display:block;font-weight:400;color:var(--muted);opacity:1}.mode small::first-letter{text-transform:uppercase}
 .bui .intro [data-go]{width:168px;height:96px;margin-top:4px}}
 .bui.nofs .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px))}.nofs .fs{display:none}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
