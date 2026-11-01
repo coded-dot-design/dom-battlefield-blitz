@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **Phone: the start screen, laid out on purpose** (owner report from an iPhone, pending owner review).
+  - **The directions card clears the corner keys.** At ≤ 620 px wide the start screen is one column that
+    starts under the top-left key row: the card (full width, one line per tip), the BLITZ! sticker with
+    room above and below, the mode keys, then PRESS START. Before, the card sat under the HOME and FULL
+    SCREEN keys and lost its first words.
+  - **The mode keys are one grid:** SOLO and PLATOON equal halves, PRACTICE the full width under them, all
+    64 px tall with the same gaps (Board UI keys, as on desktop); PRESS START centred under them at the
+    pause screen's big-key size (168 × 96). It all fits at 375 × 667, 360 × 740 and 390 × 844 without
+    scrolling, so the card stays open (no toggle).
+  - **No FULL SCREEN key where it can't work:** hidden without the Fullscreen API (iPhone Safari) and on
+    any phone (game mode already fills the screen); PAUSE takes its slot. Desktop keeps it.
+  - Desktop at 1440 is unchanged. Gameplay unchanged. Sizes (gzip): `blitz.js` 46,398 → 46,460,
+    `blitz.mjs` 46,525 → 46,578, `blitz-net.mjs` 48,391 → 48,437 (budgets unchanged; three CSS notes moved
+    out of the shipped CSS string to pay for most of it). `tests/phone.mjs` checks it at all three phone
+    sizes and at 1440 (with and without the Fullscreen API).
+
 ## 1.0.0: on @fzlt/core 0.21.2
 
 What's in it (details below): the engine on `@fzlt/core` 0.21.2 (Fizlet v0.21.2); net play with room

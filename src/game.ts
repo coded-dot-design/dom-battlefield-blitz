@@ -164,6 +164,13 @@ const AGAIN = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="cris
 const MENU = `<svg viewBox="0 0 64 64" aria-hidden="true" shape-rendering="crispEdges">${GRID}<path d="M16 18h32v6H16Zm0 11h32v6H16Zm0 11h32v6H16Z" fill="currentColor"/></svg>`;
 const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="true">${ICON[k]}</svg>`;
 
+// The CSS's notes (kept out of the string, so they don't ship): AUTO and LOCK ride on FIRE's shoulders
+// (the Battlefield cockpit); the two specials sit in a row above. PAUSE: always on the top-left key row,
+// away from the stick (left drag) and the fire pad (bottom right); where there is no full screen key
+// (.nofs) it takes that slot. Narrow (≤ 620 px): the scoreboard sits under the key row (exit · full
+// screen · pause), never over it, and the start screen is one column under the key row, so the
+// directions card never sits under the corner keys: the card, the sticker, the mode keys (2 + 1, one
+// height) and START.
 // A phone: a coarse pointer on a small screen (site.css "Game mode", the same query). The board covers
 // the screen, the keys float at its edges, and a drive stick shows bottom left.
 const PHONE = "(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px)";
@@ -197,7 +204,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .bui .fire{width:96px;height:96px;right:30px;bottom:0}.bui .fire kbd{left:50%;top:auto;bottom:-8px;translate:-50% 0}.bui .fire svg{width:40px;height:40px}
 .fire::after{content:"";position:absolute;inset:-9px;border-radius:50%;background:conic-gradient(var(--hurt) calc(var(--h,0) * 1turn),transparent 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));pointer-events:none}
 .fire.hot::after{background:var(--k-fire);animation:blink .25s steps(2) infinite}
-/* AUTO and LOCK ride on FIRE's shoulders (the Battlefield cockpit); the two specials sit in a row above. */
 .bui .long{--c:var(--hurt);right:85px;bottom:150px}.bui .strike{--lock:var(--k-attack);right:9px;bottom:150px}
 .bui :is(.lock,.auto){width:52px;height:52px}.bui .auto{right:92px;bottom:84px}.bui .lock{right:12px;bottom:84px}.bui :is(.lock,.auto) svg{width:20px;height:20px}
 .coach-on{outline:3px dashed var(--ink);outline-offset:6px;animation:coach 1s ease-in-out infinite}@keyframes coach{50%{outline-offset:10px}}
@@ -244,7 +250,6 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .vs{margin:-18px 0 0;font:900 18px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--k-sys-ink)}
 .bui .fs{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
-/* PAUSE: always on the top-left key row, away from the stick (left drag) and the fire pad (bottom right). */
 .bui .pz{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 48px);top:max(10px,env(safe-area-inset-top));display:inline-flex;align-items:center;gap:6px;height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
 .pz svg{width:18px;height:18px;stroke:currentColor;stroke-width:3.2;fill:none}
 .ov.pause .bui-overlay-keys{flex-wrap:wrap;justify-content:center;width:min(640px,calc(100% - 24px));bottom:max(20px,env(safe-area-inset-bottom))}
@@ -263,8 +268,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .legend{position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;translate:-50% 0;display:flex;flex-wrap:wrap;justify-content:center;gap:4px 18px;width:max-content;max-width:calc(100% - 128px);padding:8px 16px;font-size:11px;color:var(--muted);background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:10px;box-shadow:0 4px 0 var(--rim)}
 .legend b{color:var(--ink)}
 @media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}
-/* Narrow: the scoreboard sits under the key row (exit · full screen · pause), never over it. */
-.hud{top:max(62px,calc(env(safe-area-inset-top) + 52px))}.feed{top:max(122px,calc(env(safe-area-inset-top) + 112px))}.banner{top:max(132px,calc(env(safe-area-inset-top) + 122px))}.coach{top:max(118px,calc(env(safe-area-inset-top) + 108px))}}
+.hud{top:max(62px,calc(env(safe-area-inset-top) + 52px))}.feed{top:max(122px,calc(env(safe-area-inset-top) + 112px))}.banner{top:max(132px,calc(env(safe-area-inset-top) + 122px))}.coach{top:max(118px,calc(env(safe-area-inset-top) + 108px))}
+.over.intro{grid-template-columns:min(100%,400px);align-content:safe center;gap:20px;padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 16px 16px}
+.bui .legend{position:static;order:-1;translate:none;display:grid;gap:4px;justify-content:start;justify-self:stretch;width:auto;max-width:none;padding:8px 12px}
+.sticker{margin:8px 0}.bui .modes{display:grid;grid-template-columns:1fr 1fr;justify-self:stretch;margin:0;max-width:none}.bui .mode{min-height:64px;margin:0}.bui [data-mode=practice]{grid-column:span 2}
+.bui .intro [data-go]{width:168px;height:96px;margin-top:8px}}
+.bui.nofs .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px))}.nofs .fs{display:none}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
 @media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}
 .stk{display:none}
@@ -2532,6 +2541,12 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
   // Full screen: the real thing where the browser allows it, else the board fills the window.
   const fsKey = $<HTMLButtonElement>("[data-fs]");
   const fsOn = () => document.fullscreenElement === host || wrap.classList.contains("full");
+  // No key where it would be a dead click: no Fullscreen API (iPhone Safari), or a phone (game mode
+  // already fills the screen). PAUSE moves into its slot.
+  const fsCan = document.fullscreenEnabled || "webkitRequestFullscreen" in document.documentElement;
+  const fsHide = () => (fsKey.hidden = wrap.classList.toggle("nofs", !fsCan || phone.matches));
+  fsHide();
+  phone.addEventListener("change", fsHide, { signal: e.signal });
   const fsPaint = () => {
     const on = fsOn();
     fsKey.innerHTML = svg(on ? "exit" : "full");

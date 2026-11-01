@@ -139,6 +139,49 @@ try {
     } else assert.deepEqual([t.head, t.foot, t.exit], ["block", "block", "none"], "desktop two: as it was");
     await ctx.close();
   }
+  // The start screen on a phone (iPhone, portrait): no full screen key (a dead click there), the
+  // directions card and its text clear of the corner keys, the mode keys a 2 + 1 grid of one height,
+  // START centred, everything on screen without scrolling. Desktop keeps the full screen key, unless
+  // the browser has no Fullscreen API.
+  const IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  const start = (page) => page.evaluate(() => {
+    const sr = document.querySelector("#blitz").shadowRoot, R = (el) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
+    const fs = sr.querySelector("[data-fs]");
+    return {
+      fs: { hidden: fs.hidden, display: getComputedStyle(fs).display }, corner: [document.querySelector(".game-exit"), fs].filter((el) => getComputedStyle(el).display !== "none").map(R),
+      card: [sr.querySelector(".legend"), ...sr.querySelectorAll(".legend span")].map(R), sticker: R(sr.querySelector(".sticker")), modes: [...sr.querySelectorAll("[data-mode]")].map(R), go: R(sr.querySelector("[data-go]")),
+      scroll: document.documentElement.scrollHeight - innerHeight,
+    };
+  });
+  for (const [w, h] of [[390, 844], [375, 667], [360, 740]]) {
+    where = `${w}×${h} start screen`;
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true, userAgent: IOS });
+    const page = await ctx.newPage();
+    await page.goto(base + "play/");
+    await page.waitForTimeout(1300); // the sticker slams in
+    const s = await start(page);
+    assert.ok(s.fs.hidden && s.fs.display === "none", `${where}: no full screen key on a phone`);
+    assert.equal(s.corner.length, 1, `${where}: the exit key is the only corner key`);
+    for (const k of s.corner) for (const c of s.card) assert.ok(!hit(k, c), `${where}: the directions card clears the corner keys ${JSON.stringify([k, c])}`);
+    const [solo, platoon, practice] = s.modes;
+    assert.ok(Math.abs(solo.width - platoon.width) < 1 && Math.abs(practice.width - (platoon.x + platoon.width - solo.x)) < 1, `${where}: SOLO and PLATOON halves, PRACTICE full width`);
+    assert.ok(Math.abs(solo.height - platoon.height) < 1 && Math.abs(solo.height - practice.height) < 1, `${where}: one key height ${[solo.height, platoon.height, practice.height]}`);
+    assert.ok(s.card[0].y + s.card[0].height <= s.sticker.y && s.sticker.y + s.sticker.height <= solo.y && practice.y + practice.height <= s.go.y, `${where}: card, sticker, modes, START in order`);
+    assert.ok(Math.abs(s.go.x + s.go.width / 2 - w / 2) < 1 && s.go.y + s.go.height <= h && s.scroll === 0, `${where}: START centred and on screen, no scroll`);
+    await ctx.close();
+  }
+  for (const stub of [false, true]) {
+    where = `1440×900 full screen key${stub ? " (no Fullscreen API)" : ""}`;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    if (stub) await ctx.addInitScript(() => (Object.defineProperty(Document.prototype, "fullscreenEnabled", { get: () => false }), delete Element.prototype.webkitRequestFullscreen)); // iPhone Safari
+    const page = await ctx.newPage();
+    await page.goto(base + "play/");
+    const s = await start(page);
+    assert.equal(s.fs.display === "none", stub, `${where}: ${stub ? "hidden" : "shows"}`);
+    assert.equal(s.fs.hidden, stub);
+    await ctx.close();
+  }
+  console.log("Blitz phone start screen: 390×844, 375×667, 360×740 (iPhone): no full screen key, the directions card clear of the corner keys, SOLO · PLATOON halves and a full-width PRACTICE of one height, START centred, no scroll; 1440×900 keeps the full screen key (hidden without the Fullscreen API).");
   console.log("Blitz phone game mode: 390×844 and 844×390 (coarse pointer): no header, footer or bar on screen (h1 and footer byline in the HTML), the board fills the viewport, no scroll, no layout shift, a 44 px exit key home (/play/ and /play/multi/); the pause key ≥ 44 px, on top, clear of the HUD, pad and keys; tap / Escape / P pause, RESUME counts down, RESTART and QUIT TO MENU on screen, a hidden tab pauses; 1440×900 keeps the header, board, bar and footer.");
 } catch (err) {
   console.error(`Blitz phone test failed at: ${where}`);
