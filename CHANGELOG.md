@@ -1,8 +1,11 @@
 # Changelog
 
-## Unreleased
+## 1.0.1 - 2026-11-01
 
-- **Phone: the start screen, laid out on purpose** (owner report from an iPhone, pending owner review).
+What's in it: the phone start screen, laid out on purpose (#41), and the mode line readable over the
+board's tiles. The owner's go: "Love it ship it", "make needed changes and ship".
+
+- **Phone: the start screen, laid out on purpose** (owner report from an iPhone).
   The start screen is one column under the top-left key row: the sticker, the mode keys and their
   caption, then PRESS START.
   - **The directions behind a key.** The start screen has no directions card any more: an (i)
@@ -27,18 +30,24 @@
     sits centred under it at the pause screen's big-key size (168 × 96), with more air around it and
     the sticker. It all fits at 375 × 667, 360 × 740 and 390 × 844 without scrolling. Desktop keeps the
     lines inside the keys.
+  - **The mode line reads over any tile.** It carries a halo in the board's background colour
+    (`--bg`, three soft text shadows, about 2–4 px), so a tile sliding under it in light or dark no
+    longer swallows it. There's still no box, fill or border.
   - **No FULL SCREEN key where it can't work:** hidden without the Fullscreen API (iPhone Safari) and on
     any phone (game mode already fills the screen); DIRECTIONS takes its slot. Desktop keeps it.
   - Desktop at 1440: the start screen as it was apart from the sticker. Gameplay unchanged. Sizes
-    (gzip): `blitz.js` 46,398 → 46,754, `blitz.mjs` 46,525 → 46,874, `blitz-net.mjs` 48,391 → 48,746.
-    Budgets 46,720 / 46,720 / 48,576 → 46,784 / 46,912 / 48,768 (measured + 22–38 B; `scripts/size.mjs`
-    says why). Paid for in part by three CSS notes moved out of the shipped CSS string, the mode keys
-    built from one table and a dead sticker rule. `tests/phone.mjs` checks it all at three phone sizes:
-    no card on the start screen; it opens at START and closes in the countdown; the key toggles it with
-    `aria-expanded` in sync; Escape and a tap elsewhere close it without pausing; the tag follows the
-    pick; one row of keys; the caption's text, style and swap; no overlaps, no scroll. At 1440 it checks
-    the lines in the keys, the card on the start screen, and the full screen key with and without the
-    Fullscreen API.
+    (gzip): `blitz.js` 46,398 → 46,771, `blitz.mjs` 46,525 → 46,886, `blitz-net.mjs` 48,391 → 48,758.
+    Budgets 46,720 / 46,720 / 48,576 → 46,784 / 46,912 / 48,768 (raised in #41, measured + 22–38 B; the
+    halo fits inside them). Paid for in part by three CSS notes moved out of the shipped CSS string, the
+    mode keys built from one table and a dead sticker rule. `tests/phone.mjs` checks it all at three
+    phone sizes:
+    - no card on the start screen; it opens at START and closes in the countdown; the key toggles it
+      with `aria-expanded` in sync; Escape and a tap elsewhere close it without pausing;
+    - the tag follows the pick; one row of keys; the line's text, style, halo and swap;
+    - no overlaps, no scroll.
+
+    At 1440 it checks the lines in the keys, the card on the start screen, and the full screen key
+    with and without the Fullscreen API.
 
 ## 1.0.0: on @fzlt/core 0.21.2
 
