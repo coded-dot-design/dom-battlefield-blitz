@@ -158,7 +158,7 @@ try {
       card: { shown: getComputedStyle(card).display !== "none", rects: [card, ...card.querySelectorAll("span")].map(R) }, dk: { expanded: dk.getAttribute("aria-expanded"), controls: dk.getAttribute("aria-controls"), label: dk.getAttribute("aria-label"), focused: sr.activeElement === dk },
       sticker: R(sr.querySelector(".sticker") ?? card), name: sr.querySelector(".sticker")?.getAttribute("aria-label"), tag: sr.querySelector(".sticker span")?.textContent, state: window.blitz.state,
       modes: keys.map(R), go: sr.querySelector("[data-go]") && R(sr.querySelector("[data-go]")),
-      picked: keys.find((k) => k.getAttribute("aria-pressed") === "true")?.dataset.mode, lines: lines.map((el) => { const c = getComputedStyle(el); return { text: el.textContent, ...R(el), opacity: c.opacity, bg: c.backgroundColor, shadow: c.boxShadow, border: c.borderTopWidth, size: parseFloat(c.fontSize), weight: c.fontWeight, events: c.pointerEvents }; }),
+      picked: keys.find((k) => k.getAttribute("aria-pressed") === "true")?.dataset.mode, lines: lines.map((el) => { const c = getComputedStyle(el); return { text: el.textContent, ...R(el), opacity: c.opacity, bg: c.backgroundColor, shadow: c.boxShadow, border: c.borderTopWidth, size: parseFloat(c.fontSize), weight: c.fontWeight, events: c.pointerEvents, halo: c.textShadow }; }),
       keySize: keys[0] && parseFloat(getComputedStyle(keys[0].querySelector("b")).fontSize),
       described: keys.map((k) => [k.dataset.mode, sr.getElementById(k.getAttribute("aria-describedby"))?.textContent]),
       scroll: document.documentElement.scrollHeight - innerHeight,
@@ -198,6 +198,7 @@ try {
       assert.equal(cap.opacity, "1", `${where}: the swap settles`);
       assert.ok(Math.abs(cap.x - solo.x) < 1 && cap.x + cap.width <= practice.x + practice.width, `${where}: the caption sits under the key row, left-aligned with it`);
       assert.deepEqual([cap.bg, cap.shadow, cap.border, cap.events, cap.weight], ["rgba(0, 0, 0, 0)", "none", "0px", "none", "400"], `${where}: a quiet caption, not a key (no fill, base or border, not clickable, normal weight)`);
+      assert.ok(cap.halo.split(/\)\s+0px 0px/).length >= 3, `${where}: the line carries a background halo, so it reads over any tile (${cap.halo})`);
       assert.ok(cap.size < s.keySize, `${where}: caption type (${cap.size}px) smaller than the keys' (${s.keySize}px)`);
       assert.ok(Math.max(...s.modes.map((m) => m.y + m.height)) <= cap.y && cap.y + cap.height <= s.go.y, `${where}: the caption sits between the keys and START`);
     }
