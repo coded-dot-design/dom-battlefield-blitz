@@ -140,33 +140,56 @@ try {
     await ctx.close();
   }
   // The start screen on a phone (iPhone, portrait): no full screen key (a dead click there), the
-  // directions card and its text clear of the corner keys, the mode keys a 2 + 1 grid of one height,
-  // START centred, everything on screen without scrolling. Desktop keeps the full screen key, unless
-  // the browser has no Fullscreen API.
+  // directions card and its text clear of the corner keys, the mode keys one row of equal thirds with
+  // titles only (≤ 52 px), the picked mode's line in a pill between the keys and START (it swaps on a
+  // tap; every key keeps its line as aria-describedby), START centred, nothing overlaps, no scroll.
+  // Desktop keeps the lines in the keys and the full screen key, unless there is no Fullscreen API.
   const IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  const LINES = { solo: "every tank for itself", platoon: "you + 3 wingmen vs 2 platoons", practice: "learn the keys, with tips" };
   const start = (page) => page.evaluate(() => {
     const sr = document.querySelector("#blitz").shadowRoot, R = (el) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height }; };
-    const fs = sr.querySelector("[data-fs]");
+    const fs = sr.querySelector("[data-fs]"), keys = [...sr.querySelectorAll("[data-mode]")];
+    const lines = keys.map((k) => k.querySelector("small")).filter((el) => getComputedStyle(el).display !== "none");
     return {
       fs: { hidden: fs.hidden, display: getComputedStyle(fs).display }, corner: [document.querySelector(".game-exit"), fs].filter((el) => getComputedStyle(el).display !== "none").map(R),
-      card: [sr.querySelector(".legend"), ...sr.querySelectorAll(".legend span")].map(R), sticker: R(sr.querySelector(".sticker")), modes: [...sr.querySelectorAll("[data-mode]")].map(R), go: R(sr.querySelector("[data-go]")),
+      card: [sr.querySelector(".legend"), ...sr.querySelectorAll(".legend span")].map(R), sticker: R(sr.querySelector(".sticker")), modes: keys.map(R), go: R(sr.querySelector("[data-go]")),
+      picked: keys.find((k) => k.getAttribute("aria-pressed") === "true").dataset.mode, lines: lines.map((el) => ({ text: el.textContent, ...R(el), opacity: getComputedStyle(el).opacity })),
+      described: keys.map((k) => [k.dataset.mode, sr.getElementById(k.getAttribute("aria-describedby"))?.textContent]),
       scroll: document.documentElement.scrollHeight - innerHeight,
     };
   });
-  for (const [w, h] of [[390, 844], [375, 667], [360, 740]]) {
-    where = `${w}×${h} start screen`;
+  for (const [w, h, mode] of [[390, 844, "solo"], [375, 667, "platoon"], [360, 740, "practice"]]) {
+    where = `${w}×${h} start screen (${mode})`;
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, isMobile: true, hasTouch: true, userAgent: IOS });
+    await ctx.addInitScript((m) => localStorage.setItem("blitz:mode", m), mode);
     const page = await ctx.newPage();
     await page.goto(base + "play/");
     await page.waitForTimeout(1300); // the sticker slams in
-    const s = await start(page);
+    let s = await start(page);
     assert.ok(s.fs.hidden && s.fs.display === "none", `${where}: no full screen key on a phone`);
     assert.equal(s.corner.length, 1, `${where}: the exit key is the only corner key`);
     for (const k of s.corner) for (const c of s.card) assert.ok(!hit(k, c), `${where}: the directions card clears the corner keys ${JSON.stringify([k, c])}`);
+    assert.deepEqual(s.described, Object.entries(LINES), `${where}: each key is described by its line`);
     const [solo, platoon, practice] = s.modes;
-    assert.ok(Math.abs(solo.width - platoon.width) < 1 && Math.abs(practice.width - (platoon.x + platoon.width - solo.x)) < 1, `${where}: SOLO and PLATOON halves, PRACTICE full width`);
-    assert.ok(Math.abs(solo.height - platoon.height) < 1 && Math.abs(solo.height - practice.height) < 1, `${where}: one key height ${[solo.height, platoon.height, practice.height]}`);
-    assert.ok(s.card[0].y + s.card[0].height <= s.sticker.y && s.sticker.y + s.sticker.height <= solo.y && practice.y + practice.height <= s.go.y, `${where}: card, sticker, modes, START in order`);
+    assert.ok(Math.abs(solo.width - platoon.width) < 1 && Math.abs(solo.width - practice.width) < 1 && solo.x < platoon.x && platoon.x < practice.x, `${where}: one row of equal thirds`);
+    assert.ok(Math.max(...s.modes.map((m) => Math.abs(m.y - solo.y))) <= 6, `${where}: one row (a picked key sits 5 px down)`);
+    assert.ok(s.modes.every((m) => m.height >= 44 && m.height <= 52), `${where}: key height 44-52 px ${s.modes.map((m) => m.height)}`);
+    for (const tap of ["solo", "platoon", "practice", mode]) {
+      if (tap !== s.picked) {
+        const k = s.modes[Object.keys(LINES).indexOf(tap)];
+        await page.touchscreen.tap(k.x + k.width / 2, k.y + k.height / 2);
+        await page.waitForTimeout(260); // the pill's swap (0.2 s)
+        s = await start(page);
+      }
+      assert.equal(s.picked, tap);
+      assert.equal(s.lines.length, 1, `${where}: only the picked mode's line shows (the subtext is hidden)`);
+      const [pill] = s.lines;
+      assert.equal(pill.text, LINES[tap], `${where}: the pill reads ${tap}'s line`);
+      assert.equal(pill.opacity, "1", `${where}: the swap settles`);
+      assert.ok(Math.abs(pill.x - solo.x) < 1 && Math.abs(pill.x + pill.width - (practice.x + practice.width)) < 1, `${where}: the pill spans the key row`);
+      assert.ok(Math.max(...s.modes.map((m) => m.y + m.height)) <= pill.y && pill.y + pill.height <= s.go.y, `${where}: the pill sits between the keys and START`);
+    }
+    assert.ok(s.card[0].y + s.card[0].height <= s.sticker.y && s.sticker.y + s.sticker.height <= solo.y, `${where}: card, sticker, modes in order`);
     assert.ok(Math.abs(s.go.x + s.go.width / 2 - w / 2) < 1 && s.go.y + s.go.height <= h && s.scroll === 0, `${where}: START centred and on screen, no scroll`);
     await ctx.close();
   }
@@ -179,9 +202,10 @@ try {
     const s = await start(page);
     assert.equal(s.fs.display === "none", stub, `${where}: ${stub ? "hidden" : "shows"}`);
     assert.equal(s.fs.hidden, stub);
+    assert.deepEqual(s.lines.map((l) => l.text), Object.values(LINES), `${where}: desktop keys keep their lines`);
     await ctx.close();
   }
-  console.log("Blitz phone start screen: 390×844, 375×667, 360×740 (iPhone): no full screen key, the directions card clear of the corner keys, SOLO · PLATOON halves and a full-width PRACTICE of one height, START centred, no scroll; 1440×900 keeps the full screen key (hidden without the Fullscreen API).");
+  console.log("Blitz phone start screen: 390×844, 375×667, 360×740 (iPhone): no full screen key, the directions card clear of the corner keys, SOLO · PLATOON · PRACTICE one row of equal thirds (titles only, 44-52 px), the picked mode's line in a pill between the keys and START that swaps on a tap (each key described by its line), START centred, no scroll; 1440×900 keeps the lines in the keys and the full screen key (hidden without the Fullscreen API).");
   console.log("Blitz phone game mode: 390×844 and 844×390 (coarse pointer): no header, footer or bar on screen (h1 and footer byline in the HTML), the board fills the viewport, no scroll, no layout shift, a 44 px exit key home (/play/ and /play/multi/); the pause key ≥ 44 px, on top, clear of the HUD, pad and keys; tap / Escape / P pause, RESUME counts down, RESTART and QUIT TO MENU on screen, a hidden tab pauses; 1440×900 keeps the header, board, bar and footer.");
 } catch (err) {
   console.error(`Blitz phone test failed at: ${where}`);

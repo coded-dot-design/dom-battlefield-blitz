@@ -169,8 +169,9 @@ const svg = (k: keyof typeof ICON) => `<svg viewBox="0 0 20 20" aria-hidden="tru
 // away from the stick (left drag) and the fire pad (bottom right); where there is no full screen key
 // (.nofs) it takes that slot. Narrow (≤ 620 px): the scoreboard sits under the key row (exit · full
 // screen · pause), never over it, and the start screen is one column under the key row, so the
-// directions card never sits under the corner keys: the card, the sticker, the mode keys (2 + 1, one
-// height) and START.
+// directions card never sits under the corner keys: the card, the sticker, the mode keys (one row of
+// titles) with the picked mode's line as a pill under them (the key's own <small>, also its
+// aria-describedby), and START.
 // A phone: a coarse pointer on a small screen (site.css "Game mode", the same query). The board covers
 // the screen, the keys float at its edges, and a drive stick shows bottom left.
 const PHONE = "(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px)";
@@ -269,13 +270,14 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .legend b{color:var(--ink)}
 @media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}
 .hud{top:max(62px,calc(env(safe-area-inset-top) + 52px))}.feed{top:max(122px,calc(env(safe-area-inset-top) + 112px))}.banner{top:max(132px,calc(env(safe-area-inset-top) + 122px))}.coach{top:max(118px,calc(env(safe-area-inset-top) + 108px))}
-.over.intro{grid-template-columns:min(100%,400px);align-content:safe center;gap:20px;padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 16px 16px}
-.bui .legend{position:static;order:-1;translate:none;display:grid;gap:4px;justify-content:start;justify-self:stretch;width:auto;max-width:none;padding:8px 12px}
-.sticker{margin:8px 0}.bui .modes{display:grid;grid-template-columns:1fr 1fr;justify-self:stretch;margin:0;max-width:none}.bui .mode{min-height:64px;margin:0}.bui [data-mode=practice]{grid-column:span 2}
-.bui .intro [data-go]{width:168px;height:96px;margin-top:8px}}
+.over.intro{grid-template-columns:min(100%,400px);align-content:safe center;gap:24px;padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 16px 16px}
+.bui .legend{position:static;translate:none;display:grid;justify-content:start;justify-self:stretch;width:auto;max-width:none}
+.sticker{margin:12px 0;width:max-content}.bui .modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;justify-self:stretch;margin:0 0 38px;max-width:none}.bui .mode{height:46px;padding:0 4px;margin:0}
+.mode small{display:none;position:absolute;top:58px;left:calc(var(--i) * (-100% - 12px) - 2px);width:calc(300% + 28px);padding:7px;font-size:11px;background:inherit;border:inherit;border-radius:99px;animation:dsc .2s}.mode[aria-pressed=true] small{display:block;opacity:1}
+.bui .intro [data-go]{width:168px;height:96px;margin-top:4px}}
 .bui.nofs .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px))}.nofs .fs{display:none}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
-@media (prefers-reduced-motion:reduce){.sticker,.count,.tip{animation:none}}
+@keyframes dsc{from{opacity:0}}@media (prefers-reduced-motion:reduce){.sticker,.count,.tip,.mode small{animation:none}}
 .stk{display:none}
 @media ${PHONE}{.stk{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));display:block;width:116px;height:116px;border:2.5px solid var(--line);border-radius:50%;background:color-mix(in srgb,var(--surface) 55%,transparent);touch-action:none}
 .stk::before{content:"";position:absolute;inset:-28px;border-radius:50%}
@@ -1652,6 +1654,8 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }, { signal: e.signal });
 
   // ---------- Match flow ----------
+  // The three modes and their lines (each key's description; on a phone, the picked one's pill).
+  const MODES = [["solo", "every tank for itself"], ["platoon", "you + 3 wingmen vs 2 platoons"], ["practice", "learn the keys, with tips"]] as const;
   const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
   function intro() {
     state = "intro";
@@ -1659,25 +1663,26 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     wrap.classList.add("pre");
     over.hidden = false;
     over.classList.add("intro");
-    over.innerHTML = `<div class="sticker">${BADGE}<span data-kick>${kicker()}</span><b>BLITZ<em>!</em></b></div>
-<div class="modes bui-seg" role="group" aria-label="Mode"><button class="mode" type="button" data-mode="solo" aria-pressed="${!platoon && !practice}"><b>SOLO</b><small>every tank for itself</small></button><button class="mode" type="button" data-mode="platoon" aria-pressed="${platoon}"><b>PLATOON</b><small>you + 3 wingmen vs 2 platoons</small></button><button class="mode" type="button" data-mode="practice" aria-pressed="${practice}"><b>PRACTICE</b><small>learn the keys, with tips</small></button></div>
+    const pick = practice ? 2 : +platoon;
+    over.innerHTML = `<div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
+<div class="sticker">${BADGE}<span data-kick>${kicker()}</span><b>BLITZ<em>!</em></b></div>
+<div class="modes bui-seg" role="group" aria-label="Mode">${MODES.map(([m, d], k) => `<button class="mode" type="button" data-mode="${m}" aria-pressed="${k === pick}" aria-describedby="bz-${m}" style="--i:${k}"><b>${m.toUpperCase()}</b><small id="bz-${m}" aria-hidden="true">${d}</small></button>`).join("")}</div>
 ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${tuneChanged() > 1 ? "S" : ""} CHANGED · PRACTICE → TUNE</p>` : ""}
-<div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
 <button class="bui-sticker-key bui-call" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
-    for (const b of over.querySelectorAll<HTMLButtonElement>("[data-mode]"))
+    over.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b, k) =>
       b.addEventListener("click", () => {
-        platoon = b.dataset.mode === "platoon";
-        practice = b.dataset.mode === "practice";
+        platoon = k === 1;
+        practice = k > 1;
         try {
-          localStorage.setItem("blitz:mode", b.dataset.mode!);
+          localStorage.setItem("blitz:mode", MODES[k]![0]);
         } catch {}
         roster();
         for (const m of over.querySelectorAll("[data-mode]")) m.setAttribute("aria-pressed", String(m === b));
         over.querySelector("[data-kick]")!.textContent = kicker();
         e.events.emit("lock", 0);
-      }, { signal: e.signal });
+      }, { signal: e.signal }));
     const go = over.querySelector<HTMLButtonElement>("[data-go]")!;
-    go.addEventListener("click", () => launch(go, countdown, { reduced: matchMedia("(prefers-reduced-motion: reduce)").matches }), { signal: e.signal });
+    go.addEventListener("click", () => launch(go, countdown, { reduced: calm.matches }), { signal: e.signal });
   }
   function countdown() {
     state = "count";
@@ -1776,7 +1781,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
         // The white flag: cells white out, the flag waves, then it blows up and the match ends.
         flag.classList.add("go");
         e.events.emit("strike", 0);
-        const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const reduced = calm.matches;
         setTimeout(() => launch(flag, () => (practice ? (closeOverlay(), toIntro()) : end(true)), { reduced }), reduced ? 0 : 480);
       }, { signal: e.signal });
     } else if (state === "paused") (closeOverlay(), (state = "play"), (G[RES] = RESUME));
@@ -1921,7 +1926,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
 
   // ---------- Drawing ----------
   /** Find yourself: seconds the locate pulse runs after you land, and when it last started (render clock). */
-  const LOCATE = 1.4, still = matchMedia("(prefers-reduced-motion: reduce)");
+  const LOCATE = 1.4, still = calm;
   let youUp = false, locateAt = -9;
   /** Find yourself: each time you land (the start, every respawn) rings ripple out from your tank and
    *  a big YOU chevron drops onto it. Drawn only, on the screen's clock (never the match's). */

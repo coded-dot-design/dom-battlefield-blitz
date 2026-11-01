@@ -7,16 +7,21 @@
     starts under the top-left key row: the card (full width, one line per tip), the BLITZ! sticker with
     room above and below, the mode keys, then PRESS START. Before, the card sat under the HOME and FULL
     SCREEN keys and lost its first words.
-  - **The mode keys are one grid:** SOLO and PLATOON equal halves, PRACTICE the full width under them, all
-    64 px tall with the same gaps (Board UI keys, as on desktop); PRESS START centred under them at the
-    pause screen's big-key size (168 × 96). It all fits at 375 × 667, 360 × 740 and 390 × 844 without
-    scrolling, so the card stays open (no toggle).
+  - **The mode keys are one row of titles:** SOLO · PLATOON · PRACTICE as equal thirds, 46 px tall
+    (Board UI keys; the picked one keeps the pressed look). Their lines leave the keys: the picked mode's
+    line shows in a pill under the row, in the picked key's face (cyan, rim ink), and swaps with a quick
+    fade when you pick another (CSS only, none under reduced motion). Each key stays described by its
+    line (`aria-describedby`); the pill is not live, since the key's own press and description already
+    announce it. PRESS START sits centred under the pill at the pause screen's big-key size (168 × 96),
+    with more air around it and the sticker. It all fits at 375 × 667, 360 × 740 and 390 × 844 without
+    scrolling, so the card stays open (no toggle). Desktop keeps the lines inside the keys.
   - **No FULL SCREEN key where it can't work:** hidden without the Fullscreen API (iPhone Safari) and on
     any phone (game mode already fills the screen); PAUSE takes its slot. Desktop keeps it.
-  - Desktop at 1440 is unchanged. Gameplay unchanged. Sizes (gzip): `blitz.js` 46,398 → 46,460,
-    `blitz.mjs` 46,525 → 46,578, `blitz-net.mjs` 48,391 → 48,437 (budgets unchanged; three CSS notes moved
-    out of the shipped CSS string to pay for most of it). `tests/phone.mjs` checks it at all three phone
-    sizes and at 1440 (with and without the Fullscreen API).
+  - Desktop at 1440 is unchanged. Gameplay unchanged. Sizes (gzip): `blitz.js` 46,398 → 46,578,
+    `blitz.mjs` 46,525 → 46,703, `blitz-net.mjs` 48,391 → 48,564 (budgets unchanged; three CSS notes moved
+    out of the shipped CSS string, the mode keys built from one table). `tests/phone.mjs` checks it at all
+    three phone sizes (one row, the pill's text and swap, no overlaps, no scroll) and at 1440 (the lines
+    in the keys; the full screen key with and without the Fullscreen API).
 
 ## 1.0.0: on @fzlt/core 0.21.2
 
