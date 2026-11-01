@@ -150,6 +150,7 @@ const ICON = {
   pause: '<path d="M7 4v12M13 4v12"/>',
   full: '<path d="M2 7V2h5M18 7V2h-5M2 13v5h5M18 13v5h-5"/>',
   exit: '<path d="M7 2v5H2M13 2v5h5M7 18v-5H2M13 18v-5h5"/>',
+  info: '<circle cx="10" cy="10" r="8"/><path d="M10 9v5M10 6v.5"/>',
   tune: '<path d="M3 5h14M3 10h14M3 15h14"/><circle cx="7" cy="5" r="2" fill="currentColor"/><circle cx="13" cy="10" r="2" fill="currentColor"/><circle cx="9" cy="15" r="2" fill="currentColor"/>',
 };
 // The Battlefield cartridge skull on its grid tile, with a pink Blitz bolt.
@@ -213,11 +214,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .over{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:30px;background:color-mix(in srgb,#2a2d38 72%,transparent)}
 .over[hidden]{display:none}
 .over.intro{padding-top:64px;background:radial-gradient(closest-side,color-mix(in srgb,var(--bg) 60%,transparent),transparent)}
-.sticker{display:grid;grid-template-columns:auto auto;grid-template-areas:"icon kicker" "icon name";column-gap:14px;align-items:center;justify-items:start;padding:10px 24px 12px 14px;color:var(--rim);background:var(--k-flag);border:3px solid var(--rim);border-radius:12px;box-shadow:0 6px 0 var(--rim);rotate:-4deg;animation:bui-slam 1.1s linear both;pointer-events:none}
-.sticker.plain{grid-template-columns:auto;grid-template-areas:"kicker" "name";justify-items:center;padding:10px 24px 12px}
-.sticker .ic{grid-area:icon;display:block;width:62px;height:62px;padding:3px;color:#19f0ff;background:#10233f;border-radius:7px}
-.sticker span{grid-area:kicker;align-self:end;font:800 9px/1 ui-monospace,monospace;letter-spacing:4px;animation:blink 1s steps(2) infinite}
-.sticker b{grid-area:name;font:900 clamp(34px,7vw,58px)/1 ui-monospace,monospace;letter-spacing:3px;white-space:nowrap;text-shadow:0 4px 0 #07060f59}
+.sticker{display:flex;gap:14px;align-items:center;padding:10px 20px 12px 14px;color:var(--rim);background:var(--k-flag);border:3px solid var(--rim);border-radius:12px;box-shadow:0 6px 0 var(--rim);rotate:-4deg;animation:bui-slam 1.1s linear both;pointer-events:none}
+.sticker .ic{display:block;width:62px;height:62px;padding:3px;color:#19f0ff;background:#10233f;border-radius:7px}
+.sticker span{position:absolute;top:-14px;right:-12px;padding:4px 8px 3px;font:900 11px/1 ui-monospace,monospace;letter-spacing:.1em;white-space:nowrap;background:var(--k-attack);border:2.5px solid var(--rim);border-radius:6px;box-shadow:0 3px 0 var(--rim);rotate:10deg}
+.sticker b{font:900 clamp(34px,7vw,58px)/1 ui-monospace,monospace;letter-spacing:3px;white-space:nowrap;text-shadow:0 4px 0 #07060f59}
 .sticker b em{font-style:normal;color:#ff2e88;text-shadow:0 4px 0 #8f195066}
 .bui .bui-sticker-key{animation:pop .38s .9s var(--bui-spring) both}.bui .bui-sticker-key svg [stroke]{stroke:currentColor}.bui .bui-sticker-key b{animation:blink 1s steps(2) infinite}
 @keyframes pop{from{scale:.4;opacity:0}}
@@ -249,7 +249,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .tune .tk{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:0 -14px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--line)}
 .tuned{margin:-14px 0 0;padding:4px 10px;font-size:10px;letter-spacing:.12em;color:var(--rim);background:var(--hurt);border:2px solid var(--rim);border-radius:6px}
 .vs{margin:-18px 0 0;font:900 18px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--k-sys-ink)}
-.bui .fs{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
+.bui :is(.fs,.dk){position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
 .bui .pz{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 48px);top:max(10px,env(safe-area-inset-top));display:inline-flex;align-items:center;gap:6px;height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
 .pz svg{width:18px;height:18px;stroke:currentColor;stroke-width:3.2;fill:none}
@@ -257,10 +257,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .bui .ov [data-resume]{width:168px;height:96px}.bui .ov [data-resume] b{font-size:13px}
 .ov .by,.ov .pzl{flex-basis:100%;margin:0;text-align:center;font-size:10px;letter-spacing:.14em;color:#f6f3ff}.ov .by :is(a,button){display:inline-block;padding:8px 2px;font:inherit;letter-spacing:inherit;color:var(--k-sys);background:none;border:0;cursor:pointer;text-decoration:underline}.ov .pzl{font-size:12px;color:var(--k-sys)}
 .ov .table{position:absolute;left:50%;top:56%;translate:-50% -50%}.ov.result .bui-sticker{top:26%}
-@media (pointer:coarse){.pz span{display:none}.bui :is(.fs,.pz){width:44px;height:44px;padding:0;justify-content:center}.bui .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 52px)}.pz svg{width:22px;height:22px}}
+@media (pointer:coarse){.pz span{display:none}.bui :is(.fs,.pz,.dk){width:44px;height:44px;padding:0;justify-content:center}.bui .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 52px)}.pz svg{width:22px;height:22px}}
 @media (max-height:460px){.ov .table{top:57%;gap:2px;padding:6px 12px;font-size:10px}.ov .table div:nth-child(n+4):not(.you){display:none}.ov.result .bui-sticker{top:22%}}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
-@media (max-height:460px){.bui .legend{display:none}.over.intro{padding-top:0}}
+@media (max-height:460px){.bz:not(.nofs) .legend{display:none}.over.intro{padding-top:0}}
 @media (max-height:460px){.over{gap:24px}.bui .modes{margin-top:4px}.sticker b{font-size:34px}.sticker .ic{width:44px;height:44px}}
 .table{display:grid;gap:4px;min-width:240px;padding:12px 16px;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim)}
 .table div{display:flex;justify-content:space-between;gap:20px}.table .you{color:var(--team)}.bui[data-theme=light] .table .you{color:#0a8a55}
@@ -271,13 +271,13 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 @media (max-width:620px){.pad{scale:.82}.hud{gap:10px;padding:6px 10px}.hud .lead{display:none}.help{display:none}
 .hud{top:max(62px,calc(env(safe-area-inset-top) + 52px))}.feed{top:max(122px,calc(env(safe-area-inset-top) + 112px))}.banner{top:max(132px,calc(env(safe-area-inset-top) + 122px))}.coach{top:max(118px,calc(env(safe-area-inset-top) + 108px))}
 .over.intro{grid-template-columns:min(100%,400px);align-content:safe center;gap:24px;padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 16px 16px}
-.bui .legend{position:static;translate:none;display:grid;justify-content:start;justify-self:stretch;width:auto;max-width:none}
+.nofs .legend{display:grid;justify-content:start;left:16px;right:16px;translate:none;width:auto;max-width:none}
 .sticker{margin:12px 0;width:max-content}.bui .modes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;justify-self:stretch;margin:0 0 38px;max-width:none}.bui .mode{height:46px;padding:0 4px;margin:0}
 .mode small{display:none;position:absolute;top:58px;left:calc(var(--i) * (-100% - 12px) - 2px);width:max-content;font-size:11px;pointer-events:none;animation:dsc .2s}.mode[aria-pressed=true] small{display:block;font-weight:400;color:var(--muted);opacity:1}.mode small::first-letter{text-transform:uppercase}
 .bui .intro [data-go]{width:168px;height:96px;margin-top:4px}}
-.bui.nofs .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px))}.nofs .fs{display:none}
+.nofs .fs,.bz .dk,.bz .legend[hidden]{display:none}.nofs:not(.demo,.embed) .dk{display:grid}.nofs .legend{top:max(64px,calc(env(safe-area-inset-top) + 54px));background:var(--surface);animation:dsl .2s}
 @media (pointer:fine){.touch-only{display:none}}@media (pointer:coarse){.fine-only,.bui .rk kbd{display:none}}
-@keyframes dsc{from{opacity:0}}@media (prefers-reduced-motion:reduce){.sticker,.count,.tip,.mode small{animation:none}}
+@keyframes dsc{from{opacity:0}}@keyframes dsl{from{opacity:0;margin-top:-8px}}@media (prefers-reduced-motion:reduce){.sticker,.count,.tip,.mode small,.nofs .legend{animation:none}}
 .stk{display:none}
 @media ${PHONE}{.stk{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));display:block;width:116px;height:116px;border:2.5px solid var(--line);border-radius:50%;background:color-mix(in srgb,var(--surface) 55%,transparent);touch-action:none}
 .stk::before{content:"";position:absolute;inset:-28px;border-radius:50%}
@@ -301,6 +301,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <div class="banner" data-banner><b></b><span></span></div>
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO</div>
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
+<button class="bui-icon-key dk" type="button" data-dir aria-label="Directions" aria-expanded="false" aria-controls="bz-dir">${svg("info")}</button>
 <button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause (Esc or P)" title="Esc · P · Pause">${svg("pause")}<span>PAUSE</span></button>
 <div class="stk" data-stk aria-hidden="true"><i></i></div>
 <div class="pad" data-pad>
@@ -315,6 +316,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><div class="cx"><button class="bui-key" type="button" data-tune aria-expanded="false" aria-controls="bz-tune" title="Intensity levers: game speed, tank speed, fire rate…">${svg("tune")}TUNE</button><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div></div>
 <section class="tune bui-card" id="bz-tune" data-tune-panel hidden aria-labelledby="bz-tune-t"><header><b id="bz-tune-t">TUNE</b><small>PACE &amp; CHAOS · THIS DEVICE</small><button class="bui-key" type="button" data-tune-x>DONE</button></header><div data-tune-rows></div><p class="note">Plays in SOLO, PLATOON and PRACTICE on this device. Online matches keep the defaults.</p><code data-tune-json></code><div class="tk"><button class="bui-key" type="button" data-tune-reset>RESET</button><button class="bui-key" type="button" data-tune-copy>COPY SETTINGS</button></div></section>
 <div class="over" data-over hidden></div>
+<div class="legend" id="bz-dir" hidden><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
 <div class="bui-overlay ov" data-ov hidden role="dialog"></div>`;
   root.append(style, wrap);
   const $ = <T extends Element>(s: string) => wrap.querySelector<T>(s)!;
@@ -1656,16 +1658,24 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // ---------- Match flow ----------
   // The three modes and their lines (each key's description; on a phone, the picked one's caption).
   const MODES = [["solo", "every tank for itself"], ["platoon", "you + 3 wingmen vs 2 platoons"], ["practice", "learn the keys, with tips"]] as const;
-  const kicker = () => `BATTLEFIELD · ${practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL"}`;
+  const kicker = () => (practice ? "PRACTICE" : platoon ? "PLATOONS" : "FREE FOR ALL");
+  // Directions (phones, .nofs): a key in the top-left row opens the card; it flashes open at START and
+  // closes inside the countdown. Escape or a tap elsewhere closes it; it never pauses the match.
+  // Desktop: the card shows on the start screen, as before.
+  const dirKey = $<HTMLButtonElement>("[data-dir]"), dirCard = $<HTMLElement>("#bz-dir"), keyed = () => wrap.classList.contains("nofs");
+  const dir = (on: boolean) => ((dirCard.hidden = !on), dirKey.setAttribute("aria-expanded", "" + on));
+  dirKey.addEventListener("click", () => dir(dirCard.hidden as boolean), { signal: e.signal });
+  addEventListener("keydown", (ev) => keyed() && !dirCard.hidden && ev.code === "Escape" && (ev.stopPropagation(), dir(false), dirKey.focus()), { capture: true, signal: e.signal });
+  wrap.addEventListener("pointerdown", (ev) => keyed() && !dirKey.contains(ev.target as Node) && !dirCard.contains(ev.target as Node) && dir(false), { signal: e.signal });
   function intro() {
     state = "intro";
     G[TILE_IN] = 0;
     wrap.classList.add("pre");
     over.hidden = false;
     over.classList.add("intro");
+    dir(!keyed());
     const pick = practice ? 2 : +platoon;
-    over.innerHTML = `<div class="legend"><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
-<div class="sticker">${BADGE}<span data-kick>${kicker()}</span><b>BLITZ<em>!</em></b></div>
+    over.innerHTML = `<div class="sticker" role="img" aria-label="Battlefield Blitz">${BADGE}<b>BLITZ<em>!</em></b><span data-kick>${kicker()}</span></div>
 <div class="modes bui-seg" role="group" aria-label="Mode">${MODES.map(([m, d], k) => `<button class="mode" type="button" data-mode="${m}" aria-pressed="${k === pick}" aria-describedby="bz-${m}" style="--i:${k}"><b>${m.toUpperCase()}</b><small id="bz-${m}" aria-hidden="true">${d}</small></button>`).join("")}</div>
 ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${tuneChanged() > 1 ? "S" : ""} CHANGED · PRACTICE → TUNE</p>` : ""}
 <button class="bui-sticker-key bui-call" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
@@ -1686,6 +1696,8 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
   }
   function countdown() {
     state = "count";
+    dir(keyed());
+    setTimeout(dir, 1200, false);
     over.classList.remove("intro");
     G[CNT] = 2.4;
     G[RES] = 0;
