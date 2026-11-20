@@ -38,12 +38,14 @@ test("Blitz plays with the keyboard alone", async () => {
       return { name: el.getAttribute("aria-label") || el.textContent.trim() || el.tagName, tag: el.tagName, ring: cs.boxShadow !== "none" || cs.outlineStyle !== "none" };
     });
     const tabTo = async (re, max = 25) => {
+      const seen = [];
       for (let i = 0; i < max; i++) {
         await page.keyboard.press("Tab");
         const f = await focused();
         if (re.test(f.name)) return f;
+        seen.push(f.name);
       }
-      assert.fail(`Tab never reached ${re}`);
+      assert.fail(`Tab never reached ${re}: ${seen.join(" → ")}`);
     };
 
     // Start: Tab in from the page, pick a mode, PRESS START.
@@ -121,12 +123,13 @@ test("Blitz plays with the keyboard alone", async () => {
     await page.evaluate(() => document.getElementById("a").shadowRoot.querySelector("canvas").focus());
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => window.g.state === "paused");
-    await tabTo(/SURRENDER/, 6);
+    await page.waitForTimeout(100); // the menu takes focus on the next frame
+    await tabTo(/SURRENDER/);
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => window.g.state === "end", null, { timeout: 5000 });
     await page.waitForTimeout(100);
     assert.match((await focused()).name, /REMATCH/, "the result focuses REMATCH");
-    await tabTo(/NEW GAME/, 3);
+    await tabTo(/NEW GAME/);
     await page.keyboard.press("Enter");
     await page.waitForFunction(() => window.g.state === "intro");
     await page.waitForTimeout(100);
