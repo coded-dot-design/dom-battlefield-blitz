@@ -9,8 +9,17 @@ const xml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const tag = (html, re) => [...html.matchAll(/<(?:meta|link)\b[^>]*>/g)].map((m) => m[0]).find((t) => re.test(t));
 const attr = (t, name) => unescape(t?.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? "").replace(/\s+/g, " ").trim();
 
-/** Write the three files into `out` for a site served at `home` (absolute, ending in /). Returns the listed pages. */
+/** A staging build (PUBLIC_DEPLOY_TARGET=staging: Cloudflare staging and PR previews): every page noindex, nofollow. */
+export const STAGING = process.env.PUBLIC_DEPLOY_TARGET === "staging";
+export const STAGING_NOINDEX = '<meta name="robots" content="noindex, nofollow">';
+
+/** Write the three files into `out` for a site served at `home` (absolute, ending in /). Returns the listed pages.
+ *  Staging: robots.txt disallows every crawler, and there is no sitemap.xml or llms.txt. */
 export function writeDiscovery(out, home, name) {
+  if (STAGING) {
+    writeFileSync(join(out, "robots.txt"), "User-agent: *\nDisallow: /\n");
+    return [];
+  }
   const files = [];
   const walk = (dir) => readdirSync(dir).forEach((n) => { const f = join(dir, n); if (statSync(f).isDirectory()) walk(f); else if (f.endsWith(".html")) files.push(f); });
   walk(out);
