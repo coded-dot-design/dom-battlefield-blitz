@@ -12,6 +12,11 @@ import { FAMILY_LINE, GROUPS, PAGES, SELF, hidden } from "../site/src/sitemap.mj
 const root = resolve("artifacts/pages");
 const PREFIX = "";
 if (!existsSync(join(root, "index.html"))) throw Error("Build the site first: npm run site:build");
+// The not-found page (site/src/pages/404.astro): 404.html at the root, noindex, a key home.
+{
+  const nf = readFileSync(join(root, "404.html"), "utf8");
+  assert.ok(/<meta name="robots" content="noindex/.test(nf) && nf.includes('href="/"'), "404.html is noindex and links home");
+}
 // Discovery files (scripts/discovery.mjs): robots.txt names the sitemap; the sitemap and llms.txt list the
 // indexable pages (home, /play/, /play/multi/) and nothing that is noindex or canonical elsewhere.
 {

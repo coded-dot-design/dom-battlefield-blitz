@@ -14,8 +14,9 @@ import { ldJson } from '../schema';
 // jsonld: the page's structured data (site/src/schema.ts), facts already on the page only.
 const { title, description, page = 'home', app = false, jsonld } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
-// Staging and PR previews (Cloudflare, PUBLIC_DEPLOY_TARGET=staging) stay out of search.
-const noindex = import.meta.env.PUBLIC_DEPLOY_TARGET === 'staging';
+// Staging and PR previews (Cloudflare, PUBLIC_DEPLOY_TARGET=staging) stay out of search, and so does a page
+// that asks (noindex: the not-found page).
+const noindex = Astro.props.noindex || import.meta.env.PUBLIC_DEPLOY_TARGET === 'staging';
 const consent = consentSnippet(import.meta.env); // '' when no analytics id is set: nothing ships
 const nav = [
   ['home', 'Blitz', base()],

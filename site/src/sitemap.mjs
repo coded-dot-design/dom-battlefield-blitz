@@ -43,5 +43,7 @@ export const PAGES = [
 export const HIDDEN = [
   // The old multiplayer address: a redirect to play/multi/ (kept for shared links).
   { match: /^play\/two\/$/, why: "redirect to play/multi/" },
+  // The not-found page the host serves for a missing path: noindex.
+  { match: /^404\.html$/, why: "the not-found page: noindex" },
 ];
 export const hidden = (path) => HIDDEN.some((h) => h.match.test(path));
