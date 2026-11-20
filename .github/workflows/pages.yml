@@ -27,20 +27,14 @@ jobs:
       # Landing page (/), the game (/play/) and the drop-in (/blitz.js).
       - run: npm run site:build
         env:
-          # Custom domain (defaults here; repo variables override): SITE_URL=https://battlefieldblitz.domvirus.com and SITE_BASE=/
-          # (unset, the site builds for coded-dot-design.github.io/dom-battlefield-blitz/).
-          SITE_URL: ${{ vars.SITE_URL || 'https://battlefieldblitz.domvirus.com' }}
+          # Custom domain (defaults here; repo variables override): SITE_URL=https://battlefieldblitz.fzlt.games and SITE_BASE=/
+          SITE_URL: ${{ vars.SITE_URL || 'https://battlefieldblitz.fzlt.games' }}
           SITE_BASE: ${{ vars.SITE_BASE || '/' }}
           # GA4 + PostHog behind the consent banner (site/src/lib/analytics). Public ids, so repository
           # Variables, not Secrets. Unset = off: the build ships no analytics code.
           PUBLIC_GA4_ID: ${{ vars.PUBLIC_GA4_ID }}
           PUBLIC_POSTHOG_KEY: ${{ vars.PUBLIC_POSTHOG_KEY }}
           PUBLIC_POSTHOG_HOST: ${{ vars.PUBLIC_POSTHOG_HOST }}
-      # Pages reads the custom domain from a CNAME file in the output: its host comes from SITE_URL.
-      - name: CNAME for the custom domain
-        run: node -e 'console.log(new URL(process.env.SITE_URL).host)' > artifacts/pages/CNAME && cat artifacts/pages/CNAME
-        env:
-          SITE_URL: ${{ vars.SITE_URL || 'https://battlefieldblitz.domvirus.com' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: artifacts/pages

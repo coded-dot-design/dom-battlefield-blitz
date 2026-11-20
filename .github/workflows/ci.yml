@@ -25,7 +25,7 @@ jobs:
       - run: npm run test:lockstep
       # The step allocates nothing: 20,000 busy steps, minor GC <= 1 (its own process).
       - run: npm test
-      # The site (landing, /play/, /blitz.js), built for github.io; pages.yml deploys it.
+      # The site (landing, /play/, /blitz.js), built for battlefieldblitz.fzlt.games at /.
       - run: npm run site:build
       - run: npm run test:site
   tag-version:

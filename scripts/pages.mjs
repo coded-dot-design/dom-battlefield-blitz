@@ -1,5 +1,5 @@
 // After `astro build`: add the drop-in and check the site links up.
-// artifacts/pages is exactly what GitHub Pages serves:
+// artifacts/pages is exactly what the host (Cloudflare Pages) serves:
 //   /           landing page   (site/src/pages/index.astro)
 //   /play/      the game       (site/src/pages/play/index.astro, dist/blitz.mjs)
 //   /blitz.js   the drop-in    (dist/blitz.js, the committed build)
@@ -14,11 +14,11 @@ if (!existsSync(join(out, "index.html"))) throw Error("Run astro build first (np
 cpSync("dist/blitz.js", join(out, "blitz.js"));
 
 // Search engines and LLM readers: robots.txt, sitemap.xml, llms.txt (indexable pages only).
-const home = new URL((process.env.SITE_BASE || "/dom-battlefield-blitz").replace(/\/?$/, "/"), process.env.SITE_URL || "https://coded-dot-design.github.io").href;
+const home = new URL((process.env.SITE_BASE || "/").replace(/\/?$/, "/"), process.env.SITE_URL || "https://battlefieldblitz.fzlt.games").href;
 console.log(`Discovery: ${writeDiscovery(out, home, "Battlefield Blitz").length} pages in sitemap.xml and llms.txt`);
 
 // Every local href/src in the built pages must resolve to a file.
-const BASE = `${(process.env.SITE_BASE || "/dom-battlefield-blitz").replace(/\/$/, "")}/`;
+const BASE = `${(process.env.SITE_BASE || "/").replace(/\/$/, "")}/`;
 const pages = [];
 const walk = (dir) => readdirSync(dir).forEach((n) => {
   const f = join(dir, n);

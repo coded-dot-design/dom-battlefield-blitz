@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Moved to `fizlet/battlefield-blitz`, a private repository; all rights reserved.** Every version
+  up to and including 1.0.1 was published under the MIT licence, and copies of those stay MIT for
+  whoever has one. From here on the code is "Copyright (c) Chris Cooley. All rights reserved."
+  (`LICENSE`; package.json `"license": "UNLICENSED"`, package name `battlefield-blitz`). The site
+  builds for `https://battlefieldblitz.fzlt.games/` at `/` by default (Cloudflare Pages serves the
+  custom domain, so the Pages workflow writes no `CNAME`), links follow the new names (engine
+  `fizlet/fzlt`, Battlefield on `battlefield.fzlt.games`), and `scripts/sync.mjs` reads `FIZLET_DIR`
+  (default `../fizlet`). `vendor/fizlet` is re-synced from the same engine commit: only its
+  `ORIGIN.json` provenance changes.
+
 - **Accessible play (roadmap E14).** Blitz plays with the keyboard alone, passes axe-core with no
   serious or critical issues, and tells screen readers how the match is going. No gameplay change:
   `test:replay` plays the 0.8.2 matches value for value, `test:lockstep` 0 desyncs, the input word

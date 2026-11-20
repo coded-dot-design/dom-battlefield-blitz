@@ -1,27 +1,26 @@
 # Battlefield Blitz
 
-**Free-for-all tank chaos. The arcade version of [DOM Battlefield](https://battlefield.domvirus.com/).**
+**Free-for-all tank chaos. The arcade version of [DOM Battlefield](https://battlefield.fzlt.games/).**
 
 Every tank for itself. Parachute in, grab the blinking power tiles, call airstrikes, dodge the
 mines. Die, drop back in. Most kills in three minutes wins. Drop it onto any website and the page
 itself becomes the arena: shells knock your headings around, treads flatten them, and Escape gives
 the page back exactly as it was.
 
-- **Play:** https://battlefieldblitz.domvirus.com/play/
-- **About:** https://battlefieldblitz.domvirus.com/
-- **Drop-in:** `<script src="https://battlefieldblitz.domvirus.com/blitz.js" defer></script>`
+- **Play:** https://battlefieldblitz.fzlt.games/play/
+- **About:** https://battlefieldblitz.fzlt.games/
+- **Drop-in:** `<script src="https://battlefieldblitz.fzlt.games/blitz.js" defer></script>`
 
-Until the domain is live, the site is at https://coded-dot-design.github.io/dom-battlefield-blitz/ ,
-and the old Battlefield copy (`https://coded-dot-design.github.io/dom-battlefield/blitz/blitz.js`)
-keeps working for existing embeds.
+The old Battlefield copy (`https://battlefield.fzlt.games/blitz/blitz.js`) keeps working for
+existing embeds; the old addresses redirect here.
 
 Blitz is part of the DOM Battlefield brand: its own site (`site/`, Astro, dev only) wears the
 Battlefield styling and the Board UI kit. `npm run site:build` builds it into `artifacts/pages`;
-`npm run test:site` checks it. The footer's site map comes from `site/src/sitemap.mjs`: add a new page there (or under `HIDDEN`) and the footer lists it; the build fails on a page that is in neither. Custom domain: set the repo variables `SITE_URL=https://battlefieldblitz.domvirus.com`
-and `SITE_BASE=/`, then the custom domain in Settings → Pages; the Pages build writes `CNAME` from
-`SITE_URL`. This repo is also the game code. It is built on [Fizlet](https://github.com/coded-dot-design/fizlet)
+`npm run test:site` checks it. The footer's site map comes from `site/src/sitemap.mjs`: add a new page there (or under `HIDDEN`) and the footer lists it; the build fails on a page that is in neither. Hosting: Cloudflare Pages on `battlefieldblitz.fzlt.games`
+(Cloudflare serves the custom domain, so there is no `CNAME` file); the build defaults to
+`SITE_URL=https://battlefieldblitz.fzlt.games` and `SITE_BASE=/`, and the build env overrides them per target. This repo is also the game code. It is built on [Fizlet](https://github.com/fizlet/fzlt)
 (the engine, snapshotted in `vendor/fizlet/` with provenance) and draws tanks with the art in
-`src/sherman-sprites.ts`, taken from [Sherman Bytes](https://github.com/coded-dot-design/sherman-bytes) 0.5.2. No runtime dependencies.
+`src/sherman-sprites.ts`, taken from [Sherman Bytes](https://github.com/fizlet/sherman-bytes) 0.5.2. No runtime dependencies.
 
 ## The game
 
@@ -129,7 +128,7 @@ game.start();             // intro → countdown → match
 ## Two players (lockstep, demo)
 
 Every peer runs the same match from the room's seed; only inputs travel, 12 bytes per player per
-frame, through [`@fzlt/core/presence`](https://github.com/coded-dot-design/fizlet) and a
+frame, through [`@fzlt/core/presence`](https://github.com/fizlet/fzlt) and a
 room server that speaks the `fizlet-rooms` protocol (ours is in-house: a Cloudflare Worker +
 Durable Object, gated by an invite code; to run your own, see
 [Build your own room server](https://fizlet.com/guides/build-your-own-room-server/)).
@@ -167,4 +166,5 @@ and tags `vX.Y.Z`. The DOM Battlefield site then pins it with `node scripts/sync
 
 ## Licence
 
-MIT © Chris Cooley / coded.design
+Copyright (c) Chris Cooley. All rights reserved. Private repository (`fizlet/battlefield-blitz`); versions up to 1.0.1
+were published under MIT (see CHANGELOG).
