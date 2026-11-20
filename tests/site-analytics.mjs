@@ -1,5 +1,5 @@
-// GA4 + PostHog, consent first (site/src/lib/analytics, the astro-engine kit), against the built site
-// (artifacts/pages). Adapted from astro-engine#34 / dom-virus#38.
+// GA4 + PostHog, consent first (site/src/lib/analytics, the Astro page engine kit), against the built site
+// (artifacts/pages). Adapted from the Astro page engine kit / dom-virus#38.
 // 1. The build: with no PUBLIC_GA4_ID / PUBLIC_POSTHOG_KEY (CI and PR builds), no page or script carries
 //    analytics code; with an id, every page carries the consent runtime exactly once.
 // 2. In Chromium, on the real built pages with the runtime added (test ids, vendor hosts intercepted, so

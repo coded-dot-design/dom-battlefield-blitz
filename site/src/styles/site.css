@@ -401,7 +401,7 @@ a.bui-sticker-key {
 .foot-legal button::before {
   content: "· ";
 }
-/* Consent banner (site/src/lib/analytics, the astro-engine kit): the Board UI tokens, as fizlet.com. */
+/* Consent banner (site/src/lib/analytics, the Astro page engine kit): the Board UI tokens, as fizlet.com. */
 :root {
   --cc-bg: var(--surface);
   --cc-fg: var(--ink);

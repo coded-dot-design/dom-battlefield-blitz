@@ -1,5 +1,5 @@
 // This site's settings for the analytics-only consent pattern (the other files in this folder are the
-// astro-engine kit, kit/src/lib/analytics, copied as is). GA4 + PostHog load only after Accept, and only
+// Astro page engine kit, kit/src/lib/analytics, copied as is). GA4 + PostHog load only after Accept, and only
 // on a build with PUBLIC_GA4_ID or PUBLIC_POSTHOG_KEY set (repository Variables): with neither set this
 // returns '' and the pages ship no analytics code at all.
 import { resolveAnalytics } from "./config.mjs";

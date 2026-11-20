@@ -527,7 +527,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   }
   // The step's number registers. A double passed to, or returned from, a call V8 doesn't inline is
   // boxed (a new heap number each time), so the step's hot helpers take and give their numbers here
-  // (fizlet-engine lesson K4). Each helper has its own slots, so a nested call never clobbers them.
+  // (Fizlet factory lesson K4). Each helper has its own slots, so a nested call never clobbers them.
   const F = new Float64Array(21);
   const BX = 0, BY = 1, BR = 2; // blockedF: the point and the radius
   const TF = 3, TT = 4, TM = 5, TO = 6; // turnF: from, to, max turn → out
