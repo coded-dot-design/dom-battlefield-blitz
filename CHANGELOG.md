@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- **Movement on `@fzlt/core/steer`, the practice coach's steps on `@fzlt/core/coach`** (fizlet-engine roadmap G13).
+  - Steer runs every tank's drive: your stick and net play's input word (`drive`), bots going for their goal
+    (`seek`, pace 0.85), wingmen holding their slot (`arriveGoal`), practice MOVERs (`wander`, pace 0.55). Blitz
+    still picks the goals and keeps the stuck-rethink check. A tank keeps its own x, y and heading; each move
+    copies them into its steer slot and back. The steer is built in `roster()` and `resize()` (it reads scale and
+    arena at build) and again when TUNE's TANK SPEED changes, never in a step. The numbers are named (`MOVE`:
+    turn 7, stop 16, the arrive band 14 / 140 / 1.05 / 0.8; `WANDER_PACE`, `CHASE_PACE`); speed is TANK SPEED.
+  - Blitz's `dist` is gone: lengths are steer's exported `hypot` (same bits as `Math.hypot`, no allocation).
+  - The coach: `tour` counts the steps and the tricks (every 6 s), so `cStep`, `coachShown` and the coach clock
+    are gone; `coach:step` plays the power cue. Same steps, tricks and text; the card stays Blitz's own (TUNE and
+    END PRACTICE on it), so no design change.
+  - Same matches: `test:replay` plays the 0.8.2 matches value for value (seeds 41, 42, 7 platoons, Chrome 153);
+    `test:lockstep` 0 desyncs, 33 kills as before; `npm test` (zero-GC) green; `test:browser` checks the coach's
+    step 1 and that the FIRE step rings the FIRE key.
+  - Sizes (gzip): `blitz.js` 46,771 → 47,761, `blitz.mjs` 46,886 → 47,918, `blitz-net.mjs` 48,758 → 49,757
+    (+990 / +1,032 / +999: the two bricks, less the game code they replace). Budgets 46,784 / 46,912 / 48,768 →
+    47,808 / 47,936 / 49,792.
+
 ## 1.0.1 - 2026-11-01
 
 What's in it: the phone start screen, laid out on purpose (#41), and the mode line readable over the
