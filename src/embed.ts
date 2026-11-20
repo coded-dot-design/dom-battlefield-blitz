@@ -1,6 +1,6 @@
 /**
  * Battlefield Blitz, drop-in. One script tag turns any page into the arena:
- *   <script src="https://coded-dot-design.github.io/dom-battlefield/blitz/blitz.js" defer></script>
+ *   <script src="https://battlefield.fzlt.games/blitz/blitz.js" defer></script>
  * Options as data attributes on that tag:
  *   data-easter-egg="true"   stay hidden until the Konami code (desktop) or a hold-then-tap on any
  *                            [data-blitz-trigger] element (phones). Default: a PLAY BLITZ key.

@@ -21,7 +21,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 export const ROOMS_URL = "https://fizlet-rooms.fizlet.workers.dev";
-export const PLAY_URL = "https://battlefieldblitz.domvirus.com/play/multi/";
+export const PLAY_URL = "https://battlefieldblitz.fzlt.games/play/multi/";
 export const MARK = "<!-- play-pass -->";
 const LABEL = "play-pass", APPROVED = "approved", BOT = "github-actions[bot]";
 const WRITERS = new Set(["admin", "maintain", "write"]);

@@ -42,7 +42,7 @@ const snippet = consentSnippet({ PUBLIC_GA4_ID: "G-XXXXXXXXXX", PUBLIC_POSTHOG_K
 const strip = (html) => html.replace(/<script>\(function analyticsRuntime[\s\S]*?<\/script><script>document\.documentElement\.setAttribute\("data-consent"[\s\S]*?<\/script>/, "");
 const withRuntime = (html) => strip(html).replace("</body>", `${snippet}</body>`);
 const home = readFileSync(resolve(out, "index.html"), "utf8");
-const base = new URL(home.match(/<link rel="canonical" href="([^"]+)"/)[1]).pathname; // "/" or "/dom-battlefield-blitz/"
+const base = new URL(home.match(/<link rel="canonical" href="([^"]+)"/)[1]).pathname; // "/" (the default SITE_BASE) or a SITE_BASE prefix
 
 const browser = await chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 async function open(path = "", { gpc = false, viewport = { width: 390, height: 844 }, phone = false } = {}) {

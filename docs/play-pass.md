@@ -6,7 +6,7 @@ uses it.
 
 ## Ask for a pass (1 hour)
 
-1. Open an issue with the **[Request a multiplayer pass](https://github.com/coded-dot-design/dom-battlefield-blitz/issues/new?template=play-pass.yml)**
+1. Open an issue with the **[Request a multiplayer pass](https://github.com/fizlet/battlefield-blitz/issues/new?template=play-pass.yml)**
    form (preferred time, mode, the house rules). It gets the `play-pass` label: the open `play-pass`
    issues are the queue.
 2. A maintainer adds the `approved` label. Only a label added by someone with write access counts.

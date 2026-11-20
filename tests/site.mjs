@@ -1,5 +1,5 @@
 // Blitz site (GitHub Pages): landing page, the game at /play/ and the drop-in at /blitz.js.
-// Run after `npm run site:build`. Serves artifacts/pages at /dom-battlefield-blitz/.
+// Run after `npm run site:build`. Serves artifacts/pages at / (the default SITE_BASE).
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
@@ -10,7 +10,7 @@ import { checkHeroScrim } from "./hero-scrim.mjs";
 import { FAMILY_LINE, GROUPS, PAGES, SELF, hidden } from "../site/src/sitemap.mjs";
 
 const root = resolve("artifacts/pages");
-const PREFIX = "/dom-battlefield-blitz";
+const PREFIX = "";
 if (!existsSync(join(root, "index.html"))) throw Error("Build the site first: npm run site:build");
 // Discovery files (scripts/discovery.mjs): robots.txt names the sitemap; the sitemap and llms.txt list the
 // indexable pages (home, /play/, /play/multi/) and nothing that is noindex or canonical elsewhere.
@@ -52,8 +52,8 @@ try {
   assert.equal(await lp.locator("h1").count(), 1, "one h1");
   assert.match(await lp.locator("h1").textContent(), /Battlefield Blitz/);
   assert.match(await lp.locator(".bz-hero .eyebrow").textContent(), /BLITZ VERSION/);
-  assert.match(await lp.locator('link[rel="canonical"]').getAttribute("href"), /^https:\/\/.+\/dom-battlefield-blitz\/$/);
-  assert.match(await lp.locator('meta[property="og:image"]').getAttribute("content"), /^https:\/\/.+\/dom-battlefield-blitz\/shots\/og\.png$/);
+  assert.match(await lp.locator('link[rel="canonical"]').getAttribute("href"), /^https:\/\/battlefieldblitz\.fzlt\.games\/$/);
+  assert.match(await lp.locator('meta[property="og:image"]').getAttribute("content"), /^https:\/\/battlefieldblitz\.fzlt\.games\/shots\/og\.png$/);
   // Structured data: the site and the game, from facts on the page.
   const ld = JSON.parse(await lp.locator('script[type="application/ld+json"]').textContent());
   assert.deepEqual(ld["@graph"].map((g) => g["@type"]), ["WebSite", "VideoGame"]);
@@ -61,7 +61,7 @@ try {
   await lp.waitForFunction(() => window.blitzDemo?.world.tanks.filter((t) => t.alive).length >= 5, null, { timeout: 8000 });
   assert.equal(await lp.evaluate(() => window.blitzDemo.world.tanks.some((t) => t.you)), false, "the hero battle is all bots");
   assert.equal(new URL(await lp.locator(".start-key").getAttribute("href"), base).pathname, `${PREFIX}/play/`);
-  assert.ok(await lp.locator('a[href="https://battlefield.domvirus.com/"]').count() > 0, "links to the original");
+  assert.ok(await lp.locator('a[href="https://battlefield.fzlt.games/"]').count() > 0, "links to the original");
   assert.ok(await lp.locator('a[href="https://domvirus.com/"]').count() > 0, "links back to DOM VIRUS");
   assert.match(await lp.locator("#drop pre").first().textContent(), /\/blitz\.js/);
   await lp.setViewportSize({ width: 390, height: 844 });

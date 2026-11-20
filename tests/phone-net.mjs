@@ -17,7 +17,7 @@ import { readFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 import { join, extname, resolve } from "node:path";
 import { chromium } from "playwright";
 
-const root = resolve(process.env.ROOT ?? "artifacts/pages"), PREFIX = "/dom-battlefield-blitz", SHOTS = process.env.SHOTS, LOOSE = !!process.env.LOOSE;
+const root = resolve(process.env.ROOT ?? "artifacts/pages"), PREFIX = "", SHOTS = process.env.SHOTS, LOOSE = !!process.env.LOOSE;
 if (!existsSync(join(root, "index.html"))) throw Error("Build the site first: npm run site:build");
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json" };

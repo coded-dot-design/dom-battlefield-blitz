@@ -11,7 +11,7 @@ import { readFileSync, existsSync, statSync } from "node:fs";
 import { join, extname, resolve } from "node:path";
 import { chromium } from "playwright";
 
-const root = resolve("artifacts/pages"), PREFIX = "/dom-battlefield-blitz";
+const root = resolve("artifacts/pages"), PREFIX = "";
 if (!existsSync(join(root, "index.html"))) throw Error("Build the site first: npm run site:build");
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp" };
 const server = createServer((req, res) => {

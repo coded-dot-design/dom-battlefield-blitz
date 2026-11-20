@@ -9,7 +9,7 @@ body:
         A pass lets one device join a Blitz multiplayer room for **1 hour**. A maintainer approves the
         request, then a bot posts your pass here as a comment. It locks to the **first device** that
         uses it, so use it soon after it arrives. Everyone in the match needs their own pass: send your
-        friends here too. How it works: [docs/play-pass.md](https://github.com/coded-dot-design/dom-battlefield-blitz/blob/main/docs/play-pass.md).
+        friends here too. How it works: [docs/play-pass.md](https://github.com/fizlet/battlefield-blitz/blob/main/docs/play-pass.md).
   - type: input
     id: when
     attributes:

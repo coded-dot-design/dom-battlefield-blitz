@@ -26,7 +26,6 @@ export function homeLd(site: URL | undefined, description: string): Ld {
         gamePlatform: "Web browser",
         applicationCategory: "Game",
         softwareVersion: VERSION,
-        license: "https://opensource.org/licenses/MIT",
         isBasedOn: { "@type": "VideoGame", name: "DOM Battlefield", url: BATTLEFIELD },
         potentialAction: { "@type": "PlayAction", target: url(site, "play/") },
       },
