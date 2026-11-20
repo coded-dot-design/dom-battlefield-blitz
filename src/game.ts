@@ -70,6 +70,10 @@ const TAU = Math.PI * 2;
  *   tank    drive speed, px/s at the 1.4 scale
  *   turn    turret (aim) turn rate, × (players' and bots')
  *   fire    cannon fire rate, × (the cooldown ÷ this; everyone)
+ *   botfire bots' cannon fire rate, × on top of fire (theirs only: you vs them)
+ *   spread  bots' shot scatter, × (0.12 rad); higher misses more
+ *   range   how close a bot gets before it opens fire, px (460)
+ *   hurt    damage a cannon shell does to you, × (1 hit of 5 armour)
  *   shell   cannon shell speed, px/s (same reach: a slower shell lives longer)
  *   respawn seconds wrecked before the parachute
  *   bots    rival bots in a SOLO match (next match)
@@ -80,13 +84,17 @@ const TUNE = [
   ["tank", "TANK SPEED", "how fast every tank drives", 150, 80, 220, 5, " px/s"],
   ["turn", "TURRET TURN", "how fast turrets swing onto a target", 1, 0.4, 1.5, 0.05, "×"],
   ["fire", "FIRE RATE", "cannon shots per second, everyone", 1, 0.4, 1.5, 0.05, "×"],
+  ["botfire", "BOT RELOAD", "bots' fire rate only, on top of FIRE RATE", 1, 0.3, 1.5, 0.05, "×"],
+  ["spread", "BOT SPREAD", "bots' aim scatter: higher misses more", 1, 0, 4, 0.25, "×"],
+  ["range", "BOT RANGE", "how close bots get before they open fire", 460, 200, 700, 20, " px"],
+  ["hurt", "DAMAGE TO YOU", "per cannon hit on your tank (5 armour)", 1, 0.25, 2, 0.25, "×"],
   ["shell", "SHELL SPEED", "slower shells are easier to dodge", 600, 300, 900, 25, " px/s"],
   ["respawn", "RESPAWN", "time out after you are wrecked", 2.2, 1, 6, 0.1, " s"],
   ["bots", "SOLO BOTS", "rivals in a SOLO match (next match)", 7, 1, 10, 1, ""],
   ["air", "BOT AIRSTRIKES", "how often bots call strikes in", 1, 0, 2, 0.1, "×"],
 ] as const;
 export type TuneKey = (typeof TUNE)[number][0];
-const U_SPEED = 0, U_TANK = 1, U_TURN = 2, U_FIRE = 3, U_SHELL = 4, U_RESPAWN = 5, U_BOTS = 6, U_AIR = 7;
+const U_SPEED = 0, U_TANK = 1, U_TURN = 2, U_FIRE = 3, U_BOTFIRE = 4, U_SPREAD = 5, U_RANGE = 6, U_HURT = 7, U_SHELL = 8, U_RESPAWN = 9, U_BOTS = 10, U_AIR = 11;
 const tuneDefaults = () => Object.fromEntries(TUNE.map((r) => [r[0], r[3]])) as Record<TuneKey, number>;
 /** A lever's value on its slider's grid, clamped to its range. */
 const tuneFit = (k: number, v: number) => {
@@ -246,7 +254,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .tune input:focus-visible{outline:3px solid var(--k-sys-ink);outline-offset:1px;border-radius:6px}
 .tune .note{margin:0;font-size:10px;line-height:1.4;color:var(--muted)}
 .tune code{display:block;padding:6px 8px;font:10px/1.45 ui-monospace,monospace;word-break:break-all;color:var(--ink);background:var(--raised);border:1px solid var(--line);border-radius:6px;user-select:text;-webkit-user-select:text}
-.tune .tk{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:0 -14px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--line)}
+.tune .tk{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:0 -14px;padding:10px 14px 14px;background:var(--card);border-top:1px solid var(--line)}.tune .tk [data-tune-share]{grid-column:1/-1}
+.bui .tz{position:absolute;z-index:5;left:max(12px,env(safe-area-inset-left));top:max(58px,calc(env(safe-area-inset-top) + 48px));width:40px;height:40px;min-height:0}.tz[hidden]{display:none}.dev .tune{top:max(106px,calc(env(safe-area-inset-top) + 96px));max-height:calc(100% - 122px)}
+.bui .tuned button{min-height:0;margin-left:8px;padding:3px 8px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.1em}.bui .ov .devk{min-height:0;padding:7px 10px;font:900 10px/1 ui-monospace,monospace;letter-spacing:.1em}
 .tuned{margin:-14px 0 0;padding:4px 10px;font-size:10px;letter-spacing:.12em;color:var(--rim);background:var(--hurt);border:2px solid var(--rim);border-radius:6px}
 .vs{margin:-18px 0 0;font:900 18px/1 ui-monospace,monospace;letter-spacing:.2em;color:var(--k-sys-ink)}
 .bui :is(.fs,.dk){position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
@@ -302,6 +312,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 <div class="tip" data-tip hidden>AIRSTRIKE · <span class="fine-only">CLICK</span><span class="touch-only">TAP</span> WHERE THE BOMBS GO<span class="fine-only"> · ENTER: ON YOUR TARGET</span></div>
 <button class="bui-icon-key fs" type="button" data-fs aria-label="Full screen" title="Full screen">${svg("full")}</button>
 <button class="bui-icon-key dk" type="button" data-dir aria-label="Directions" aria-expanded="false" aria-controls="bz-dir">${svg("info")}</button>
+<button class="bui-icon-key tz" type="button" data-tune-dev hidden aria-expanded="false" aria-controls="bz-tune" aria-label="Tuning (dev): the gameplay levers" title="Tuning (dev)">${svg("tune")}</button>
 <button class="bui-arcade bui-flag pz" type="button" data-pause aria-label="Pause (Esc or P)" title="Esc · P · Pause">${svg("pause")}<span>PAUSE</span></button>
 <div class="stk" data-stk aria-hidden="true"><i></i></div>
 <div class="pad" data-pad>
@@ -314,7 +325,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
 </div>
 <div class="help fine-only">WASD DRIVE · MOUSE AIM · CLICK FIRE · E LONG SHOT · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC/P PAUSE"}</div>
 <div class="coach" data-coach hidden><span data-cs>1/8</span><b data-ct></b><small data-cm></small><div class="cx"><button class="bui-key" type="button" data-tune aria-expanded="false" aria-controls="bz-tune" title="Intensity levers: game speed, tank speed, fire rate…">${svg("tune")}TUNE</button><button class="bui-arcade bui-attack" type="button" data-cx>END PRACTICE</button></div></div>
-<section class="tune bui-card" id="bz-tune" data-tune-panel hidden aria-labelledby="bz-tune-t"><header><b id="bz-tune-t">TUNE</b><small>PACE &amp; CHAOS · THIS DEVICE</small><button class="bui-key" type="button" data-tune-x>DONE</button></header><div data-tune-rows></div><p class="note">Plays in SOLO, PLATOON and PRACTICE on this device. Online matches keep the defaults.</p><code data-tune-json></code><div class="tk"><button class="bui-key" type="button" data-tune-reset>RESET</button><button class="bui-key" type="button" data-tune-copy>COPY SETTINGS</button></div></section>
+<section class="tune bui-card" id="bz-tune" data-tune-panel hidden aria-labelledby="bz-tune-t"><header><b id="bz-tune-t">TUNE</b><small>PACE · FIRE · CHAOS · THIS DEVICE</small><button class="bui-key" type="button" data-tune-x>DONE</button></header><div data-tune-rows></div><p class="note">Live in SOLO, PLATOON and PRACTICE, mid-match; SOLO BOTS from the next match. Online matches keep the defaults.</p><code data-tune-json></code><div class="tk"><button class="bui-key" type="button" data-tune-share>SHARE LINK</button><button class="bui-key" type="button" data-tune-reset>RESET</button><button class="bui-key" type="button" data-tune-copy>COPY SETTINGS</button></div></section>
 <div class="over" data-over hidden></div>
 <div class="legend" id="bz-dir" hidden><span><b>FIRE</b> fast cannon (it overheats)</span><span><b>LONG</b> lock on, hit across the field</span><span><b>STRIKE</b> tap a spot, the bombs go boom</span><span><b>AUTO · LOCK</b> let the turret aim</span><span><b>STREAKS</b> 2 long · 3 strike · 5 carpet · 8 nuke</span><span><b>CRATES</b> health, ammo, strikes</span></div>
 <div class="bui-overlay ov" data-ov hidden role="dialog"></div>`;
@@ -404,9 +415,29 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   const tuneLoad = (v: unknown) => {
     if (v && typeof v === "object") for (let k = 0; k < TUNE.length; k++) { const x = (v as Record<string, unknown>)[TUNE[k]![0]]; if (x != null) TU[k] = tuneFit(k, Number(x)); }
   };
+  // Tuning (dev): the TUNE key in every local mode. On with ?tune=1 (off: ?tune=0) or the pause menu,
+  // remembered. A shared setup, ?t=fire0.6_hurt0.5 (only the levers off their defaults), replaces the
+  // levers, is saved like the sliders and turns tuning on; the address drops it so a reload keeps edits.
+  let dev = false, linked = false;
   if (tunable)
     try {
       tuneLoad(JSON.parse(localStorage.getItem("blitz:tune") ?? "null"));
+      dev = localStorage.getItem("blitz:dev") === "1";
+      const q = new URLSearchParams(location.search), code = q.get("t"), flag = q.get("tune");
+      if (code != null) {
+        const v: Record<string, string> = {};
+        for (const m of code.matchAll(/([a-z]+)(\d+(?:\.\d+)?)/g)) v[m[1]!] = m[2]!;
+        TU.set(TUNE.map((r) => r[3]));
+        tuneLoad(v);
+        linked = dev = true;
+        if (TUNE.some((r, k) => TU[k] !== r[3])) localStorage.setItem("blitz:tune", JSON.stringify(Object.fromEntries(TUNE.map((r, k) => [r[0], TU[k]!]))));
+        else localStorage.removeItem("blitz:tune");
+        q.delete("t");
+        history.replaceState(history.state, "", `${location.pathname}${q.size ? `?${q}` : ""}${location.hash}`);
+      }
+      if (flag === "1" || flag === "0") dev = flag === "1";
+      if (dev) localStorage.setItem("blitz:dev", "1");
+      else localStorage.removeItem("blitz:dev");
     } catch {}
   tuneLoad(o.tune);
   // Net play: the mode (tanks a side, a 4-seat room the computer backfills, the 2v2 sides). P1's
@@ -680,7 +711,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     for (let k = 0; k < spreads; k++) {
       const s = freeShell();
       if (!s) break;
-      const a = t.ta + (spreads > 1 ? (k - 1) * 0.2 : 0) + (t.you ? (R() - 0.5) * 0.04 : (R() - 0.5) * 0.12);
+      const a = t.ta + (spreads > 1 ? (k - 1) * 0.2 : 0) + (t.you ? (R() - 0.5) * 0.04 : (R() - 0.5) * 0.12 * TU[U_SPREAD]!);
       s.on = true;
       s.rail = false;
       s.tgt = -1;
@@ -695,7 +726,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     t.flash = 0.08;
     if (t.you) cShots++;
     // The cannon is quick; hold it down too long and it overheats (rapid fire never does).
-    t.cool = (t.you ? (t.rapid > 0 ? 0.1 : 0.19) : t.rapid > 0 ? 0.22 : 0.5 + R() * 0.35) / TU[U_FIRE]!;
+    t.cool = (t.you ? (t.rapid > 0 ? 0.1 : 0.19) : (t.rapid > 0 ? 0.22 : 0.5 + R() * 0.35) / TU[U_BOTFIRE]!) / TU[U_FIRE]!;
     if (t.you && t.rapid <= 0 && (t.heat += 0.16) >= 1) {
       t.hot = 1.4;
       ((FQ[0] = t.x), (FQ[1] = t.y - 34), (FQ[2] = W_HOT), (FQ[3] = 2), (FQ[4] = 16), fxPush(FX_WORD));
@@ -789,6 +820,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       ((FQ[0] = 2), (FQ[1] = t.x), (FQ[2] = t.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 18), (FQ[6] = 0.3), (FQ[7] = 4), fxPush(FX_SPAWN));
       return false;
     }
+    if (amount < 0) amount = t.you ? TU[U_HURT]! : 1; // a cannon shell (DAMAGE TO YOU)
     t.hp -= amount;
     t.lastHit = by;
     if (t.you) (G[QUAKE] = Math.min(18, G[QUAKE]! + amount * 2.5)), (buzz += 35 * amount); // worse the harder you're hit
@@ -1131,7 +1163,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
       const aim = Math.atan2(o2.y - t.y, o2.x - t.x);
       (F[TF] = t.ta), (F[TT] = aim), (F[TM] = 4.5 * TU[U_TURN]! * dt), turretTo(t);
       const err = Math.abs(Math.atan2(Math.sin(aim - t.ta), Math.cos(aim - t.ta)));
-      if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && within(o2, t, 460)) fire(t);
+      if (t.cool <= 0 && t.charge <= 0 && err < 0.12 && within(o2, t, TU[U_RANGE]!)) fire(t);
     } else (F[TF] = t.ta), (F[TT] = t.a), (F[TM] = 3 * TU[U_TURN]! * dt), turretTo(t);
   }
   /** What your turret is on: the lock, else auto-aim's pick, else nothing (-1). */
@@ -1452,7 +1484,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
           if (shellHits(s, t)) {
             done = true;
             ((FQ[0] = t.x), (FQ[1] = t.y), (FQ[2] = s.rail ? 1.8 : 1), (FQ[3] = s.rail ? 1 : 4), boomQ());
-            damage(t, s.owner, s.rail ? MAXHP : 1, s.rail ? W_SNIPED : W_BOOM);
+            damage(t, s.owner, s.rail ? MAXHP : -1, s.rail ? W_SNIPED : W_BOOM);
           }
         }
         const b = done ? null : ((F[BX] = nx), (F[BY] = ny), (F[BR] = 2), blockedF());
@@ -1584,8 +1616,9 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
   // Each slider writes one number of TU (the config the step reads), saved on this device. Practice
   // plays it live; SOLO and PLATOON read it at the next match. COPY SETTINGS puts the JSON on the
   // clipboard, to send back the numbers that feel right.
-  const tunePanel = $<HTMLElement>("[data-tune-panel]"), tuneKey = $<HTMLButtonElement>("[data-tune]"), tuneJson = $<HTMLElement>("[data-tune-json]");
-  const copyKey = $<HTMLButtonElement>("[data-tune-copy]");
+  const tunePanel = $<HTMLElement>("[data-tune-panel]"), coachKey = $<HTMLButtonElement>("[data-tune]"), devKey = $<HTMLButtonElement>("[data-tune-dev]"), tuneJson = $<HTMLElement>("[data-tune-json]");
+  const copyKey = $<HTMLButtonElement>("[data-tune-copy]"), shareKey = $<HTMLButtonElement>("[data-tune-share]");
+  let tuneKey = coachKey; // the key that opened the card (focus goes back to it)
   const tuneValues = () => Object.fromEntries(TUNE.map((r, k) => [r[0], TU[k]!])) as Record<TuneKey, number>;
   const tuneChanged = () => TUNE.reduce((n, r, k) => n + (TU[k] !== r[3] ? 1 : 0), 0);
   const tuneShow = (k: number, v: number) => `${v.toFixed(TUNE[k]![6] < 0.1 ? 2 : TUNE[k]![6] < 1 ? 1 : 0)}${TUNE[k]![7]}`;
@@ -1607,6 +1640,27 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     // TANK SPEED is a steer option (read when the steer is built): a new value builds a new steer, here, never in a step.
     if (motor && TU[U_TANK] !== tankSpeed) (tankSpeed = TU[U_TANK]!), (motor = mkSteer());
   }
+  /** The levers off their defaults, as a link code: fire0.6_hurt0.5 ("" when untouched). */
+  const tuneCode = () => TUNE.map((r, k) => (TU[k] !== r[3] ? `${r[0]}${TU[k]}` : "")).filter(Boolean).join("_");
+  /** This page with the setup in its address (?t=…; untouched: ?tune=1, tuning on). */
+  function tuneLink() {
+    const u = new URL(location.href), code = tuneCode();
+    u.hash = "";
+    u.searchParams.delete(code ? "tune" : "t");
+    u.searchParams.set(code ? "t" : "tune", code || "1");
+    return u.href;
+  }
+  /** Tuning (dev) on or off: the TUNE key top left in every local mode (remembered on this device). */
+  function devSet(on: boolean) {
+    dev = tunable && on;
+    try {
+      if (dev) localStorage.setItem("blitz:dev", "1");
+      else localStorage.removeItem("blitz:dev");
+    } catch {}
+    devKey.hidden = !dev;
+    wrap.classList.toggle("dev", dev);
+    if (!dev && !tunePanel.hidden && !(practice && state === "play")) tuneOpen(false);
+  }
   const tuneSave = () => {
     try {
       if (tuneChanged()) localStorage.setItem("blitz:tune", JSON.stringify(tuneValues()));
@@ -1617,12 +1671,14 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (on) tunePaint();
     tunePanel.hidden = !on;
     wrap.classList.toggle("tuning", on);
-    tuneKey.setAttribute("aria-expanded", String(on));
+    coachKey.setAttribute("aria-expanded", String(on));
+    devKey.setAttribute("aria-expanded", String(on));
     if (on) tuneInputs[0]!.focus({ preventScroll: true });
   }
   tunePanel.addEventListener("input", (ev) => {
     const inp = ev.target as HTMLInputElement, k = Number(inp.dataset.u);
     TU[k] = tuneFit(k, Number(inp.value));
+    linked = false;
     tuneSave();
     tunePaint();
   }, { signal: e.signal });
@@ -1631,9 +1687,24 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     if (ev.code === "Escape") return void (ev.stopPropagation(), tuneOpen(false), tuneKey.focus({ preventScroll: true }));
     if ((ev.target as Element).matches("input") && /^(Arrow|Home|End|Page)/.test(ev.code)) ev.stopPropagation();
   }, { signal: e.signal });
-  tuneKey.addEventListener("click", () => tuneOpen(!!tunePanel.hidden), { signal: e.signal });
+  for (const k of [coachKey, devKey]) k.addEventListener("click", () => ((tuneKey = k), tuneOpen(!!tunePanel.hidden)), { signal: e.signal });
+  devSet(dev);
   $<HTMLButtonElement>("[data-tune-x]").addEventListener("click", () => (tuneOpen(false), tuneKey.focus({ preventScroll: true })), { signal: e.signal });
-  $<HTMLButtonElement>("[data-tune-reset]").addEventListener("click", () => (TU.set(TUNE.map((r) => r[3])), tuneSave(), tunePaint()), { signal: e.signal });
+  const tuneReset = () => (TU.set(TUNE.map((r) => r[3])), (linked = false), tuneSave(), tunePaint());
+  $<HTMLButtonElement>("[data-tune-reset]").addEventListener("click", tuneReset, { signal: e.signal });
+  // SHARE LINK: this page's address with the setup in it; opening it loads the same levers.
+  shareKey.addEventListener("click", async () => {
+    const href = tuneLink();
+    try {
+      await navigator.clipboard.writeText(href);
+      shareKey.textContent = "LINK COPIED";
+    } catch {
+      tuneJson.textContent = href;
+      getSelection()?.selectAllChildren(tuneJson);
+      shareKey.textContent = "SELECTED · COPY IT";
+    }
+    setTimeout(() => (shareKey.textContent = "SHARE LINK"), 1800);
+  }, { signal: e.signal });
   copyKey.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(tuneValues()));
@@ -1668,7 +1739,7 @@ export function createBlitz(host: HTMLElement, o: BlitzOptions = {}) {
     const pick = practice ? 2 : +platoon;
     over.innerHTML = `<div class="sticker" role="img" aria-label="Battlefield Blitz">${BADGE}<b>BLITZ<em>!</em></b><span data-kick>${kicker()}</span></div>
 <div class="modes bui-seg" role="group" aria-label="Mode">${MODES.map(([m, d], k) => `<button class="mode" type="button" data-mode="${m}" aria-pressed="${k === pick}" aria-describedby="bz-${m}" style="--i:${k}"><b>${m.toUpperCase()}</b><small id="bz-${m}" aria-hidden="true">${d}</small></button>`).join("")}</div>
-${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${tuneChanged() > 1 ? "S" : ""} CHANGED · PRACTICE → TUNE</p>` : ""}
+${linked ? `<p class="tuned" data-linked>TUNED SETUP LOADED · ${tuneChanged()} LEVER${tuneChanged() === 1 ? "" : "S"}<button class="bui-key" type="button" data-tuned-reset>RESET</button></p>` : tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${tuneChanged() > 1 ? "S" : ""} CHANGED · ${dev ? "TUNE KEY, TOP LEFT" : "PRACTICE → TUNE"}</p>` : ""}
 <button class="bui-sticker-key bui-call" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
     over.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach((b, k) =>
       b.addEventListener("click", () => {
@@ -1682,6 +1753,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
         over.querySelector("[data-kick]")!.textContent = kicker();
         e.events.emit("lock", 0);
       }, { signal: e.signal }));
+    over.querySelector("[data-tuned-reset]")?.addEventListener("click", () => (tuneReset(), over.querySelector("[data-linked]")?.remove()), { signal: e.signal });
     const go = over.querySelector<HTMLButtonElement>("[data-go]")!;
     if (root.activeElement) go.focus({ preventScroll: true }); // back from a match: focus on PRESS START
     go.addEventListener("click", () => launch(go, countdown, { reduced: calm.matches }), { signal: e.signal });
@@ -1788,6 +1860,12 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       ov.querySelector("[data-resume]")!.addEventListener("click", togglePause, { signal: e.signal });
       ov.querySelector("[data-restart]")!.addEventListener("click", () => (closeOverlay(), rematch()), { signal: e.signal });
       ov.querySelector("[data-menu]")!.addEventListener("click", () => toIntro(), { signal: e.signal });
+      // The menu's dev switch: Tuning (dev) puts the TUNE key top left in every local mode.
+      if (tunable) {
+        ov.insertAdjacentHTML("beforeend", `<button class="bui-key devk" type="button" data-dev aria-pressed="${dev}">TUNING (DEV) · ${dev ? "ON" : "OFF"}</button>`);
+        const dk = ov.querySelector<HTMLButtonElement>("[data-dev]")!;
+        dk.addEventListener("click", () => (devSet(!dev), dk.setAttribute("aria-pressed", String(dev)), (dk.textContent = `TUNING (DEV) · ${dev ? "ON" : "OFF"}`)), { signal: e.signal });
+      }
       const flag = ov.querySelector<HTMLButtonElement>("[data-surrender]")!;
       flag.addEventListener("click", () => {
         if (flag.classList.contains("go")) return;
@@ -1838,7 +1916,7 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
     if (last.pr !== practice) wrap.classList.toggle("practice", (last.pr = practice));
     if (last.na !== noAuto) wrap.classList.toggle("noauto", !!(last.na = noAuto)); // P1 turned auto-aim off: no AUTO / LOCK keys
     const coaching = practice && state === "play";
-    if (!coaching && !tunePanel.hidden) tuneOpen(false);
+    if (!coaching && !dev && !tunePanel.hidden) tuneOpen(false);
     if (coaching) coachFrame();
     if ($<HTMLElement>("[data-coach]").hidden === coaching) {
       $<HTMLElement>("[data-coach]").hidden = !coaching;
@@ -2682,6 +2760,21 @@ ${tunable && tuneChanged() ? `<p class="tuned">TUNED · ${tuneChanged()} LEVER${
       },
       /** The TUNE card's key: open or close it (practice). */
       open: (on = true) => tuneOpen(on),
+      /** Tuning (dev): the TUNE key in every local mode (remembered); read or set. */
+      get dev() {
+        return dev;
+      },
+      set dev(on: boolean) {
+        devSet(on);
+      },
+      /** The share link: this page with the setup in its address (?t=…). */
+      get link() {
+        return tuneLink();
+      },
+      /** The levers came from a shared link (?t=…) and haven't been changed since. */
+      get linked() {
+        return linked;
+      },
     },
     get practice() {
       return practice;

@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- **Tune it while you play: Tuning (dev) in every local mode, firing levers, shareable setups** (owner:
+  "gameplay levers adjustable in the game … behind a dev toggle … in the URL so I can share a setup").
+  No default changed: an untouched game plays bit for bit as before (`test:replay` plays the 0.8.2 matches
+  value for value; lockstep 0 desyncs).
+  - **Tuning (dev).** Off for players. `?tune=1` (or PAUSE → TUNING (DEV) · ON) puts a TUNE key top left
+    in SOLO, PLATOON and PRACTICE, on the start screen and mid-match; `?tune=0` or the same switch turns it
+    off. Remembered on this device (`blitz:dev`). Every lever plays live, mid-match, except SOLO BOTS (next
+    match, labelled). Practice's coach TUNE key stays as it was.
+  - **Four firing levers** (the "too fast to compete" ones, read in `fire()`, `gun()` and `damage()`):
+    BOT RELOAD 1.00× (bots' cannon rate on top of FIRE RATE, so you vs them), BOT SPREAD 1.00× (bots'
+    scatter, 0.12 rad), BOT RANGE 460 px (how close a bot gets before it fires), DAMAGE TO YOU 1.00×
+    (per cannon hit on your tank, 5 armour). Twelve levers in all, one config layer (`TU`). Cannon shells
+    have no splash, so there is no splash lever; airstrike blasts are unchanged.
+  - **Share a setup.** SHARE LINK copies this page's address with the changed levers, `?t=botfire0.5_hurt0.5`
+    (untouched: `?tune=1`). Opening it replaces the levers, saves them (`blitz:tune`), turns tuning on and
+    drops `?t=` from the address (a reload keeps edits); the start screen says "TUNED SETUP LOADED · n
+    LEVERS" with a RESET key. Module: `tune.dev`, `tune.link`, `tune.linked`.
+  - **Online stays on the defaults.** Lockstep needs identical numbers on every peer; a `?t=` on the
+    multiplayer page is ignored. Carrying P1's setup in the match setup needs ~12 levers × 5-6 bits through
+    the countdown (the team pick uses 3 spare bits), so it is left for its own change.
+  - Sizes (gzip, on main with accessible play): `blitz.js` 48,615 → 49,850 (+1,235), `blitz.mjs` 48,759 → 49,972
+    (+1,213), `blitz-net.mjs` 50,570 → 51,806 (+1,236). Budgets raised by the measured cost: 48,662 → 49,897 (js),
+    48,777 → 49,990 (mjs), 50,605 → 51,841 (net).
+
 - **Accessible play (roadmap E14).** Blitz plays with the keyboard alone, passes axe-core with no
   serious or critical issues, and tells screen readers how the match is going. No gameplay change:
   `test:replay` plays the 0.8.2 matches value for value, `test:lockstep` 0 desyncs, the input word
