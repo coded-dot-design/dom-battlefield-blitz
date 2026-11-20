@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Movement on `@fzlt/core/steer`, the practice coach's steps on `@fzlt/core/coach`** (fizlet-engine roadmap G13).
+- **Movement on `@fzlt/core/steer`, the practice coach's steps on `@fzlt/core/coach`** (the Fizlet factory's roadmap, G13).
   - Steer runs every tank's drive: your stick and net play's input word (`drive`), bots going for their goal
     (`seek`, pace 0.85), wingmen holding their slot (`arriveGoal`), practice MOVERs (`wander`, pace 0.55). Blitz
     still picks the goals and keeps the stuck-rethink check. A tank keeps its own x, y and heading; each move

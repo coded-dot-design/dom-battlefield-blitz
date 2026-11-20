@@ -1,5 +1,5 @@
 /**
- * @fzlt/core/slot: mount a Fizlet scene into an astro-base-engine slot: the element carrying
+ * @fzlt/core/slot: mount a Fizlet scene into an Astro page engine slot: the element carrying
  *   class="ae-slot" data-slot-target="<page>#<slot>" role="img" aria-label="…". Both shapes the engine
  *   has rendered are found: the figure itself (`<figure class="ae-slot">`), or a box inside one
  *   (`<figure class="ae-slot-figure"><div class="ae-slot">…</div><figcaption class="ae-slot__fallback">`,
@@ -51,7 +51,7 @@ const REDUCE = "(prefers-reduced-motion: reduce)";
 export const findSlot = (target: string, doc: Document = document) =>
   [...doc.querySelectorAll<HTMLElement>(".ae-slot[data-slot-target]")].find((f) => f.dataset.slotTarget === target) ?? null;
 
-/** Mount a scene into an astro-base-engine slot (`target`: its `data-slot-target` or the element).
+/** Mount a scene into an Astro page engine slot (`target`: its `data-slot-target` or the element).
  *  `load` runs once the slot nears the viewport and the main thread is idle (or on the first tap);
  *  with reduced motion it never loads. Returns `el`, `mounted` and `destroy()`. */
 export function slot(target: string | HTMLElement, load: () => Promise<SlotMount> | SlotMount, opts: SlotOptions = {}) {
