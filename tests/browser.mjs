@@ -305,7 +305,8 @@ try {
     const s = w.shells.find((q) => !q.on);
     // Start inside the hit radius: the tank check comes before blocks, so no wall or edge between can eat the shell.
     Object.assign(s, { on: true, rail: false, tgt: -1, owner: bot.i, x: me.x - 4, y: me.y, vx: 600, vy: 0, life: 1 });
-    for (let f = 0; f < 6 && me.hp === 5; f++) pr.engine.advance(1 / 60);
+    // Up to 5 s of frames: a resume countdown (G[RES]) holds the world, and the shell with it.
+    for (let f = 0; f < 300 && me.hp === 5; f++) pr.engine.advance(1 / 60);
     pr.engine.start();
     return { hp: me.hp, state: pr.state, shell: s.on, x: me.x, y: me.y };
   });
