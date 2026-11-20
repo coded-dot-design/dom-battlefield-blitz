@@ -303,12 +303,13 @@ try {
     const w = pr.world, me = w.tanks[0], bot = w.tanks[1];
     me.alive = true; me.drop = 1; me.shield = 0; me.hp = 5;
     const s = w.shells.find((q) => !q.on);
-    Object.assign(s, { on: true, rail: false, tgt: -1, owner: bot.i, x: me.x - 30, y: me.y, vx: 600, vy: 0, life: 1 });
+    // Start inside the hit radius: the tank check comes before blocks, so no wall or edge between can eat the shell.
+    Object.assign(s, { on: true, rail: false, tgt: -1, owner: bot.i, x: me.x - 4, y: me.y, vx: 600, vy: 0, life: 1 });
     for (let f = 0; f < 6 && me.hp === 5; f++) pr.engine.advance(1 / 60);
     pr.engine.start();
-    return me.hp;
+    return { hp: me.hp, state: pr.state, shell: s.on, x: me.x, y: me.y };
   });
-  assert.equal(hurt, 4.5, "DAMAGE TO YOU 0.5×: one hit takes half a pip, live");
+  assert.equal(hurt.hp, 4.5, `DAMAGE TO YOU 0.5×: one hit takes half a pip, live (${JSON.stringify(hurt)})`);
   const link = await page.evaluate(() => pr.tune.link);
   assert.match(link, /\?t=botfire0\.5_range300_hurt0\.5$/, "the share link carries only the changed levers: " + link);
   await page.evaluate(`${shadow("[data-tune-share]")}.click()`);
