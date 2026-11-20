@@ -12,7 +12,10 @@ let failed = false;
 // elsewhere) and the sticker's mode tag. Measured on main 46,398 / 46,525 / 48,391 → 46,754 / 46,874 / 48,746
 // (+356 / +349 / +355, of which the round-5 key and tag +167 / +164 / +175 after win-backs); budgets
 // 46,720 / 46,720 / 48,576 → 46,784 / 46,912 / 48,768 (measured + 22-38 B).
-for (const [file, budget] of [["dist/blitz.js", 46784], ["dist/blitz.mjs", 46912], ["dist/blitz-net.mjs", 48768]]) {
+// Movement on @fzlt/core/steer, the practice coach on @fzlt/core/coach (G13): measured on main 46,771 / 46,886 / 48,758
+// → 47,761 / 47,918 / 49,757 (+990 / +1,032 / +999: the two bricks, less the game code they replace); budgets
+// 46,784 / 46,912 / 48,768 → 47,808 / 47,936 / 49,792 (measured + 18-47 B).
+for (const [file, budget] of [["dist/blitz.js", 47808], ["dist/blitz.mjs", 47936], ["dist/blitz-net.mjs", 49792]]) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= budget;
   failed ||= !ok;
   console.log(`${ok ? "ok  " : "OVER"} ${file.padEnd(16)} ${gz} / ${budget} bytes gzip`);
