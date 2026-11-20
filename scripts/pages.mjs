@@ -7,7 +7,7 @@
 import { cpSync, existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { PAGES, hidden } from "../site/src/sitemap.mjs";
-import { writeDiscovery } from "./discovery.mjs";
+import { writeDiscovery, STAGING } from "./discovery.mjs";
 
 const out = resolve("artifacts/pages");
 if (!existsSync(join(out, "index.html"))) throw Error("Run astro build first (npm run site:build).");
@@ -15,7 +15,8 @@ cpSync("dist/blitz.js", join(out, "blitz.js"));
 
 // Search engines and LLM readers: robots.txt, sitemap.xml, llms.txt (indexable pages only).
 const home = new URL((process.env.SITE_BASE || "/").replace(/\/?$/, "/"), process.env.SITE_URL || "https://battlefieldblitz.fzlt.games").href;
-console.log(`Discovery: ${writeDiscovery(out, home, "Battlefield Blitz").length} pages in sitemap.xml and llms.txt`);
+const listedPages = writeDiscovery(out, home, "Battlefield Blitz").length;
+console.log(STAGING ? "Discovery: staging, robots.txt disallows all (no sitemap.xml or llms.txt)" : `Discovery: ${listedPages} pages in sitemap.xml and llms.txt`);
 
 // Every local href/src in the built pages must resolve to a file.
 const BASE = `${(process.env.SITE_BASE || "/").replace(/\/$/, "")}/`;
@@ -51,7 +52,7 @@ for (const page of pages) {
   const path = page.slice(out.length + 1).replace(/index\.html$/, "");
   const noindex = /<meta\s+name="robots"\s+content="[^"]*noindex/.test(readFileSync(page, "utf8"));
   if (listed.has(path)) {
-    if (noindex) unmapped.push(`/${path}: noindex, but in PAGES`);
+    if (noindex && !STAGING) unmapped.push(`/${path}: noindex, but in PAGES`);
     listed.delete(path);
   } else if (!hidden(path)) unmapped.push(`/${path}: add it to PAGES or HIDDEN in site/src/sitemap.mjs`);
 }
