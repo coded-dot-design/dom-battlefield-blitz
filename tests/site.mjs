@@ -1,4 +1,4 @@
-// Blitz site (GitHub Pages): landing page, the game at /play/ and the drop-in at /blitz.js.
+// Blitz site (Cloudflare Pages): landing page, the game at /play/ and the drop-in at /blitz.js.
 // Run after `npm run site:build`. Serves artifacts/pages at / (the default SITE_BASE).
 import assert from "node:assert/strict";
 import { createServer } from "node:http";

@@ -17,7 +17,8 @@ existing embeds; the old addresses redirect here.
 Blitz is part of the DOM Battlefield brand: its own site (`site/`, Astro, dev only) wears the
 Battlefield styling and the Board UI kit. `npm run site:build` builds it into `artifacts/pages`;
 `npm run test:site` checks it. The footer's site map comes from `site/src/sitemap.mjs`: add a new page there (or under `HIDDEN`) and the footer lists it; the build fails on a page that is in neither. Hosting: Cloudflare Pages on `battlefieldblitz.fzlt.games`
-(Cloudflare serves the custom domain, so there is no `CNAME` file); the build defaults to
+(`.github/workflows/cloudflare.yml`: a PR deploys a preview, `main` deploys staging on `battlefieldblitz-staging.fzlt.games`
+(`PUBLIC_DEPLOY_TARGET=staging`: noindex, no sitemap), and promoting a green `main` SHA deploys production; no `CNAME` file); the build defaults to
 `SITE_URL=https://battlefieldblitz.fzlt.games` and `SITE_BASE=/`, and the build env overrides them per target. This repo is also the game code. It is built on [Fizlet](https://github.com/fizlet/fzlt)
 (the engine, snapshotted in `vendor/fizlet/` with provenance) and draws tanks with the art in
 `src/sherman-sprites.ts`, taken from [Sherman Bytes](https://github.com/fizlet/sherman-bytes) 0.5.2. No runtime dependencies.
